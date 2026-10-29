@@ -173,6 +173,17 @@ test('a paused payment is denied in the UI and never runs', async ({ page }) => 
   expect(result.isError).toBe(true);
   expect(result._meta?.['tortoisegate/decision']?.code).toBe('TG_APPROVAL_DENIED');
   await expect(page.getByTestId('feed')).toContainText('denied');
+  // Explain the paused call: the panel shows the rule and the verified ledger entries.
+  await page
+    .getByTestId('feed')
+    .locator('tr', { hasText: 'First payment to this recipient.' })
+    .getByRole('button', { name: 'Explain' })
+    .first()
+    .click();
+  const incident = page.getByTestId('incident');
+  await expect(incident).toContainText('was paused');
+  await expect(incident).toContainText('First payment to this recipient.');
+  await expect(incident.getByTestId('incident-ledger')).toContainText(/^Ledger verified/);
   await agent.close();
 });
 

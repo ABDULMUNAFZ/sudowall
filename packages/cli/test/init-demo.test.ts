@@ -84,4 +84,29 @@ describe('demo --ci', () => {
     // The demo keeps its state in a temp dir and never touches the user's real state.
     expect(existsSync(join(r.home, 'tortoisegate', 'ledger.db'))).toBe(false);
   });
+
+  it('keeps its ledger with --keep, and incident explains the paused payment from it', () => {
+    const r = cli(['demo', '--ci', '--keep'], 240_000);
+    expect(r.code, `${r.stdout}\n${r.stderr}`).toBe(0);
+    const dir = /Demo state kept in (.+)$/m.exec(r.stdout)?.[1];
+    expect(dir).toBeDefined();
+    const flags = ['--db', join(String(dir), 'ledger.db'), '--key-dir', join(String(dir), 'keys')];
+    const text = cli(['incident', '5', ...flags]);
+    expect(text.code, text.stderr).toBe(0);
+    expect(text.stdout).toContain('Decision: ask; human denied it');
+    expect(text.stdout).toMatch(
+      /\/to = 0xFe5c…91ed \(evm-address\): exact match with untrusted content from files\/read_text_file/,
+    );
+    expect(text.stdout).toContain('which was the result of files/read_text_file');
+    expect(text.stdout).toContain('all covered by a signed checkpoint');
+    // The payout email was read after this payment and must not appear as its cause.
+    expect(text.stdout).not.toContain('payout');
+    const json = JSON.parse(cli(['incident', '10', '--format', 'json', ...flags]).stdout) as {
+      call: { verdict: string };
+      path: { match: { type: string; nearKind: string } }[];
+    };
+    expect(json.call.verdict).toBe('block');
+    expect(json.path.some((p) => p.match.nearKind === 'address-poisoning')).toBe(true);
+    expect(cli(['incident', 'no-such-id', ...flags]).code).toBe(2);
+  });
 });

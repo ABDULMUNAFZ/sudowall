@@ -61,6 +61,33 @@ export type VerifyResult =
     }
   | { ok: false; kind: string; message: string; seq?: number; signerChecked: boolean };
 
+export interface IncidentStep {
+  depth: number;
+  argPath: string;
+  value: { kind: string; display: string };
+  match: { type: string; nearKind: string };
+  source: { id: string; label: string; serverId: string; origin: string; observedAt: string };
+  producedBy?: { eventId: string; serverId: string; tool: string; ts: string; verdict: string };
+}
+
+export interface Incident {
+  call: {
+    eventId: string;
+    seq: number;
+    ts: string;
+    serverId: string;
+    tool: string;
+    verdict: string;
+    effective: string;
+    rules: string[];
+    reason: string;
+    outcome: string;
+    approval?: { outcome: string; channel: string };
+  };
+  path: IncidentStep[];
+  ledger: { ok: boolean; message: string; entries: number[]; allSigned: boolean };
+}
+
 const TOKEN_KEY = 'tortoisegate-token';
 
 /** The token arrives in the URL fragment; keep it for this tab and remove it from the address bar. */
@@ -124,6 +151,15 @@ export class Api {
       (r.body as { error?: string }).error ??
       'error'
     );
+  }
+
+  async incident(eventId: string): Promise<Incident> {
+    const r = await fetch(`/api/incident/${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+      cache: 'no-store',
+    });
+    if (!r.ok) throw new Error(`Could not load the explanation (HTTP ${String(r.status)}).`);
+    return (await r.json()) as Incident;
   }
 
   async verify(): Promise<VerifyResult> {

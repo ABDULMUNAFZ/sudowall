@@ -10,6 +10,7 @@ import {
   verifyDatabase,
   type StateDb,
 } from '@tortoisegate/ledger';
+import { IncidentNotFound, incidentReport, sha256ValueId } from '@tortoisegate/graph';
 import { ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
 
@@ -237,6 +238,27 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       });
       return;
     }
+    const inc = /^\/api\/incident\/([0-9a-f-]{36})$/.exec(path);
+    if (req.method === 'GET' && inc !== null) {
+      // Read-only, like /api/state. The graph is built in memory from the ledger and never leaves
+      // this process, so plain value hashes are enough here.
+      if (!hasTable(db, 'ledger_entries')) throw new HttpError(404, 'no ledger yet');
+      const expected = installationPublicKey(o.keyDir);
+      try {
+        const r = await incidentReport({
+          db,
+          ref: inc[1] ?? '',
+          valueId: sha256ValueId,
+          ...(expected === undefined ? {} : { expectedPublicKey: expected }),
+        });
+        send(res, 200, { call: r.call, path: r.path, ledger: r.ledger });
+      } catch (e) {
+        if (e instanceof IncidentNotFound) throw new HttpError(404, e.message);
+        throw e;
+      }
+      return;
+    }
+    if (req.method === 'GET') throw new HttpError(404, 'not found');
     if (req.method !== 'POST') throw new HttpError(405, 'method not allowed');
     const origin = req.headers.origin;
     if (origin === undefined || !allowedOrigins().has(origin)) {

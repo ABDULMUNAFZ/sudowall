@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@tortoisegate/core": "workspace:*",
+    "@tortoisegate/graph": "workspace:*",
     "@tortoisegate/ledger": "workspace:*",
     "@tortoisegate/policy": "workspace:*",
     "@tortoisegate/provenance": "workspace:*",

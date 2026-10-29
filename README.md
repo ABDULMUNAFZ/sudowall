@@ -88,6 +88,7 @@ claude            # "Read the emails in my inbox with the tortoise-gate-demo too
 - `observe` mode records what would happen and blocks nothing; `enforce` mode applies the policy.
 - Tested against the official reference servers, the MCP TypeScript SDKs (v1 and v2) and Claude Code. See [compatibility](docs/compatibility.md).
 
+- Incident reports: `tortoisegate incident <id>` and an Explain button in the UI show the rule and where each value in a call came from (which tool result, read by which earlier call), with proof that the ledger entries verify. Optional TigerGraph backend for the same queries. See [incident graph](docs/graph.md).
 - One npm package, `tortoisegate`, with `init` (starter config and policy) and `demo`, tested by installing the packed tarball into a path with spaces on Ubuntu and macOS in CI.
 
 Not built yet: an independent verifier, desktop app, credential vault, SDK for agents that do not use MCP.
@@ -133,7 +134,7 @@ pnpm install
 pnpm build && pnpm test && pnpm lint
 ```
 
-Design docs: [architecture](docs/architecture.md), [configuration](docs/configuration.md), [compatibility](docs/compatibility.md), [performance](docs/performance.md), [threat model](docs/threat-model.md), [event schema](docs/event-schema.md), [policy DSL](docs/policy-dsl.md), [ledger spec](docs/ledger-spec.md), [ADRs](docs/adr/).
+Design docs: [architecture](docs/architecture.md), [configuration](docs/configuration.md), [compatibility](docs/compatibility.md), [performance](docs/performance.md), [threat model](docs/threat-model.md), [event schema](docs/event-schema.md), [policy DSL](docs/policy-dsl.md), [ledger spec](docs/ledger-spec.md), [incident graph](docs/graph.md), [ADRs](docs/adr/).
 
 ## Licence
 

@@ -4,6 +4,7 @@ import {
   takeToken,
   type Approval,
   type FeedItem,
+  type Incident,
   type State,
   type VerifyResult,
 } from './api.js';
@@ -123,7 +124,77 @@ function PendingCard({
   );
 }
 
-function FeedRow({ f }: { f: FeedItem }) {
+function sourceName(s: Incident['path'][number]['source']): string {
+  return s.serverId === '' ? 'your policy list' : `${s.serverId}/${s.origin}`;
+}
+
+function IncidentPanel({ i, onClose }: { i: Incident; onClose: () => void }) {
+  const c = i.call;
+  return (
+    <section className="card incident" aria-labelledby="incident-h" data-testid="incident">
+      <header>
+        <h3 id="incident-h">
+          Why {c.serverId}/{c.tool} was{' '}
+          <span className={`badge ${c.effective}`}>
+            {c.verdict === 'ask' ? 'paused' : c.verdict === 'block' ? 'blocked' : 'allowed'}
+          </span>
+        </h3>
+        <button type="button" className="close" onClick={onClose}>
+          Close
+        </button>
+      </header>
+      <p className="reason">{visible(c.reason)}</p>
+      {c.approval !== undefined && (
+        <p className="muted">
+          A person {c.approval.outcome} it in the {c.approval.channel}. Outcome: {c.outcome}.
+        </p>
+      )}
+      <h4>Where its values came from</h4>
+      {i.path.length === 0 && (
+        <p className="muted">No argument matched untrusted content or a known value.</p>
+      )}
+      <ol className="flow">
+        {i.path.map((p, k) => (
+          <li key={k} className="flow-row" style={{ marginLeft: `${String(p.depth * 1.5)}rem` }}>
+            <span className={`node source ${p.source.label}`}>
+              <small>
+                {p.source.label === 'user' ? 'trusted list' : `${p.source.label} result`}
+              </small>
+              {visible(sourceName(p.source))}
+              {p.producedBy !== undefined && (
+                <small className="mono">read by call {p.producedBy.eventId.slice(0, 8)}</small>
+              )}
+            </span>
+            <span className="arrow" aria-hidden="true">
+              {p.match.type === 'near' ? 'looks like' : 'contained'}
+            </span>
+            <span className="node value">
+              <small>{p.value.kind}</small>
+              <span className="mono">{visible(p.value.display)}</span>
+            </span>
+            <span className="arrow" aria-hidden="true">
+              used as
+            </span>
+            <span className="node call">
+              <small>{p.depth === 0 ? 'this call' : 'an earlier call'}</small>
+              <span className="mono">{visible(p.argPath)}</span>
+            </span>
+            <span className="sr-only">
+              {`${p.argPath} (${p.value.kind} ${p.value.display}) ${p.match.type === 'near' ? `looks like a value from ${sourceName(p.source)} (${p.match.nearKind})` : `was found in ${p.source.label} content from ${sourceName(p.source)}`}.`}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className={i.ledger.ok ? 'ok' : 'error'} data-testid="incident-ledger">
+        {i.ledger.ok ? 'Ledger verified' : 'Ledger verification FAILED'}: {i.ledger.message}.
+        Entries {i.ledger.entries.join(', ')}
+        {i.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}
+      </p>
+    </section>
+  );
+}
+
+function FeedRow({ f, onExplain }: { f: FeedItem; onExplain: (eventId: string) => void }) {
   if (f.type === 'approval.resolved') {
     return (
       <tr className={`row ${f.resultingAction}`}>
@@ -151,7 +222,18 @@ function FeedRow({ f }: { f: FeedItem }) {
           <span className="note"> (observe: allowed)</span>
         )}
       </td>
-      <td>{visible(f.reason)}</td>
+      <td>
+        {visible(f.reason)}{' '}
+        <button
+          type="button"
+          className="link"
+          onClick={() => {
+            onExplain(f.eventId);
+          }}
+        >
+          Explain
+        </button>
+      </td>
     </tr>
   );
 }
@@ -163,6 +245,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [incident, setIncident] = useState<Incident | null>(null);
 
   const refresh = useCallback(() => {
     if (api === null) return;
@@ -195,6 +278,17 @@ export function App() {
       </main>
     );
   }
+
+  const explain = (eventId: string) => {
+    api
+      .incident(eventId)
+      .then((i) => {
+        setIncident(i);
+      })
+      .catch((e: unknown) => {
+        setError((e as Error).message);
+      });
+  };
 
   const runVerify = () => {
     setVerifying(true);
@@ -255,6 +349,14 @@ export function App() {
 
       <section aria-labelledby="feed-h">
         <h2 id="feed-h">Live decisions</h2>
+        {incident !== null && (
+          <IncidentPanel
+            i={incident}
+            onClose={() => {
+              setIncident(null);
+            }}
+          />
+        )}
         {state !== null && state.feed.length === 0 && (
           <p className="muted">No tool calls yet. Decisions appear here as your agent works.</p>
         )}
@@ -269,7 +371,7 @@ export function App() {
           </thead>
           <tbody>
             {state?.feed.map((f) => (
-              <FeedRow key={f.seq} f={f} />
+              <FeedRow key={f.seq} f={f} onExplain={explain} />
             ))}
           </tbody>
         </table>

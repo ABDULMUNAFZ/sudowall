@@ -291,6 +291,9 @@ importers:
       '@tortoisegate/gateway':
         specifier: workspace:*
         version: link:../gateway
+      '@tortoisegate/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@tortoisegate/ledger':
         specifier: workspace:*
         version: link:../ledger
@@ -328,6 +331,9 @@ importers:
       '@tortoisegate/core':
         specifier: workspace:*
         version: link:../core
+      '@tortoisegate/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@tortoisegate/ledger':
         specifier: workspace:*
         version: link:../ledger
@@ -363,7 +369,18 @@ importers:
         specifier: 2.0.1
         version: 2.0.1
 
-  packages/graph: {}
+  packages/graph:
+    dependencies:
+      '@tortoisegate/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: 9.6.0
+        version: 9.6.0
 
   packages/ledger:
     dependencies:

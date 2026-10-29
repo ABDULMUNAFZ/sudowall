@@ -2,6 +2,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { demoCommand } from './demo.js';
+import { graphCommand, incidentCommand } from './incident-cmd.js';
 import { initCommand } from './init-cmd.js';
 import { ledgerCommand } from './ledger-cmd.js';
 import { uiCommand } from './ui-cmd.js';
@@ -38,6 +39,12 @@ Usage:
   tortoisegate ledger export [--db <file>] [--out <file>]
       Write the ledger as JSON Lines (docs/ledger-spec.md section 6).
   tortoisegate ledger key show [--key-dir <dir>]
+  tortoisegate incident <event id | seq> [--format text|markdown|json] [--tigergraph] [--db <file>]
+      Explain one decision: the rule, and where each value in the call came from (which tool
+      result, read by which earlier call), with proof that the ledger entries verify.
+  tortoisegate graph sync [--db <file>]
+      Push the data-flow graph to TigerGraph (TG_TIGERGRAPH_HOST, TG_TIGERGRAPH_TOKEN or
+      TG_TIGERGRAPH_USERNAME/TG_TIGERGRAPH_PASSWORD). Sends ids, verdicts and keyed hashes only.
   tortoisegate ui [--config <file>] [--port <n>] [--db <file>] [--key-dir <dir>]
       Serve the local web UI on 127.0.0.1: live decisions, approvals, ledger Verify.
       Prints the address to open; it contains this run's access token.
@@ -56,6 +63,8 @@ Options:
   --ci                demo: deny the paused payment automatically and exit when done
   --keep              demo: keep the demo's temporary files
   --no-open           demo: do not open the approval UI in a browser
+  --format <fmt>      incident: text (default), markdown or json
+  --tigergraph        incident: run the graph queries on TigerGraph instead of locally
 
 Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verification failed.
 `;
@@ -167,6 +176,8 @@ export async function main(argv: string[]): Promise<number> {
       ci: { type: 'boolean' },
       keep: { type: 'boolean' },
       'no-open': { type: 'boolean' },
+      format: { type: 'string' },
+      tigergraph: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -194,6 +205,19 @@ export async function main(argv: string[]): Promise<number> {
       publicKey: values['public-key'],
       out: values.out,
     });
+  }
+
+  if (command === 'incident') {
+    return incidentCommand(positionals.slice(1), {
+      db: values.db,
+      keyDir: values['key-dir'],
+      format: values.format,
+      tigergraph: values.tigergraph === true,
+    });
+  }
+
+  if (command === 'graph') {
+    return graphCommand(positionals.slice(1), { db: values.db, keyDir: values['key-dir'] });
   }
 
   if (command === 'init') {

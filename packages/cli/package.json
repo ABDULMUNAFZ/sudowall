@@ -34,6 +34,7 @@
     "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@tortoisegate/core": "workspace:*",
     "@tortoisegate/gateway": "workspace:*",
+    "@tortoisegate/graph": "workspace:*",
     "@tortoisegate/ledger": "workspace:*",
     "@tortoisegate/policy": "workspace:*",
     "@tortoisegate/web-ui": "workspace:*"

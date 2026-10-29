@@ -125,6 +125,14 @@ describe('local UI server', () => {
     expect(u.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/#token=[A-Za-z0-9_-]{43}$/);
   });
 
+  it('incident API needs the token and answers 404 for an unknown event', async () => {
+    const { port, auth } = await setup();
+    const id = '00000000-0000-4000-8000-000000000000';
+    expect((await http(port, 'GET', `/api/incident/${id}`)).status).toBe(401);
+    expect((await http(port, 'GET', `/api/incident/${id}`, auth)).status).toBe(404);
+    expect((await http(port, 'GET', '/api/incident/not-a-uuid', auth)).status).toBe(404);
+  });
+
   it('API needs the bearer token', async () => {
     const { port, state } = await setup();
     expect(state.pending).toHaveLength(1);
