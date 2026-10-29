@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "bench:latency": "node bench/latency.mjs"
   },
   "dependencies": {
     "@tortoisegate/core": "workspace:*",
@@ -29,5 +30,12 @@
   },
   "bin": {
     "tortoisegate": "./dist/main.js"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@modelcontextprotocol/server-everything": "2.1.0",
+    "@modelcontextprotocol/server-filesystem": "2.1.0",
+    "@modelcontextprotocol/server-memory": "2.0.1"
   }
 }

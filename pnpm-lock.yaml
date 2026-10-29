@@ -208,6 +208,22 @@ importers:
       '@tortoisegate/gateway':
         specifier: workspace:*
         version: link:../gateway
+    devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.4.0
+        version: 2.4.0
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
+      '@modelcontextprotocol/server-everything':
+        specifier: 2.1.0
+        version: 2.1.0
+      '@modelcontextprotocol/server-filesystem':
+        specifier: 2.1.0
+        version: 2.1.0
+      '@modelcontextprotocol/server-memory':
+        specifier: 2.0.1
+        version: 2.0.1
 
   packages/core:
     dependencies:

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { TortoiseGateError, parseConfig } from '@tortoisegate/core';
 import {
@@ -155,10 +156,8 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 function fail(e: unknown): number {
-  if (
-    e instanceof UsageError ||
-    (e as { code?: string }).code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION'
-  ) {
+  const code = (e as { code?: unknown }).code;
+  if (e instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
     process.stderr.write(`tortoisegate: ${(e as Error).message}\n\n${USAGE}`);
     return EXIT.usage;
   }
@@ -170,10 +169,18 @@ function fail(e: unknown): number {
   return EXIT.runtime;
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.url === new URL(`file://${process.argv[1]}`).href
-) {
+/** True when this module is the program node was started with, also through a bin symlink. */
+function isEntryPoint(): boolean {
+  const script = process.argv[1];
+  if (script === undefined) return false;
+  try {
+    return realpathSync(script) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main(process.argv.slice(2)).then(
     (code) => {
       process.exitCode = code;

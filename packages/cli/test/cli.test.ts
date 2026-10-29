@@ -1,0 +1,148 @@
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { GATEWAY_VERSION } from '@tortoisegate/gateway';
+
+const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
+const MEMORY = fileURLToPath(
+  new URL('../node_modules/@modelcontextprotocol/server-memory/dist/index.js', import.meta.url),
+);
+const EVERYTHING = fileURLToPath(
+  new URL('../node_modules/@modelcontextprotocol/server-everything/dist/index.js', import.meta.url),
+);
+
+const tmp = () => mkdtempSync(join(tmpdir(), 'tg-cli-'));
+
+function cli(args: string[], env: Record<string, string> = {}) {
+  const r = spawnSync(process.execPath, [CLI, ...args], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: tmp(), ...env },
+    input: '',
+    timeout: 20_000,
+  });
+  return { code: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+function events(home: string): Record<string, unknown>[] {
+  return readFileSync(join(home, 'tortoisegate', 'events.jsonl'), 'utf8')
+    .split('\n')
+    .filter((l) => l !== '')
+    .map((l) => JSON.parse(l) as Record<string, unknown>);
+}
+
+describe('tortoisegate command line', () => {
+  it('prints the version and exits 0', () => {
+    const r = cli(['--version']);
+    expect(r).toMatchObject({ code: 0, stdout: `${GATEWAY_VERSION}\n` });
+  });
+
+  it('runs through a symlinked bin (as npm installs it)', () => {
+    const link = join(tmp(), 'tortoisegate');
+    symlinkSync(CLI, link);
+    const r = spawnSync(process.execPath, [link, '--version'], { encoding: 'utf8' });
+    expect(r.stdout).toBe(`${GATEWAY_VERSION}\n`);
+  });
+
+  it.each([
+    [[], /Usage:/],
+    [['frobnicate'], /unknown command "frobnicate"/],
+    [['wrap'], /wrap needs a server command after --/],
+    [['wrap', '--mode', 'yolo', '--', 'x'], /--mode must be observe or enforce/],
+    [['wrap', '--config'], /--config/],
+    [['wrap', '--bogus', '--', 'x'], /bogus/],
+    [['serve'], /serve needs --config/],
+  ])('exits 2 with a helpful message for bad usage: %j', (args, msg) => {
+    const r = cli(args);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(msg);
+  });
+
+  it('exits 3 with the file name for a missing or invalid config', () => {
+    const missing = cli(['serve', '--config', '/nonexistent/tg.json']);
+    expect(missing.code).toBe(3);
+    expect(missing.stderr).toMatch(/cannot read config file \/nonexistent\/tg\.json/);
+
+    const dir = tmp();
+    writeFileSync(join(dir, 'bad.json'), '{ not json');
+    const bad = cli(['serve', '--config', join(dir, 'bad.json')]);
+    expect(bad.code).toBe(3);
+    expect(bad.stderr).toMatch(/not valid JSON/);
+
+    writeFileSync(join(dir, 'schema.json'), '{"schemaVersion":1,"upstreams":[],"mode":"loose"}');
+    const schema = cli(['serve', '--config', join(dir, 'schema.json')]);
+    expect(schema.code).toBe(3);
+  });
+});
+
+describe('wrap', () => {
+  it('in enforce mode returns a readable isError result for a denied tool and records the block', async () => {
+    const home = tmp();
+    const cfg = join(home, 'tg.json');
+    writeFileSync(cfg, JSON.stringify({ deny: { tools: [{ tool: 'get-sum' }] } }));
+    const client = new Client({ name: 'enforce-test', version: '1' });
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [CLI, 'wrap', '--config', cfg, '--mode', 'enforce', '--', EVERYTHING, 'stdio'],
+        env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: home },
+        stderr: 'ignore',
+      }),
+    );
+    const res = await client.callTool({ name: 'get-sum', arguments: { a: 1, b: 2 } });
+    expect(res.isError).toBe(true);
+    expect(res.content).toEqual([
+      { type: 'text', text: expect.stringMatching(/^Blocked by Tortoise Gate: /) as unknown },
+    ]);
+    expect(res._meta?.['tortoisegate/decision']).toMatchObject({
+      code: 'TG_BLOCKED',
+      ruleIds: ['deny-list-0'],
+    });
+    const ok = await client.callTool({ name: 'echo', arguments: { message: 'still fine' } });
+    expect(ok.isError).not.toBe(true);
+    await client.close();
+
+    const ev = events(home);
+    const call = ev.find(
+      (e) => e['type'] === 'tool.call' && (e as { tool?: string }).tool === 'get-sum',
+    );
+    expect(call).toMatchObject({ decision: { verdict: 'block', effective: 'block' } });
+    expect((res._meta?.['tortoisegate/decision'] as { eventId: string }).eventId).toBe(
+      (call as { id: string }).id,
+    );
+  });
+
+  it('shuts down cleanly on SIGTERM and records the session end', async () => {
+    const home = tmp();
+    const child = spawn(process.execPath, [CLI, 'wrap', '--', MEMORY], {
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        XDG_STATE_HOME: home,
+        MEMORY_FILE_PATH: join(home, 'm.jsonl'),
+      },
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    child.stdin.write(
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"sig","version":"1"}}}\n',
+    );
+    await new Promise<void>((resolve) => {
+      child.stdout.once('data', () => {
+        resolve();
+      });
+    });
+    const exited = new Promise<number | null>((resolve) => {
+      child.once('exit', (code) => {
+        resolve(code);
+      });
+    });
+    child.kill('SIGTERM');
+    expect(await exited).toBe(0);
+    const types = events(home).map((e) => e['type']);
+    expect(types[0]).toBe('session.started');
+    expect(types.at(-1)).toBe('session.ended');
+  });
+});
