@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -108,5 +108,60 @@ describe('demo --ci', () => {
     expect(json.call.verdict).toBe('block');
     expect(json.path.some((p) => p.match.nearKind === 'address-poisoning')).toBe(true);
     expect(cli(['incident', 'no-such-id', ...flags]).code).toBe(2);
+  });
+});
+
+describe('demo waiting for a human', () => {
+  // Regression: the demo's MCP client gave up after its default 60 s request timeout while the
+  // gate was still holding the paused payment for a human, and the demo crashed with
+  // "SdkError: Request timed out". Nobody clicks here; the gate's 65 s approval timeout must win.
+  it(
+    'outlasts a 60 s client timeout and ends with the gate denying by timeout',
+    { timeout: 240_000 },
+    async () => {
+      const home = tmp();
+      const child = spawn(
+        process.execPath,
+        [CLI, 'demo', '--no-open', '--approval-timeout', '65'],
+        {
+          env: {
+            PATH: process.env['PATH'] ?? '',
+            ...(process.env['FOUNDRY_DIR'] ? { FOUNDRY_DIR: process.env['FOUNDRY_DIR'] } : {}),
+            XDG_STATE_HOME: home,
+            XDG_CONFIG_HOME: home,
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
+      let stdout = '';
+      let stderr = '';
+      child.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+      const started = Date.now();
+      const code = await new Promise<number | null>((resolve) => {
+        child.stdout.on('data', (d: Buffer) => {
+          stdout += d.toString();
+          // Interactive runs keep the UI open after the summary until Ctrl-C.
+          if (stdout.includes('Press Ctrl-C to stop the demo')) child.kill('SIGINT');
+        });
+        child.on('exit', (c) => {
+          resolve(c);
+        });
+      });
+      expect(Date.now() - started).toBeGreaterThan(60_000);
+      expect(stderr).not.toContain('Request timed out');
+      expect(stdout).toContain('If nobody decides within 65 s, the gate denies it.');
+      expect(stdout).toContain('Gate: TG_APPROVAL_TIMEOUT');
+      expect(stdout).toContain('Attacker received: 0 ETH');
+      expect(stdout).toContain('ok    pay address injected in an email: TG_APPROVAL_TIMEOUT');
+      expect(stdout).not.toContain('FAIL ');
+      expect(code).toBe(130);
+    },
+  );
+
+  it('rejects an approval timeout outside 5 to 3600 seconds', () => {
+    expect(cli(['demo', '--approval-timeout', '2']).code).toBe(2);
+    expect(cli(['demo', '--approval-timeout', 'soon']).code).toBe(2);
   });
 });

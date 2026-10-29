@@ -2,6 +2,18 @@
 
 All notable changes to Tortoise Gate. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.1.1 (2026-10-30)
+
+### Fixed
+
+- `tortoisegate demo` crashed with `SdkError: Request timed out` when nobody decided the paused payment within 60 seconds. The demo's MCP client now waits for the whole approval window, and a payment nobody answers is denied by the gate's timeout, as designed. Found by a user running the demo from a non-interactive shell, where no browser opened.
+- `tortoisegate ... | head` no longer crashes with `EPIPE` when the output is cut short.
+- The one-time Foundry (Anvil) download now says what it is downloading and shows a progress bar in a terminal, instead of looking stuck.
+
+### Added
+
+- `tortoisegate demo --approval-timeout <seconds>` sets how long the paused payment waits for you (default 300).
+
 ## 0.1.0 (2026-10-30)
 
 First public release. Alpha: working end to end and tested, but young. Do not put it in front of real funds yet.

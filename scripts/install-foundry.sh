@@ -22,7 +22,13 @@ fi
 TARBALL="foundry_${VERSION}_${PLATFORM}.tar.gz"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-curl -fsSL -o "$TMP/$TARBALL" "https://github.com/foundry-rs/foundry/releases/download/${VERSION}/${TARBALL}"
+URL="https://github.com/foundry-rs/foundry/releases/download/${VERSION}/${TARBALL}"
+echo "downloading Foundry ${VERSION} for ${PLATFORM} (about 130 MB; one time only)" >&2
+if [ -t 2 ]; then
+  curl -fL --progress-bar -o "$TMP/$TARBALL" "$URL"
+else
+  curl -fsSL -o "$TMP/$TARBALL" "$URL"
+fi
 if command -v sha256sum >/dev/null; then
   echo "$SHA  $TMP/$TARBALL" | sha256sum -c - >/dev/null
 else

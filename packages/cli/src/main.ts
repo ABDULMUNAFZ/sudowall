@@ -22,7 +22,7 @@ export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3, verifyFailed: 4 } 
 const USAGE = `Tortoise Gate ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
 Usage:
-  tortoisegate demo [--ci] [--keep] [--no-open]
+  tortoisegate demo [--ci] [--keep] [--no-open] [--approval-timeout <s>]
       Two-minute walkthrough on a private local test chain: a scripted agent (no LLM) reads
       poisoned emails and tries three payments; you decide the paused one in the approval UI;
       the ledger is verified, then shown catching an edit. Installs the pinned Anvil if missing.
@@ -63,6 +63,7 @@ Options:
   --ci                demo: deny the paused payment automatically and exit when done
   --keep              demo: keep the demo's temporary files
   --no-open           demo: do not open the approval UI in a browser
+  --approval-timeout <s>  demo: seconds the paused payment waits for you (default 300)
   --format <fmt>      incident: text (default), markdown or json
   --tigergraph        incident: run the graph queries on TigerGraph instead of locally
 
@@ -176,6 +177,7 @@ export async function main(argv: string[]): Promise<number> {
       ci: { type: 'boolean' },
       keep: { type: 'boolean' },
       'no-open': { type: 'boolean' },
+      'approval-timeout': { type: 'string' },
       format: { type: 'string' },
       tigergraph: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
@@ -231,10 +233,22 @@ export async function main(argv: string[]): Promise<number> {
 
   if (command === 'demo') {
     if (positionals.length > 1) throw new UsageError('demo takes no arguments');
+    const t = values['approval-timeout'];
+    const approvalTimeoutSeconds = t === undefined ? undefined : Number(t);
+    if (approvalTimeoutSeconds !== undefined) {
+      if (
+        !Number.isInteger(approvalTimeoutSeconds) ||
+        approvalTimeoutSeconds < 5 ||
+        approvalTimeoutSeconds > 3600
+      ) {
+        throw new UsageError('--approval-timeout must be a whole number of seconds from 5 to 3600');
+      }
+    }
     return demoCommand({
       ci: values.ci === true,
       keep: values.keep === true,
       open: values['no-open'] !== true && process.stdout.isTTY,
+      ...(approvalTimeoutSeconds === undefined ? {} : { approvalTimeoutSeconds }),
     });
   }
 
@@ -336,6 +350,11 @@ function isEntryPoint(): boolean {
 }
 
 if (isEntryPoint()) {
+  // `tortoisegate ... | head` closes stdout early; stop quietly instead of crashing with EPIPE.
+  process.stdout.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code === 'EPIPE') process.exit(0);
+    throw e;
+  });
   main(process.argv.slice(2)).then(
     (code) => {
       process.exitCode = code;

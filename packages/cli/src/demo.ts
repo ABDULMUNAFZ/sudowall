@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { ApprovalStore, silentLogger, startUiServer, type RunningUi } from '@tortoisegate/gateway';
+import {
+  ApprovalStore,
+  GATEWAY_VERSION,
+  silentLogger,
+  startUiServer,
+  type RunningUi,
+} from '@tortoisegate/gateway';
 import { openStateDb } from '@tortoisegate/ledger';
 import { ensureAnvil, rpc, balanceWei, startAnvil, type RunningAnvil } from './anvil.js';
 import { cliEntry, demoAssets, webUiDir } from './assets.js';
@@ -18,6 +24,8 @@ export interface DemoFlags {
   keep: boolean;
   /** Open the approval UI in the default browser (interactive runs only). */
   open: boolean;
+  /** How long the paused payment waits for a human before the gate denies it (default 300). */
+  approvalTimeoutSeconds?: number;
 }
 
 interface ToolResult {
@@ -68,6 +76,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
   if (!existsSync(assets.evmServer)) {
     throw new Error(`demo payments server is not built: ${assets.evmServer} (run pnpm build)`);
   }
+  const approvalTimeout = flags.approvalTimeoutSeconds ?? (flags.ci ? 60 : 300);
   const stateDir = mkdtempSync(join(tmpdir(), 'tortoisegate-demo-'));
   let anvil: RunningAnvil | undefined;
   let ui: RunningUi | undefined;
@@ -98,7 +107,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     const files = writeDemoConfig({
       stateDir,
       anvilUrl: anvil.url,
-      approvalTimeoutSeconds: flags.ci ? 60 : 300,
+      approvalTimeoutSeconds: approvalTimeout,
       assets,
     });
     const transport = new StdioClientTransport({
@@ -110,7 +119,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     transport.stderr?.on('data', (d: Buffer) => {
       gatewayErr += d.toString();
     });
-    client = new Client({ name: 'tortoisegate-demo-agent', version: '0.1.0' });
+    client = new Client({ name: 'tortoisegate-demo-agent', version: GATEWAY_VERSION });
     try {
       await client.connect(transport);
     } catch (e) {
@@ -134,8 +143,12 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     if (!flags.ci && flags.open) openBrowser(ui.url);
 
     const c = client;
+    // A paused call stays open until a human decides or the gate's approval timeout denies it.
+    // The client's own request timeout (60 s by default) must outlast that, or the demo gives up
+    // on a call the gate is still holding.
+    const callTimeoutMs = (approvalTimeout + 30) * 1000;
     const call = (name: string, args: Record<string, unknown>) =>
-      c.callTool({ name, arguments: args }) as Promise<ToolResult>;
+      c.callTool({ name, arguments: args }, { timeout: callTimeoutMs }) as Promise<ToolResult>;
     const url = anvil.url;
     const outcomes: { step: string; expected: string; got: string; ok: boolean }[] = [];
 
@@ -166,6 +179,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       await nextPending(files.dbPath);
       out('   Paused for a human. Open the approval UI above: it shows the recipient, that it was');
       out('   copied from the email, and the rule. Click Deny (or Approve, to see it go through).');
+      out(`   If nobody decides within ${String(approvalTimeout)} s, the gate denies it.`);
     }
     const r1 = await paused;
     const d1 = decisionOf(r1);
@@ -180,7 +194,12 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       step: 'pay address injected in an email',
       expected: 'paused for a human (ask)',
       got: r1.isError === true ? (d1?.code ?? 'error') : 'approved by you, sent',
-      ok: d1?.code === 'TG_APPROVAL_DENIED' || r1.isError !== true,
+      // Denied, approved, or nobody answered in time (the gate then denies by default): all are
+      // the gate working. Anything else, such as the payment running without a pause, is not.
+      ok:
+        d1?.code === 'TG_APPROVAL_DENIED' ||
+        d1?.code === 'TG_APPROVAL_TIMEOUT' ||
+        r1.isError !== true,
     });
 
     // 2. Address poisoning.

@@ -290,4 +290,4 @@ export function modernMeta(params: Record<string, unknown>): Record<string, unkn
   };
 }
 
-export const GATEWAY_VERSION = '0.1.0';
+export const GATEWAY_VERSION = '0.1.1';

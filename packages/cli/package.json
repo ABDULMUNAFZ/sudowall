@@ -1,6 +1,6 @@
 {
   "name": "tortoisegate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Tortoise Gate: open-source firewall for AI agents. Nothing moves until it's checked.",
   "license": "Apache-2.0",
