@@ -113,15 +113,15 @@ export function walkQuery(
   startType: VertexType,
   edgeTypes: readonly string[],
 ): string {
-  return `INTERPRET QUERY (STRING startId, INT maxDepth) FOR GRAPH ${graph} SYNTAX v1 {
+  // Interpreted mode does not support to_vertex(), so the start is a typed vertex parameter.
+  return `INTERPRET QUERY (VERTEX<${TG_VERTEX[startType]}> startV, INT maxDepth) FOR GRAPH ${graph} SYNTAX v1 {
   SetAccum<EDGE> @@edges;
   SetAccum<VERTEX> @@seen;
   OrAccum @visited;
-  VERTEX start = to_vertex(startId, "${TG_VERTEX[startType]}");
-  Frontier = {start};
+  Frontier (ANY) = {startV};
   Frontier = SELECT s FROM Frontier:s POST-ACCUM s.@visited = TRUE, @@seen += s;
   WHILE Frontier.size() > 0 LIMIT maxDepth DO
-    Next = SELECT t FROM Frontier:s -((${edgeTypes.join('|')}):e)- :t
+    Next (ANY) = SELECT t FROM Frontier:s -((${edgeTypes.join('|')}):e)- :t
            ACCUM @@edges += e, @@seen += t;
     Frontier = SELECT t FROM Next:t WHERE t.@visited == FALSE POST-ACCUM t.@visited = TRUE;
   END;
@@ -282,7 +282,7 @@ export class TigerGraph implements GraphBackend {
     edgeTypes: readonly string[],
     maxDepth: number,
   ): Promise<Subgraph> {
-    const qs = new URLSearchParams({ startId, maxDepth: String(maxDepth) });
+    const qs = new URLSearchParams({ startV: startId, maxDepth: String(maxDepth) });
     const out = (await this.call(
       'POST',
       `/gsql/v1/queries/interpret?${qs.toString()}`,

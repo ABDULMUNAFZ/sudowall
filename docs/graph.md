@@ -52,5 +52,18 @@ What is sent: event and source ids, server and tool names, verdicts, rule ids, p
 
 The local backend is covered by unit and property tests on events from a real demo ledger, and end to end by the CLI and Playwright tests. The TigerGraph parity test (`packages/graph/test/graph.test.ts`) compares both backends on the same events; it runs only when `TG_TIGERGRAPH_HOST` is set. Last result: see the table below.
 
-| Date | TigerGraph | Result |
-| ---- | ---------- | ------ |
+| Date       | TigerGraph                                                                                         | Result                                                                                                                                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-30 | TigerGraph Community 4.2.5 (official Docker image `tigergraph/community:4.2.5`, local, basic auth) | Parity test passed: causal paths and blast radii identical to the local graph for every call and source in the demo ledger. `graph sync` and `incident --tigergraph` checked by hand. |
+
+To rerun it:
+
+```sh
+docker run -d --name tg -p 127.0.0.1:14240:14240 --ulimit nofile=1000000:1000000 tigergraph/community:4.2.5
+TG_TIGERGRAPH_HOST=http://127.0.0.1:14240 TG_TIGERGRAPH_USERNAME=tigergraph TG_TIGERGRAPH_PASSWORD=tigergraph \
+  pnpm --filter @tortoisegate/graph test
+```
+
+Not verified yet: TigerGraph Savanna (cloud) with token auth. The code sends `Authorization: Bearer <token>`; check it against a Savanna instance before relying on it.
+
+Notes from verifying on 4.2.5: interpreted queries do not support `to_vertex()`, so the start vertex is a typed `VERTEX<...>` parameter, and walk results are declared `(ANY)` because they mix vertex types.

@@ -183,14 +183,17 @@ const tgConfig = tigerGraphConfigFromEnv(process.env);
 describe.skipIf(tgConfig === undefined)(
   'TigerGraph parity (real server: set TG_TIGERGRAPH_HOST)',
   () => {
-    /** Compare what both backends can express: TigerGraph never receives `display`. */
+    /**
+     * Compare what both backends can express: TigerGraph never receives `display`, and it returns
+     * an empty string for an attribute a vertex never had, where the local store omits it.
+     */
     const comparable = (s: Subgraph) => ({
       vertices: s.vertices.map((v) => ({
         type: v.type,
         id: v.id,
         attrs: Object.fromEntries(
           Object.entries(v.attrs)
-            .filter(([k]) => k !== 'display')
+            .filter(([k, x]) => k !== 'display' && String(x) !== '')
             .map(([k, x]) => [k, String(x)]),
         ),
       })),

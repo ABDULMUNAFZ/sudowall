@@ -47,3 +47,9 @@ Checkpoint notes per step (done, tests, time).
 - Done: UI header line, plural-correct ledger summary ("No signed checkpoint yet" instead of "entry none"), empty decision list; landing page `apps/site` (static, no cookies or third-party requests, 360 px and dark mode checked in a browser) deployed on Vercel at https://tortoise-gate.vercel.app because the owner's GitHub Pages custom domain points at another site; GitHub Pages disabled again; "tried it" issue form; README quickstart with real demo output; `docs/pitch.md` (90-second script, 3-minute pitch, honest answers); `docs/users.md`; repo homepage, topics, secret scanning and push protection set.
 - Tests: Playwright 3 passed locally with the new header and ledger checks; live site returns 200 and serves no dotfiles.
 - Time: about 1.5 h (boxes 1 h + 1.5 h + 1 h).
+
+### Step E: incident graph and TigerGraph
+
+- Done: `packages/graph` (graph from ledger events, keyed value hashes, per-use value vertices so causes respect time), local SQLite backend with recursive causal-path and blast-radius queries, `tortoisegate incident` (text, markdown, json, ledger proof), `tortoisegate graph sync`, Explain panel in the UI, TigerGraph 4.x adapter (GSQL schema, REST upserts, interpreted queries); ADR 0020, `docs/graph.md`; landing page "Ask why" section, redeployed.
+- Tests: 351 tests green; graph tests on a real demo ledger (batch equals incremental, causality, blast radius, no raw values exported, depth property); CLI incident on a real `demo --keep` ledger; Playwright Explain check; TigerGraph parity test passed against TigerGraph Community 4.2.5 in Docker (found and fixed: `to_vertex()` unsupported in interpreted mode, frontier vertex types).
+- Time: about 3 h (box 3 h), including the 7.4 GB image download.

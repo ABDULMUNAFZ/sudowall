@@ -117,6 +117,14 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
     const graph = await backend.causalPath(callId);
     const v = new Map(graph.vertices.map((x) => [`${x.type}:${x.id}`, x]));
     const attr = (type: string, id: string, k: string) => s(v.get(`${type}:${id}`)?.attrs[k]);
+    // Masked labels are computed from the local ledger and never exported, so a remote backend
+    // (TigerGraph) does not have them: fill them in here.
+    const displays = new Map<string, string>();
+    for (const x of events) {
+      for (const vx of deltaFor(x.event, o.valueId).vertices) {
+        if (vx.type === 'Value') displays.set(vx.id, s(vx.attrs['display']));
+      }
+    }
 
     const path: PathStep[] = [];
     const seen = new Set<string>();
@@ -134,7 +142,7 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
             argPath: s(used.attrs['argPath']),
             value: {
               kind: attr('Value', used.from.id, 'kind'),
-              display: attr('Value', used.from.id, 'display'),
+              display: attr('Value', used.from.id, 'display') || (displays.get(used.from.id) ?? ''),
             },
             match: { type: s(c.attrs['matchType']), nearKind: s(c.attrs['nearKind']) },
             source: {
