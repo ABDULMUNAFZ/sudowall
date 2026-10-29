@@ -1,6 +1,13 @@
 # Tortoise Gate
 
+[![npm](https://img.shields.io/npm/v/tortoisegate?label=npm%20tortoisegate)](https://www.npmjs.com/package/tortoisegate)
+[![CI](https://github.com/ABDULMUNAFZ/tortoise-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/ABDULMUNAFZ/tortoise-gate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ABDULMUNAFZ/tortoise-gate)](https://github.com/ABDULMUNAFZ/tortoise-gate/releases/latest)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 **Nothing moves until it's checked.**
+
+Install: `npx tortoisegate demo` ([npm](https://www.npmjs.com/package/tortoisegate)). The same package is on [GitHub Packages](https://github.com/ABDULMUNAFZ/tortoise-gate/pkgs/npm/tortoisegate) as `@abdulmunafz/tortoisegate`.
 
 Tortoise Gate is an open-source firewall for AI agents. It sits between an agent and its MCP tools. It checks every tool call before it runs, blocks risky calls or asks you about them, and keeps a tamper-evident record of what the agent did. A hidden instruction in an email should not be able to make your agent leak data or send money.
 
