@@ -44,7 +44,9 @@ It stores, per value: HMAC-SHA256 tags (key derived from the installation secret
 
 ## Time window
 
-Only content observed within `provenance.windowSeconds` (default 86400, 24 hours) can match. Longer windows catch attacks where the payment comes long after the poisoned content was read, but raise the chance that an unrelated old value matches and asks the user needlessly. Shorter windows reduce noise but let a patient attacker wait the window out. The index keeps older rows (pruning is deferred), so widening the window takes effect on existing data.
+Only content observed within `provenance.windowSeconds` (default 86400, 24 hours) can match. Longer windows catch attacks where the payment comes long after the poisoned content was read, but raise the chance that an unrelated old value matches and asks the user needlessly. Shorter windows reduce noise but let a patient attacker wait the window out. The index keeps rows older than the window (time-based pruning is deferred), so widening the window takes effect on existing data.
+
+Per (value, exact text, trust label) group the index keeps only the 16 newest rows; older rows of the group are deleted when a new one is written. The engine reports at most 16 evidence spans and only distinguishes these groups, so no match changes. Without this, a value that appears in thousands of results (an agent's own wallet address in every balance check) made each lookup linear in the number of repeats: 22 ms per `analyze` at 8,000 repeats before the change.
 
 ## Corpus results
 
@@ -61,7 +63,7 @@ This corpus was written by us alongside the code, so it shows the matcher does w
 
 ## Performance
 
-`analyze` with 400,000 indexed values: p50 0.27 ms, p99 0.47 ms (test `lookup latency`, 2026-10-29, same laptop as `performance.md`).
+`analyze` with 400,000 indexed values: p50 0.27 ms, p99 0.47 ms (test `lookup latency`, 2026-10-29, same laptop as `performance.md`). With one value repeated in 3,000 results, `analyze` stays under 20 ms per call in the test (`repeated values`); measured locally it no longer grows with the number of repeats.
 
 ## Limits
 

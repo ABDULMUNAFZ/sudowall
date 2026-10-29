@@ -3,7 +3,7 @@ import type { TrustLabel } from '@tortoisegate/core';
 import { migrateComponent, type StateDb } from '@tortoisegate/ledger';
 import type { Extracted } from './extract.js';
 
-const MIGRATIONS = [
+export const PROVENANCE_MIGRATIONS = [
   `
   CREATE TABLE provenance_sources (
     source_id TEXT PRIMARY KEY,
@@ -32,6 +32,14 @@ const MIGRATIONS = [
   CREATE INDEX provenance_values_poison ON provenance_values (poison_hash, observed_at)
     WHERE poison_hash IS NOT NULL;
   `,
+  // 2: the source label on each value row, so rows can be pruned per group (see record()).
+  `
+  ALTER TABLE provenance_values ADD COLUMN label TEXT;
+  UPDATE provenance_values SET label =
+    (SELECT s.label FROM provenance_sources s WHERE s.source_id = provenance_values.source_id);
+  CREATE INDEX provenance_values_group
+    ON provenance_values (value_hash, raw_hash, label, observed_at);
+  `,
 ];
 
 export interface SourceRecord {
@@ -57,6 +65,13 @@ export interface IndexHit {
 export type Variant = 'value' | 'raw' | 'skeleton' | 'poison';
 
 /**
+ * Rows kept per (value, raw text, label) group: the newest ones. The engine reports at most 16
+ * evidence spans and only distinguishes groups, so older rows of a group are never used, and a
+ * value repeated in thousands of results (an agent's own wallet address) keeps lookups bounded.
+ */
+export const ROWS_PER_GROUP = 16;
+
+/**
  * The provenance index, in the state database shared by every gateway process of this user.
  * It stores keyed hashes (HMAC-SHA256 under a per-installation key) of extracted values, the
  * source id, event id, offsets and time. It never stores the content or the values themselves.
@@ -68,7 +83,7 @@ export class ProvenanceIndex {
     private readonly db: StateDb,
     private readonly key: Buffer,
   ) {
-    migrateComponent(db, 'provenance', MIGRATIONS);
+    migrateComponent(db, 'provenance', PROVENANCE_MIGRATIONS);
     const lookup = (col: string) =>
       db.prepare(
         `SELECT v.source_id AS sourceId, s.label AS label, v.start AS start, v."end" AS "end",
@@ -81,7 +96,13 @@ export class ProvenanceIndex {
         'INSERT INTO provenance_sources (source_id, event_id, kind, label, server_id, origin, observed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       ),
       value: db.prepare(
-        'INSERT INTO provenance_values (source_id, kind, value_hash, raw_hash, skeleton_hash, poison_hash, start, "end", observed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO provenance_values (source_id, kind, value_hash, raw_hash, skeleton_hash, poison_hash, start, "end", observed_at, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ),
+      prune: db.prepare(
+        `DELETE FROM provenance_values WHERE rowid IN (
+           SELECT rowid FROM provenance_values
+           WHERE value_hash = ? AND raw_hash = ? AND label = ?
+           ORDER BY observed_at DESC, rowid DESC LIMIT -1 OFFSET ${String(ROWS_PER_GROUP)})`,
       ),
       byValue: lookup('value_hash'),
       bySkeleton: lookup('skeleton_hash'),
@@ -114,18 +135,26 @@ export class ProvenanceIndex {
           src.origin,
           at,
         );
+        const groups = new Map<string, [string, string]>();
         for (const v of values) {
+          const valueHash = this.hash('value', v.kind, v.value);
+          const rawHash = this.hash('raw', v.kind, v.raw);
           this.stmts.value.run(
             src.sourceId,
             v.kind,
-            this.hash('value', v.kind, v.value),
-            this.hash('raw', v.kind, v.raw),
+            valueHash,
+            rawHash,
             v.skeleton === undefined ? null : this.hash('skeleton', v.kind, v.skeleton),
             v.poison === undefined ? null : this.hash('poison', v.kind, v.poison),
             v.start,
             v.end,
             at,
+            src.label,
           );
+          groups.set(`${valueHash}${rawHash}`, [valueHash, rawHash]);
+        }
+        for (const [valueHash, rawHash] of groups.values()) {
+          this.stmts.prune.run(valueHash, rawHash, src.label);
         }
       })
       .immediate();

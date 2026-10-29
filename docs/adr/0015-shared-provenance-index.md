@@ -18,4 +18,4 @@ The architecture planned an in-memory, per-session provenance index. Claude Code
 
 - Two unrelated agents of the same user share one index, so content one agent read can raise a match for the other. This errs towards asking.
 - The window trades missed slow attacks against unrelated old matches (`provenance.md`).
-- Index rows are never pruned yet; the index grows with use (backlog).
+- Rows older than the window are not pruned yet; the index grows with the number of distinct values seen (backlog). Repeats of one value are capped per group (16 newest rows; `provenance.md`, added in step C).

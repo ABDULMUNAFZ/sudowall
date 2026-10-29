@@ -3,6 +3,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { ProvenanceReport } from '@tortoisegate/core';
+import { migrateComponent } from '@tortoisegate/ledger';
+import { PROVENANCE_MIGRATIONS } from '../src/index.js';
 import { CORPUS } from './corpus.js';
 import { KEY, NOW, engine, freshDb, minutesAgo, seen } from './helpers.js';
 
@@ -101,6 +103,56 @@ describe('ProvenanceEngine', () => {
     seen(engine(db), 'pay exfil@attacker.example');
     const other = engine(db, [], randomBytes(32));
     expect(other.analyze({ to: 'exfil@attacker.example' }, { now: NOW }).matches).toEqual([]);
+  });
+});
+
+describe('repeated values', () => {
+  it('a value seen in thousands of results keeps every match class and a bounded lookup', () => {
+    const { db } = freshDb();
+    const e = engine(db, [{ server: 'wallet', tool: '*' }]);
+    const own = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+    const look = `0x5aae${'1'.repeat(32)}eaed`;
+    // One untrusted mention and one lookalike, buried under 3000 trusted repeats of the address.
+    seen(e, `pay ${own}`, minutesAgo(30));
+    seen(e, `from ${look}`, minutesAgo(29));
+    for (let i = 0; i < 3000; i++)
+      seen(e, `balance of ${own}`, minutesAgo(20), 'wallet', 'get_balance');
+    const r = e.analyze({ to: own }, { now: NOW });
+    expect(classes(r)).toEqual(['exact', 'near:address-poisoning']);
+    const exact = r.matches.find((m) => m.matchType === 'exact');
+    expect(exact?.sourceLabel).toBe('untrusted');
+    expect(exact?.evidence).toHaveLength(16);
+    // Older rows of each (value, raw text, label) group were pruned on write.
+    const hits = e.index.lookup(
+      'value',
+      e.index.hash('value', 'evm-address', own.toLowerCase()),
+      0,
+    );
+    expect(hits.length).toBe(16 + 1);
+    expect(hits.filter((h) => h.label === 'untrusted')).toHaveLength(1);
+    const t0 = performance.now();
+    for (let i = 0; i < 50; i++) e.analyze({ to: own }, { now: NOW });
+    expect((performance.now() - t0) / 50).toBeLessThan(20);
+  });
+});
+
+describe('index schema migration', () => {
+  it('upgrades a version 1 index in place and backfills labels', () => {
+    const { db } = freshDb();
+    migrateComponent(db, 'provenance', PROVENANCE_MIGRATIONS.slice(0, 1));
+    db.prepare(
+      "INSERT INTO provenance_sources VALUES ('s1', NULL, 'tool-result', 'untrusted', 'files', 'read', 1)",
+    ).run();
+    db.prepare(
+      "INSERT INTO provenance_values VALUES ('s1', 'email', 'v', 'r', NULL, NULL, 0, 5, 1)",
+    ).run();
+    engine(db);
+    expect(db.prepare('SELECT label FROM provenance_values').get()).toEqual({ label: 'untrusted' });
+    expect(
+      db.prepare("SELECT version FROM tg_schema WHERE component = 'provenance'").get(),
+    ).toEqual({
+      version: PROVENANCE_MIGRATIONS.length,
+    });
   });
 });
 
