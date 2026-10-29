@@ -26,14 +26,34 @@ export function openStateDb(path: string, opts: OpenStateDbOptions = {}): StateD
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   closeSync(openSync(path, 'a', 0o600));
   const db = new Database(path);
-  db.pragma(`busy_timeout = ${opts.busyTimeoutMs ?? 5000}`);
-  db.pragma('journal_mode = WAL');
+  const busyTimeoutMs = opts.busyTimeoutMs ?? 5000;
+  db.pragma(`busy_timeout = ${busyTimeoutMs}`);
+  setWalWithRetry(db, busyTimeoutMs);
   db.pragma(`synchronous = ${opts.durability === 'power-loss' ? 'FULL' : 'NORMAL'}`);
   db.pragma('foreign_keys = ON');
   db.exec(
     'CREATE TABLE IF NOT EXISTS tg_schema (component TEXT PRIMARY KEY, version INTEGER NOT NULL)',
   );
   return db;
+}
+
+/**
+ * Switching a fresh file to WAL needs an exclusive lock, and SQLite returns SQLITE_BUSY for it
+ * without consulting the busy handler. When several processes create the database at once,
+ * retry with a short sleep until the busy timeout runs out, then rethrow.
+ */
+function setWalWithRetry(db: StateDb, busyTimeoutMs: number): void {
+  const deadline = Date.now() + busyTimeoutMs;
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  for (;;) {
+    try {
+      db.pragma('journal_mode = WAL');
+      return;
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'SQLITE_BUSY' || Date.now() >= deadline) throw err;
+      Atomics.wait(sleeper, 0, 0, 10 + Math.floor(Math.random() * 20));
+    }
+  }
 }
 
 /**
