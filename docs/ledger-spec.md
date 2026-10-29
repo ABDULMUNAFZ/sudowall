@@ -30,7 +30,7 @@ This document is the normative spec for the Tortoise Gate ledger. A third party 
 3. Strings are escaped as ECMAScript `JSON.stringify` does (ES2019 well-formed). A lone surrogate is written as a lowercase `\udxxx` escape, not rejected. This is the one deviation from RFC 8785; it exists so the ledger can record every string a tool sent.
 4. An own property named `__proto__` is an ordinary key.
 
-Implementation note: tool arguments are parsed with `JSON.parse` before they reach the ledger. An integer larger than 2^53 − 1 has already lost precision at that point. The policy engine therefore treats unsafe integers in amount arguments as an error (fail closed). Money amounts SHOULD be sent as decimal strings.
+**Phase 1 change (ADR 0010), to be applied in Phase 2.** Events are parsed losslessly. A number whose source text is not its shortest ECMAScript form (an integer above 2^53 − 1, `1.0`, `1e3`, a long decimal) reaches the ledger as a `JSON.rawJSON(source)` value. `tgjson` MUST serialise such a value as its source token, unchanged, instead of rule 2. The verifier MUST parse stored JSON the same way (lossless) before re-hashing. Every other number follows rule 2. As a result, `1.0` and `1` hash differently: the ledger records what was sent, not a normalised value. The policy engine still treats unsafe integers in amount arguments as an error (fail closed). Money amounts SHOULD be sent as decimal strings.
 
 ## 3. Ledger identity and keys
 

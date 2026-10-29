@@ -13,7 +13,14 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 
 - Forwarding of sampling, elicitation and roots (server-initiated requests and 2026-07-28 MRTR `input_required`) with inspection.
 - Tasks extension (`io.modelcontextprotocol/tasks`).
-- Preserving integers above 2^53 exactly (raw JSON forwarding) instead of failing closed on them.
+- Cancellation for stateless 2026-07-28 HTTP clients sent as a separate request (needs per-client id mapping).
+- `subscriptions/listen` and server-to-client requests in aggregate mode.
+- OAuth for Streamable HTTP upstreams.
+- Benchmarks for HTTP transports, aggregate mode and near-limit message sizes.
+
+## Tooling
+
+- Upgrade to TypeScript 7 together with typescript-eslint once it supports it (ADR 0011).
 
 ## Ledger
 

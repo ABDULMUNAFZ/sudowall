@@ -30,7 +30,7 @@ Tortoise Gate is a firewall for AI agents. It sits between an AI agent and the t
 
 ## Stack
 
-TypeScript (strict), Node.js 24 LTS, pnpm workspaces, Turborepo. `@modelcontextprotocol/sdk` (verify installed API). SQLite via `better-sqlite3` (WAL). `zod` for all external input. Vitest, `fast-check`, Playwright. viem for EVM testnet work. Ed25519 via `node:crypto`, SHA-256. Local web UI: React + Vite, served by the gateway on 127.0.0.1. Electron later.
+TypeScript (strict, 6.0.x until typescript-eslint supports 7; ADR 0011), Node.js 24 LTS, pnpm workspaces, Turborepo. MCP: the gateway relays raw JSON-RPC itself (ADR 0010) and speaks spec 2025-11-25 and 2026-07-28; tests use SDK v2 `@modelcontextprotocol/client` / `server` and the v1 `@modelcontextprotocol/sdk` as real peers (ADR 0008; verify installed API). SQLite via `better-sqlite3` (WAL). `zod` for all external input. Vitest, `fast-check`, Playwright. viem for EVM testnet work. Ed25519 via `node:crypto`, SHA-256. Local web UI: React + Vite, served by the gateway on 127.0.0.1. Electron later.
 
 ## Repository layout
 

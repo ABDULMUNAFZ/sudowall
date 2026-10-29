@@ -4,15 +4,15 @@ The source of truth is `packages/core/src/events.ts` (zod). This document descri
 
 ## Common types
 
-| Name          | Format                                                                                                                                    |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `Id`          | UUID (RFC 9562)                                                                                                                           |
-| `Timestamp`   | RFC 3339 UTC, millisecond precision: `2026-10-29T07:00:00.123Z`. Offsets and second precision are rejected                                |
-| `Sha256Hex`   | 64 lowercase hex chars                                                                                                                    |
-| `JsonPointer` | RFC 6901 (`""` is the whole document; `/to`, `/items/0/address`)                                                                          |
-| `ServerId`    | `^[a-z0-9][a-z0-9-]{0,62}$`, the upstream's config id                                                                                     |
-| `Transport`   | `"stdio"` \| `"streamable-http"`                                                                                                          |
-| `JsonValue`   | Any JSON value: finite numbers, plain objects, max depth 256. Validated in place, never copied, so an own `__proto__` key is kept as data |
+| Name          | Format                                                                                                                                                                                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Id`          | UUID (RFC 9562)                                                                                                                                                                                                                                                                                      |
+| `Timestamp`   | RFC 3339 UTC, millisecond precision: `2026-10-29T07:00:00.123Z`. Offsets and second precision are rejected                                                                                                                                                                                           |
+| `Sha256Hex`   | 64 lowercase hex chars                                                                                                                                                                                                                                                                               |
+| `JsonPointer` | RFC 6901 (`""` is the whole document; `/to`, `/items/0/address`)                                                                                                                                                                                                                                     |
+| `ServerId`    | `^[a-z0-9][a-z0-9-]{0,62}$`, the upstream's config id                                                                                                                                                                                                                                                |
+| `Transport`   | `"stdio"` \| `"streamable-http"`                                                                                                                                                                                                                                                                     |
+| `JsonValue`   | Any JSON value: finite numbers, plain objects, max depth 256. Validated in place, never copied, so an own `__proto__` key is kept as data. A number whose source text is not its shortest ECMAScript form (for example an integer above 2^53) is held as `JSON.rawJSON(source)` and keeps its digits |
 
 ## Envelope (every event)
 
@@ -47,9 +47,10 @@ Written **before** the call is forwarded (write-ahead).
 | `server`     | `{id, name, version, transport}`                                     | `name` and `version` as the upstream reported them (untrusted) |
 | `tool`       | string                                                               | The upstream's own tool name, not the namespaced name          |
 | `requestId`  | string \| integer                                                    | JSON-RPC id from the client                                    |
-| `arguments`  | JSON object                                                          | **After redaction**                                            |
+| `rawSha256`  | Sha256Hex                                                            | SHA-256 of the exact request text the client sent (ADR 0010)   |
+| `arguments`  | JSON object                                                          | **After redaction** (Phase 2; Phase 1 stores them as received) |
 | `redaction`  | `{ruleVersion, applied: [{path, method: "removed"\|"hmac-sha256"}]}` | Paths are relative to `arguments`                              |
-| `provenance` | ProvenanceReport                                                     | See below                                                      |
+| `provenance` | ProvenanceReport \| null                                             | null until the provenance engine runs (Phase 3)                |
 | `decision`   | Decision                                                             | See below                                                      |
 
 ### ProvenanceReport
@@ -89,6 +90,8 @@ ArgumentMatch:
 | `callEventId`    | Id                                                                                            | The `tool.call` event this answers                                                    |
 | `server`, `tool` | as in `tool.call`                                                                             |                                                                                       |
 | `outcome`        | `ok` \| `tool-error` \| `protocol-error` \| `blocked` \| `denied` \| `timeout` \| `cancelled` | `blocked` and `denied` mean the upstream was never called                             |
+| `rawSha256`      | Sha256Hex \| null                                                                             | SHA-256 of the exact response text the upstream sent; null if it never answered       |
+| `error`          | `{code, message}` \| null                                                                     | The JSON-RPC error, for `protocol-error`; null otherwise                              |
 | `result`         | JsonValue \| null                                                                             | **After redaction**, cut to `ledger.maxStoredResultBytes`. null if no upstream result |
 | `truncated`      | boolean                                                                                       |                                                                                       |
 | `resultSha256`   | Sha256Hex \| null                                                                             | Hash of `tgjson` of the full redacted result before truncation                        |
