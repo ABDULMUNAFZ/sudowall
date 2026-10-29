@@ -7,6 +7,7 @@
 //   RECORD_FILE   append every received line, verbatim, to this file
 //   TOOLS_PREFIX  prefix for tool names (to create or avoid collisions between instances)
 //   CRASH_ON_START=1  exit immediately (restart backoff tests)
+//   MODERN_ONLY=1     reject `initialize`, as a server that only speaks 2026-07-28 would
 import { appendFileSync } from 'node:fs';
 
 if (process.env.CRASH_ON_START === '1') process.exit(3);
@@ -20,8 +21,12 @@ const tools = ['echo', 'slow', 'crash', 'huge', 'notify', 'sample'].map((n) => (
 }));
 
 const send = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`);
-const modernFields = (msg) =>
-  msg.params?._meta?.['io.modelcontextprotocol/protocolVersion'] ? { resultType: 'complete' } : {};
+const modernFields = (msg) => {
+  if (!msg.params?._meta?.['io.modelcontextprotocol/protocolVersion']) return {};
+  // 2026-07-28 list results carry cache hints.
+  const cache = msg.method.endsWith('/list') ? { ttlMs: 0, cacheScope: 'private' } : {};
+  return { resultType: 'complete', ...cache };
+};
 
 let buf = '';
 process.stdin.on('data', (chunk) => {
@@ -52,6 +57,13 @@ function handle(line) {
     send({ jsonrpc: '2.0', id: msg.id, result: { ...result, ...modernFields(msg) } });
   switch (msg.method) {
     case 'initialize':
+      if (process.env.MODERN_ONLY === '1') {
+        return send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          error: { code: -32602, message: 'Unsupported protocol version' },
+        });
+      }
       return reply({
         protocolVersion: msg.params?.protocolVersion ?? '2025-11-25',
         capabilities: { tools: { listChanged: true }, tasks: {} },
@@ -60,7 +72,10 @@ function handle(line) {
     case 'server/discover':
       return reply({
         supportedVersions: ['2026-07-28'],
-        capabilities: { tools: { listChanged: true } },
+        capabilities: {
+          tools: { listChanged: true },
+          extensions: { 'io.modelcontextprotocol/tasks': {} },
+        },
         ttlMs: 0,
         cacheScope: 'private',
       });

@@ -37,6 +37,8 @@ const ENV_INFO = 'io.modelcontextprotocol/clientInfo';
 const UNSUPPORTED_CLIENT_CAPS = ['sampling', 'elicitation', 'roots', 'tasks'];
 /** Server capabilities the gateway does not support; removed before they reach the client. */
 const UNSUPPORTED_SERVER_CAPS = ['tasks'];
+/** 2026-07-28 form of task support (`capabilities.extensions`); removed on both sides. */
+const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
 /** `_meta` key carrying the machine-readable gateway decision on results the gateway produced. */
 export const DECISION_META_KEY = 'tortoisegate/decision';
 
@@ -1298,9 +1300,17 @@ function classifyReq(text: string): { root: RawNode; id: RawNode | undefined } {
 function stripCaps(text: string, root: RawNode, path: string[], drop: readonly string[]): string {
   const node = rawGet(root, ...path);
   if (node?.kind !== 'object') return text;
-  if (!node.members.some((mm) => drop.includes(mm.key))) return text;
+  const ext = rawGet(node, 'extensions');
+  const extHit = ext?.kind === 'object' && ext.members.some((mm) => mm.key === TASKS_EXTENSION);
+  if (!extHit && !node.members.some((mm) => drop.includes(mm.key))) return text;
   const value = nodeValue(text, node) as Record<string, unknown>;
   const kept = Object.fromEntries(Object.entries(value).filter(([k]) => !drop.includes(k)));
+  const extensions = kept['extensions'];
+  if (extHit && isObj(extensions)) {
+    kept['extensions'] = Object.fromEntries(
+      Object.entries(extensions).filter(([k]) => k !== TASKS_EXTENSION),
+    );
+  }
   return applyEdits(text, [
     { start: node.start, end: node.end, replacement: JSON.stringify(kept) },
   ]);

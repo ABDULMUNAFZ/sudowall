@@ -68,6 +68,35 @@ describe('byte fidelity (passthrough)', () => {
     });
   });
 
+  it('serves a 2026-07-28 client: strips unsupported envelope capabilities and the tasks extension', async () => {
+    const rec = join(tempDir(), 'rec.log');
+    h = startSession({ upstreams: [rawUpstream('raw', { RECORD_FILE: rec })] });
+    const meta =
+      '"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{"sampling":{},"extensions":{"io.modelcontextprotocol/tasks":{}}},"io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}';
+    h.client.push(`{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{${meta}}}`);
+    const res = await h.client.response('1');
+    expect((res['result'] as { capabilities: unknown }).capabilities).toEqual({
+      tools: { listChanged: true },
+      extensions: {},
+    });
+    h.client.push(
+      `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"echo","arguments":{"k":1},${meta}}}`,
+    );
+    const call = await h.client.response('2');
+    expect(call['result']).toMatchObject({ resultType: 'complete' });
+    const sent = readLines(rec).map(
+      (l) => JSON.parse(l) as { params: { _meta: Record<string, unknown> } },
+    );
+    for (const m of sent) {
+      expect(m.params._meta['io.modelcontextprotocol/clientCapabilities']).toEqual({
+        extensions: {},
+      });
+    }
+    expect(h.events.find((e) => e.type === 'session.started')).toMatchObject({
+      protocolVersion: '2026-07-28',
+    });
+  });
+
   it('refuses server-initiated sampling with an explicit error and never shows it to the client', async () => {
     h = startSession({ upstreams: [rawUpstream('raw')] });
     await handshake(h.client);

@@ -5,6 +5,7 @@ import type { Logger } from './log.js';
 import { SseParser } from './sse.js';
 
 const MODERN = '2026-07-28';
+const ENV_VERSION = 'io.modelcontextprotocol/protocolVersion';
 
 /**
  * Upstream over MCP Streamable HTTP. The gateway is the HTTP client: each outgoing message is a
@@ -64,9 +65,15 @@ export class HttpUpstreamChannel implements Channel {
       accept: 'application/json, text/event-stream',
     };
     if (this.sessionId !== undefined) h['mcp-session-id'] = this.sessionId;
-    if (this.protocolVersion !== undefined) h['mcp-protocol-version'] = this.protocolVersion;
-    if (this.protocolVersion === MODERN) {
-      const m = classify(text);
+    const m = classify(text);
+    // A 2026-07-28 message names its revision in its own envelope; the headers mirror it.
+    const envelope =
+      m.kind === 'request' || m.kind === 'notification'
+        ? rawGet(m.root, 'params', '_meta', ENV_VERSION)
+        : undefined;
+    const version = envelope?.kind === 'string' ? envelope.value : this.protocolVersion;
+    if (version !== undefined) h['mcp-protocol-version'] = version;
+    if (version === MODERN) {
       if (m.kind === 'request' || m.kind === 'notification') {
         h['mcp-method'] = m.method;
         const params = rawGet(m.root, 'params');
