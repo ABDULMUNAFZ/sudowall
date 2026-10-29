@@ -53,3 +53,8 @@ Checkpoint notes per step (done, tests, time).
 - Done: `packages/graph` (graph from ledger events, keyed value hashes, per-use value vertices so causes respect time), local SQLite backend with recursive causal-path and blast-radius queries, `tortoisegate incident` (text, markdown, json, ledger proof), `tortoisegate graph sync`, Explain panel in the UI, TigerGraph 4.x adapter (GSQL schema, REST upserts, interpreted queries); ADR 0020, `docs/graph.md`; landing page "Ask why" section, redeployed.
 - Tests: 351 tests green; graph tests on a real demo ledger (batch equals incremental, causality, blast radius, no raw values exported, depth property); CLI incident on a real `demo --keep` ledger; Playwright Explain check; TigerGraph parity test passed against TigerGraph Community 4.2.5 in Docker (found and fixed: `to_vertex()` unsupported in interpreted mode, frontier vertex types).
 - Time: about 3 h (box 3 h), including the 7.4 GB image download.
+
+### Real-world test, GitHub Packages and a three-page site
+
+- Done: `@abdulmunafz/tortoisegate` published to GitHub Packages by a release workflow (GITHUB_TOKEN); README badges; repo description corrected (it claimed a desktop app that does not exist yet); real test with Claude Code (claude-sonnet-5-5) through `tortoisegate@0.1.0` from npm, three runs, written up in `docs/real-world-test.md`; site split into Home, Get started and See it real, shared `site.css`, strict CSP without inline styles, real screenshots from the run.
+- Tests: real run: attacker and lookalike balances unchanged, Dana +0.005 ETH, `ledger verify` OK on 34 entries, `incident 24` correct; site checked at 360 px (no horizontal scroll) and desktop.

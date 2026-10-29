@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Get started with Tortoise Gate</title>
+    <meta
+      name="description"
+      content="Install Tortoise Gate, put it in front of your AI agent's MCP tools, write a policy, approve risky actions and explain any decision."
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 20c0-7 5.4-12 12-12s12 5 12 12z' fill='%232f6b4f'/%3E%3Cpath d='M9 20l3-6h8l3 6' fill='none' stroke='%23eef1ea' stroke-width='1.6'/%3E%3Crect x='3' y='20' width='26' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="site">
+        <a class="mark" href="./">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 20c0-7 5.4-12 12-12s12 5 12 12z" fill="#2f6b4f" />
+            <path d="M9 20l3-6h8l3 6" fill="none" stroke="#eef1ea" stroke-width="1.6" />
+            <rect x="3" y="20" width="26" height="3" rx="1.5" fill="currentColor" />
+          </svg>
+          Tortoise Gate
+        </a>
+        <nav aria-label="Site">
+          <a href="./">Home</a>
+          <a href="get-started.html" aria-current="page">Get started</a>
+          <a href="real-run.html">See it real</a>
+          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Source</a>
+          <a href="https://www.npmjs.com/package/tortoisegate">npm</a>
+        </nav>
+      </header>
+
+      <main>
+        <div class="page-head prose">
+          <h1>Put the gate in front of your agent</h1>
+          <p class="lede">
+            Tortoise Gate runs on your machine, next to your agent. It speaks MCP on both sides, so
+            your agent and your tools do not change.
+          </p>
+        </div>
+
+        <section aria-labelledby="needs">
+          <div class="prose">
+            <h2 id="needs">What you need</h2>
+            <p>
+              Node.js 24 on macOS or Linux, and an agent that uses MCP tools, such as Claude Code,
+              Claude Desktop or Cursor. Tortoise Gate is on npm as
+              <a href="https://www.npmjs.com/package/tortoisegate"><code>tortoisegate</code></a
+              >, so every command below works with <code>npx</code> and nothing to install globally.
+            </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="steps">
+          <h2 id="steps">Five steps</h2>
+          <ol class="howto">
+            <li>
+              <h3>See it work first</h3>
+              <p>
+                A two-minute walkthrough on a private local test chain: a scripted agent reads two
+                poisoned emails and tries three payments, and you decide the paused one.
+              </p>
+              <pre><code>npx tortoisegate demo</code></pre>
+            </li>
+            <li>
+              <h3>Create a config and a policy</h3>
+              <p>
+                This writes <code>config.json</code> in observe mode, which records every decision
+                but blocks nothing, and <code>policy.yaml</code> from the money-moving template. It
+                prints where it wrote them (on macOS,
+                <code>~/Library/Application Support/tortoisegate/</code>; on Linux,
+                <code>~/.config/tortoisegate/</code>). Use that path as <code>CONFIG</code> below.
+              </p>
+              <pre><code>npx tortoisegate init</code></pre>
+            </li>
+            <li>
+              <h3>Wrap one of your MCP servers</h3>
+              <p>
+                Put <code>tortoisegate wrap --</code> in front of the server command you already
+                use. With Claude Code:
+              </p>
+              <pre><code># before
+claude mcp add memory -- npx -y @modelcontextprotocol/server-memory
+# after
+claude mcp add memory -- npx -y tortoisegate wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>
+              <p>
+                Tool names and results stay the same. For several servers behind one gate, list them
+                in a config and use <code>tortoisegate serve --config gateway.json</code>:
+              </p>
+              <pre><code>{
+  "schemaVersion": 1,
+  "mode": "enforce",
+  "upstreams": [
+    { "id": "files", "transport": "stdio", "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/inbox"] },
+    { "id": "wallet", "transport": "stdio", "command": "node", "args": ["wallet-server.js"] }
+  ],
+  "listen": { "transport": "stdio" },
+  "policy": { "path": "policy.yaml" }
+}</code></pre>
+            </li>
+            <li>
+              <h3>Watch decisions and answer approvals</h3>
+              <p>
+                The local UI shows every decision with its reason, and a card for each paused call
+                with the recipient, where it came from and the rule. It listens on 127.0.0.1 only
+                and prints an address that carries an access token.
+              </p>
+              <pre><code>npx tortoisegate ui --config "$CONFIG"</code></pre>
+              <p>
+                When the decisions look right, change <code>"mode"</code> to
+                <code>"enforce"</code> in the config.
+              </p>
+            </li>
+            <li>
+              <h3>Ask why, and check the record</h3>
+              <p>
+                Every decision has an Explain button in the UI. From the terminal, the same report
+                traces each value in a call to the tool result it came from, and verifies the
+                ledger.
+              </p>
+              <pre><code>npx tortoisegate incident &lt;event id or ledger entry number&gt;
+npx tortoisegate ledger verify</code></pre>
+            </li>
+          </ol>
+        </section>
+
+        <section aria-labelledby="policy">
+          <div class="prose">
+            <h2 id="policy">How a policy reads</h2>
+            <p>
+              Policies are YAML. A rule names the risky argument, a condition and an action. The
+              strictest matching rule wins. These two rules from the money-moving template are the
+              ones that stopped the payments in the <a href="real-run.html">real run</a>:
+            </p>
+          </div>
+          <pre><code>- id: ask-untrusted-recipient
+  description: Recipient copied from content the agent read (prompt injection)
+  match: { sink: evm-transfer }
+  when:
+    all:
+      - { arg: to, provenance: { label: untrusted } }
+      - not: { arg: to, in_list: trusted-recipients }
+  action: ask
+  reason: The recipient address was copied from untrusted content.
+
+- id: block-lookalike-recipient
+  match: { sink: evm-transfer }
+  when:
+    all:
+      - { arg: to, near: [address-poisoning, confusable, zero-width, split] }
+      - not: { arg: to, in_list: trusted-recipients }
+  action: block
+  reason: The recipient looks like a known address but is a different one (possible address poisoning).</code></pre>
+          <div class="prose">
+            <p>
+              Full reference:
+              <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/policy-dsl.md"
+                >policy language</a
+              >,
+              <a
+                href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/policy-templates.md"
+                >templates</a
+              >,
+              <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/configuration.md"
+                >configuration</a
+              >.
+            </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="limits">
+          <div class="prose">
+            <h2 id="limits">Know the limits</h2>
+            <ul class="limits">
+              <li>It only sees tool calls that pass through it, and today that means MCP.</li>
+              <li>
+                It catches structured values copied exactly or nearly (addresses, emails, URLs,
+                amounts), not instructions an agent rewords in its own words.
+              </li>
+              <li>Alpha software. Try it on test networks and test data first.</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p>
+          Open source under Apache-2.0.
+          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Read the code</a>, or
+          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/issues/new?template=tried-it.yml"
+            >tell us how it went</a
+          >.
+        </p>
+        <p>This page sets no cookies and loads nothing from other sites.</p>
+      </footer>
+    </div>
+  </body>
+</html>

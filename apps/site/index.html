@@ -11,347 +11,13 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; frame-src https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; style-src 'self'; script-src 'unsafe-inline'; img-src 'self' data:; frame-src https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none'"
     />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 20c0-7 5.4-12 12-12s12 5 12 12z' fill='%232f6b4f'/%3E%3Cpath d='M9 20l3-6h8l3 6' fill='none' stroke='%23eef1ea' stroke-width='1.6'/%3E%3Crect x='3' y='20' width='26' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
     />
-    <style>
-      :root {
-        --bg: #eef1ea;
-        --panel: #fbfcf9;
-        --ink: #1f2a22;
-        --muted: #56635a;
-        --line: #d1d9cd;
-        --allow: #2f6b4f;
-        --ask: #8a5f00;
-        --block: #b3261e;
-        --round:
-          ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', 'Nunito', system-ui, sans-serif;
-        --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-        --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-        color-scheme: light dark;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #141a16;
-          --panel: #1c241e;
-          --ink: #e4ebe4;
-          --muted: #9fada3;
-          --line: #2f3a32;
-          --allow: #7cc79f;
-          --ask: #e2b33c;
-          --block: #f08a80;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      html {
-        -webkit-text-size-adjust: 100%;
-      }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--ink);
-        font: 17px/1.6 var(--sans);
-      }
-      a {
-        color: var(--allow);
-        text-underline-offset: 0.18em;
-      }
-      a:focus-visible,
-      button:focus-visible {
-        outline: 3px solid var(--ask);
-        outline-offset: 2px;
-        border-radius: 4px;
-      }
-      .wrap {
-        max-width: 68rem;
-        margin: 0 auto;
-        padding: 0 1rem;
-      }
-      header.site {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.25rem 0;
-        font-size: 0.95rem;
-      }
-      .mark {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font: 600 1.05rem var(--round);
-        color: var(--ink);
-        text-decoration: none;
-      }
-      .mark svg {
-        width: 28px;
-        height: 28px;
-      }
-      header.site nav {
-        display: flex;
-        gap: 1.25rem;
-      }
-
-      /* Hero: the pitch on the left, the gate at work on the right. */
-      .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 2.5rem;
-        padding: 2.5rem 0 3.5rem;
-      }
-      @media (min-width: 860px) {
-        .hero {
-          grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-          align-items: center;
-          padding-top: 4rem;
-        }
-      }
-      h1 {
-        font: 700 clamp(2.3rem, 6vw, 3.6rem) / 1.05 var(--round);
-        letter-spacing: -0.02em;
-        margin: 0 0 1.25rem;
-        max-width: 14ch;
-      }
-      .lede {
-        font-size: 1.15rem;
-        color: var(--muted);
-        max-width: 38ch;
-        margin: 0 0 2rem;
-      }
-      .try {
-        display: flex;
-        align-items: stretch;
-        max-width: 26rem;
-        border: 1.5px solid var(--ink);
-        border-radius: 10px;
-        overflow: hidden;
-        background: var(--panel);
-      }
-      .try code {
-        flex: 1;
-        padding: 0.8rem 1rem;
-        font: 600 1rem var(--mono);
-        white-space: nowrap;
-        overflow-x: auto;
-      }
-      .try button {
-        border: 0;
-        border-left: 1.5px solid var(--ink);
-        background: var(--ink);
-        color: var(--bg);
-        font: 600 0.95rem var(--sans);
-        padding: 0 1.1rem;
-        cursor: pointer;
-      }
-      .try-note {
-        font-size: 0.9rem;
-        color: var(--muted);
-        margin: 0.75rem 0 0;
-        max-width: 42ch;
-      }
-
-      /* The checkpoint lane: three calls from the demo, each stamped by the gate. */
-      .lane {
-        position: relative;
-        margin: 0;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 18px 18px 18px 4px;
-        padding: 1.25rem 1.25rem 1rem;
-      }
-      .lane-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        font-size: 0.85rem;
-        color: var(--muted);
-        padding-bottom: 0.9rem;
-        border-bottom: 2px dashed var(--line);
-        margin-bottom: 0.4rem;
-      }
-      .call {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 0.35rem 1rem;
-        align-items: center;
-        padding: 0.85rem 0;
-        border-bottom: 1px solid var(--line);
-      }
-      .call:last-child {
-        border-bottom: 0;
-      }
-      .call .what {
-        font: 600 0.9rem var(--mono);
-        overflow-wrap: anywhere;
-      }
-      .call .addr {
-        white-space: nowrap;
-      }
-      .call .why {
-        grid-column: 1 / -1;
-        font-size: 0.9rem;
-        color: var(--muted);
-      }
-      .stamp {
-        font: 800 0.85rem var(--round);
-        padding: 0.25rem 0.7rem;
-        border: 2px solid currentColor;
-        background: color-mix(in srgb, currentColor 10%, transparent);
-        border-radius: 999px;
-        white-space: nowrap;
-        transform: rotate(-4deg);
-      }
-      .stamp.allow {
-        color: var(--allow);
-      }
-      .stamp.ask {
-        color: var(--ask);
-      }
-      .stamp.block {
-        color: var(--block);
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        .js .call {
-          opacity: 0;
-        }
-        .js .call.shown {
-          opacity: 1;
-          transition: opacity 0.35s ease;
-        }
-        .js .call .stamp {
-          opacity: 0;
-          transform: rotate(-4deg) scale(1.6);
-        }
-        .js .call.stamped .stamp {
-          opacity: 1;
-          transform: rotate(-4deg) scale(1);
-          transition:
-            transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.3),
-            opacity 0.15s ease;
-        }
-      }
-
-      section {
-        padding: 3rem 0;
-        border-top: 1px solid var(--line);
-      }
-      h2 {
-        font: 700 1.75rem/1.2 var(--round);
-        margin: 0 0 1rem;
-        letter-spacing: -0.01em;
-      }
-      .prose {
-        max-width: 40rem;
-      }
-      .prose p {
-        margin: 0 0 1rem;
-      }
-      ol.steps {
-        list-style: none;
-        counter-reset: step;
-        padding: 0;
-        margin: 1.5rem 0 0;
-        display: grid;
-        gap: 1.5rem;
-        grid-template-columns: minmax(0, 1fr);
-      }
-      @media (min-width: 760px) {
-        ol.steps {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-        }
-      }
-      ol.steps li {
-        counter-increment: step;
-      }
-      ol.steps li::before {
-        content: counter(step);
-        display: inline-grid;
-        place-items: center;
-        width: 2rem;
-        height: 2rem;
-        border-radius: 50%;
-        background: var(--ink);
-        color: var(--bg);
-        font: 700 1rem var(--round);
-        margin-bottom: 0.6rem;
-      }
-      ol.steps h3 {
-        font: 700 1.1rem var(--round);
-        margin: 0 0 0.35rem;
-      }
-      ol.steps p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.97rem;
-      }
-      .table-scroll {
-        overflow-x: auto;
-        margin-top: 1.25rem;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        min-width: 32rem;
-        max-width: 52rem;
-        font-size: 0.97rem;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.7rem 0.9rem 0.7rem 0;
-        border-bottom: 1px solid var(--line);
-        vertical-align: top;
-      }
-      th {
-        font-weight: 600;
-        color: var(--muted);
-      }
-      td.v {
-        font-weight: 700;
-        white-space: nowrap;
-      }
-      td.v.allow {
-        color: var(--allow);
-      }
-      td.v.ask {
-        color: var(--ask);
-      }
-      td.v.block {
-        color: var(--block);
-      }
-      pre {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 1rem;
-        overflow-x: auto;
-        font: 0.92rem/1.55 var(--mono);
-        max-width: 46rem;
-      }
-      .limits li {
-        margin-bottom: 0.6rem;
-      }
-      footer {
-        border-top: 1px solid var(--line);
-        padding: 2rem 0 3rem;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-      footer p {
-        margin: 0 0 0.5rem;
-      }
-      .video {
-        aspect-ratio: 16 / 9;
-        width: 100%;
-        max-width: 46rem;
-        border: 0;
-        border-radius: 12px;
-      }
-    </style>
+    <link rel="stylesheet" href="site.css" />
   </head>
   <body>
     <div class="wrap">
@@ -364,9 +30,11 @@
           </svg>
           Tortoise Gate
         </a>
-        <nav aria-label="Project links">
+        <nav aria-label="Site">
+          <a href="./" aria-current="page">Home</a>
+          <a href="get-started.html">Get started</a>
+          <a href="real-run.html">See it real</a>
           <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Source</a>
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/tree/main/docs">Docs</a>
           <a href="https://www.npmjs.com/package/tortoisegate">npm</a>
         </nav>
       </header>
@@ -386,8 +54,7 @@
             </div>
             <p class="try-note">
               A two-minute walkthrough on a private local test chain. Needs Node.js 24 on macOS or
-              Linux. From source:
-              <a href="https://github.com/ABDULMUNAFZ/tortoise-gate#quickstart">quickstart</a>.
+              Linux. Then <a href="get-started.html">put it in front of your own agent</a>.
             </p>
           </div>
 
@@ -538,6 +205,10 @@ Where its values came from:
 Ledger: OK, 13 entries verified, signed up to entry 13.
 Entries this report rests on: 3, 4, 5, 6, 7; all covered by a signed checkpoint.</code></pre>
           <div class="prose">
+            <p>
+              <a href="real-run.html">See a real Claude Code agent run through the gate</a>, with
+              the actual approval and Explain screens.
+            </p>
             <p>
               The same questions can run on TigerGraph if you connect one. That is opt-in, and only
               ids, verdicts and keyed hashes are sent, never your tool arguments or results.

@@ -63,6 +63,8 @@ Without `--ci`, the paused payment waits for you to click Approve or Deny in the
 
 ## Demo with Claude Code and a real model
 
+A recorded test of the published package with Claude Code and a real model, three runs, real screenshots: [docs/real-world-test.md](docs/real-world-test.md) and https://tortoise-gate.vercel.app/real-run.html.
+
 Claude Code pays invoices from an inbox through Tortoise Gate, on a local Anvil chain (testnet only). Full walkthrough and a recorded run: [docs/demo.md](docs/demo.md).
 
 ```sh
