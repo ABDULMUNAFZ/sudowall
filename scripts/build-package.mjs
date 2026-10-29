@@ -120,7 +120,8 @@ const pkg = {
     "Open-source firewall for AI agents. Checks every MCP tool call before it runs, pauses or blocks risky ones, and keeps a tamper-evident log. Nothing moves until it's checked.",
   license: 'Apache-2.0',
   type: 'module',
-  bin: { tortoisegate: './dist/main.js' },
+  // npm normalises bin paths on publish and warns about a leading ./, so write the normal form.
+  bin: { tortoisegate: 'dist/main.js' },
   files: ['dist', 'assets', 'LICENSE', 'README.md'],
   engines: { node: '>=24.0.0' },
   os: ['darwin', 'linux'],
