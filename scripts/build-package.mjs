@@ -125,7 +125,7 @@ const pkg = {
   engines: { node: '>=24.0.0' },
   os: ['darwin', 'linux'],
   repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/tortoise-gate.git' },
-  homepage: 'https://abdulmunafz.github.io/tortoise-gate/',
+  homepage: 'https://tortoise-gate.vercel.app/',
   bugs: { url: 'https://github.com/ABDULMUNAFZ/tortoise-gate/issues' },
   keywords: [
     'ai-agents',
