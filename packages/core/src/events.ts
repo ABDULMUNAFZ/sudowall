@@ -100,8 +100,10 @@ export const ToolResultEventSchema = z.strictObject({
   rawSha256: Sha256HexSchema.nullable(),
   /** JSON-RPC error from the upstream (protocol-error outcome); null otherwise. */
   error: z.strictObject({ code: z.int(), message: z.string() }).nullable(),
-  /** Result after redaction; null when the call never reached the upstream. */
+  /** Result after redaction; null when the call never reached the upstream or was too large. */
   result: JsonValueSchema.nullable(),
+  /** Paths relative to `result`, or to `error` (`/message`) for a protocol error. */
+  redaction: RedactionSchema,
   /** True when `result` was cut to the configured storage limit. */
   truncated: z.boolean(),
   /** SHA-256 of the canonical JSON of the full redacted result, before truncation. */

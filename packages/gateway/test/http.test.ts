@@ -144,10 +144,10 @@ describe('config sections not implemented yet', () => {
       redaction: { rules: [{ path: '/password', method: 'removed' }] },
       policy: { path: 'p.yaml' },
     });
-    expect(unimplementedConfig(config)).toEqual(['redaction.rules (Phase 2)', 'policy (Phase 4)']);
+    expect(unimplementedConfig(config)).toEqual(['policy (Phase 4)']);
     await expect(
       runGateway({ config, log: silentLogger, sink: new MemorySink(), stateDir: tempDir() }),
-    ).rejects.toThrow(/does not implement: redaction\.rules/);
+    ).rejects.toThrow(/does not implement: policy/);
   });
 });
 

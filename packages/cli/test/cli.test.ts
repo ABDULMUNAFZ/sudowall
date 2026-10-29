@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { openStateDb } from '@tortoisegate/ledger';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { GATEWAY_VERSION } from '@tortoisegate/gateway';
@@ -20,20 +21,28 @@ const EVERYTHING = fileURLToPath(
 const tmp = () => mkdtempSync(join(tmpdir(), 'tg-cli-'));
 
 function cli(args: string[], env: Record<string, string> = {}) {
+  const home = tmp();
   const r = spawnSync(process.execPath, [CLI, ...args], {
     encoding: 'utf8',
-    env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: tmp(), ...env },
+    env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: home, XDG_CONFIG_HOME: home, ...env },
     input: '',
     timeout: 20_000,
   });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
+/** Events recorded in the ledger, in order. */
 function events(home: string): Record<string, unknown>[] {
-  return readFileSync(join(home, 'tortoisegate', 'events.jsonl'), 'utf8')
-    .split('\n')
-    .filter((l) => l !== '')
-    .map((l) => JSON.parse(l) as Record<string, unknown>);
+  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  try {
+    return (
+      db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {
+        event_json: string;
+      }[]
+    ).map((r) => JSON.parse(r.event_json) as Record<string, unknown>);
+  } finally {
+    db.close();
+  }
 }
 
 describe('upstream id for a wrapped command', () => {
@@ -124,7 +133,7 @@ describe('wrap', () => {
       new StdioClientTransport({
         command: process.execPath,
         args: [CLI, 'wrap', '--config', cfg, '--mode', 'enforce', '--', EVERYTHING, 'stdio'],
-        env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: home },
+        env: { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: home, XDG_CONFIG_HOME: home },
         stderr: 'ignore',
       }),
     );
@@ -157,6 +166,7 @@ describe('wrap', () => {
       env: {
         PATH: process.env['PATH'] ?? '',
         XDG_STATE_HOME: home,
+        XDG_CONFIG_HOME: home,
         MEMORY_FILE_PATH: join(home, 'm.jsonl'),
       },
       stdio: ['pipe', 'pipe', 'ignore'],

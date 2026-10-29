@@ -7,3 +7,5 @@ export * from './config.js';
 export * from './errors.js';
 export * from './versioning.js';
 export * from './raw-json.js';
+export * from './canonical.js';
+export * from './glob.js';

@@ -1,6 +1,7 @@
 import { mkdir, open, rename, rm, stat, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { EventSchema, type Event } from '@tortoisegate/core';
+import { prepareForStorage, type Ledger, type Redactor } from '@tortoisegate/ledger';
 import { z } from 'zod';
 
 /** Where gateway events go. `write` resolves only once the event is accepted by the store. */
@@ -110,5 +111,60 @@ async function exists(p: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Redacts each event and applies the stored-result size limit before any store sees it, so the
+ * ledger hashes the redacted form and secrets never reach disk (ledger-spec §8).
+ */
+export class PreparingSink implements EventSink {
+  constructor(
+    private readonly redactor: () => Redactor,
+    private readonly maxStoredResultBytes: number,
+    private readonly inner: EventSink,
+  ) {}
+
+  async write(event: Event): Promise<void> {
+    await this.inner.write(prepareForStorage(event, this.redactor(), this.maxStoredResultBytes));
+  }
+
+  close(): Promise<void> {
+    return this.inner.close();
+  }
+}
+
+/** Writes each event to every sink; fails if any of them fails. */
+export class FanoutSink implements EventSink {
+  constructor(private readonly sinks: readonly EventSink[]) {}
+
+  async write(event: Event): Promise<void> {
+    await Promise.all(this.sinks.map((s) => s.write(event)));
+  }
+
+  async close(): Promise<void> {
+    await Promise.all(this.sinks.map((s) => s.close()));
+  }
+}
+
+/**
+ * Appends events to the signed ledger. The ledger is opened on first use and, if opening fails
+ * (for example a key mismatch), again on every later write, so each write reports the failure
+ * and the gateway applies its ledger-unavailable stance.
+ */
+export class LedgerSink implements EventSink {
+  constructor(private readonly ledger: () => Ledger) {}
+
+  write(event: Event): Promise<void> {
+    try {
+      this.ledger().append(event);
+      return Promise.resolve();
+    } catch (e) {
+      return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 }

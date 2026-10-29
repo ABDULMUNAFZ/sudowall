@@ -830,7 +830,8 @@ export class Session {
       requestId: JSON.parse(m.idKey) as string | number,
       rawSha256,
       arguments: args as JsonObject,
-      redaction: { ruleVersion: this.cfg.redaction.ruleVersion, applied: [] },
+      // Filled in by the storage layer before the event is hashed or stored.
+      redaction: { ruleVersion: 0, applied: [] },
       provenance: null,
       decision,
     };
@@ -953,11 +954,8 @@ export class Session {
           } else {
             const isErr = rawGet(resultNode, 'isError');
             outcome = isErr?.kind === 'true' ? 'tool-error' : 'ok';
-            const limit = this.cfg.ledger?.maxStoredResultBytes ?? 262_144;
-            resultValue =
-              resultNode.end - resultNode.start <= limit
-                ? (nodeValue(m.text, resultNode) as JsonValue)
-                : null;
+            // The full result is parsed for provenance; the storage layer applies the size limit.
+            resultValue = nodeValue(m.text, resultNode) as JsonValue;
           }
         }
       }
@@ -970,9 +968,7 @@ export class Session {
       }
       this.client.send(text, { requestIdKey: p.clientIdKey, final: true });
       if (p.toolCall !== undefined) {
-        const truncated =
-          outcome !== 'protocol-error' && resultNode !== undefined && resultValue === null;
-        void this.recordResult(p, outcome, resultValue, sha256(m.text), error, truncated);
+        void this.recordResult(p, outcome, resultValue, sha256(m.text), error);
       }
       return;
     }
@@ -1210,7 +1206,6 @@ export class Session {
     result: JsonValue | null,
     rawSha256: string | null,
     error: ToolResultEvent['error'],
-    truncated = false,
   ): Promise<void> {
     const call = p.toolCall;
     if (call === undefined) return Promise.resolve();
@@ -1228,7 +1223,9 @@ export class Session {
       rawSha256,
       error,
       result,
-      truncated,
+      // Filled in by the storage layer (redaction, size limit, hash of the redacted result).
+      redaction: { ruleVersion: 0, applied: [] },
+      truncated: false,
       resultSha256: null,
       source: null,
       durationMs: Date.now() - call.startedAt,

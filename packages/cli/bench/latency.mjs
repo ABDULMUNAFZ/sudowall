@@ -59,7 +59,7 @@ async function measure(label, args, env) {
 const home = mkdtempSync(join(tmpdir(), 'tg-bench-'));
 const cfg = join(home, 'enforce.json');
 writeFileSync(cfg, JSON.stringify({ deny: { tools: [{ tool: 'never-called' }] } }));
-const env = { PATH: process.env.PATH ?? '', XDG_STATE_HOME: home };
+const env = { PATH: process.env.PATH ?? '', XDG_STATE_HOME: home, XDG_CONFIG_HOME: home };
 
 try {
   const direct = await measure('direct', [EVERYTHING, 'stdio'], env);

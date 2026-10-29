@@ -48,7 +48,7 @@ Written **before** the call is forwarded (write-ahead).
 | `tool`       | string                                                               | The upstream's own tool name, not the namespaced name          |
 | `requestId`  | string \| integer                                                    | JSON-RPC id from the client                                    |
 | `rawSha256`  | Sha256Hex                                                            | SHA-256 of the exact request text the client sent (ADR 0010)   |
-| `arguments`  | JSON object                                                          | **After redaction** (Phase 2; Phase 1 stores them as received) |
+| `arguments`  | JSON object                                                          | **After redaction** (`ledger-spec.md` §8)                      |
 | `redaction`  | `{ruleVersion, applied: [{path, method: "removed"\|"hmac-sha256"}]}` | Paths are relative to `arguments`                              |
 | `provenance` | ProvenanceReport \| null                                             | null until the provenance engine runs (Phase 3)                |
 | `decision`   | Decision                                                             | See below                                                      |
@@ -92,7 +92,8 @@ ArgumentMatch:
 | `outcome`        | `ok` \| `tool-error` \| `protocol-error` \| `blocked` \| `denied` \| `timeout` \| `cancelled` | `blocked` and `denied` mean the upstream was never called                             |
 | `rawSha256`      | Sha256Hex \| null                                                                             | SHA-256 of the exact response text the upstream sent; null if it never answered       |
 | `error`          | `{code, message}` \| null                                                                     | The JSON-RPC error, for `protocol-error`; null otherwise                              |
-| `result`         | JsonValue \| null                                                                             | **After redaction**, cut to `ledger.maxStoredResultBytes`. null if no upstream result |
+| `result`         | JsonValue \| null                                                                             | **After redaction**; null if over `ledger.maxStoredResultBytes` or no upstream result |
+| `redaction`      | `{ruleVersion, applied: [{path, method}]}`                                                    | Paths relative to `result`, or to `error` (`/message`) for a protocol error           |
 | `truncated`      | boolean                                                                                       |                                                                                       |
 | `resultSha256`   | Sha256Hex \| null                                                                             | Hash of `tgjson` of the full redacted result before truncation                        |
 | `source`         | Source \| null                                                                                | The provenance source created from this result                                        |

@@ -26,7 +26,7 @@ describe('config schema', () => {
     expect(c.mode).toBe('observe');
     expect(c.failure.onPolicyErrorNonSink).toBe('block');
     expect(c.trust.trustedTools).toEqual([]);
-    expect(c.ledger?.checkpoint).toEqual({ everyEntries: 256, everySeconds: 60 });
+    expect(c.ledger.checkpoint).toEqual({ everyEntries: 256, everySeconds: 60 });
     expect(c.ui.port).toBe(0);
   });
 

@@ -1,12 +1,13 @@
 // Conformance: real SDK clients against the official reference servers, once directly and once
 // through `tortoisegate wrap` / `serve`. Each scenario's observable results must be identical.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { openStateDb } from '@tortoisegate/ledger';
 import { Client as V2Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport as V2Stdio } from '@modelcontextprotocol/client/stdio';
 import { Client as V1Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -169,7 +170,11 @@ async function run(kind: ClientKind, t: Target, via: 'direct' | 'gateway', home:
   t.reset();
   const argv = t.argv();
   const [cmd, ...args] = via === 'direct' ? argv : [process.execPath, CLI, 'wrap', '--', ...argv];
-  const c = await connect(kind, cmd ?? '', args, { ...t.env(), XDG_STATE_HOME: home });
+  const c = await connect(kind, cmd ?? '', args, {
+    ...t.env(),
+    XDG_STATE_HOME: home,
+    XDG_CONFIG_HOME: home,
+  });
   try {
     return normalise(await t.scenario(c));
   } finally {
@@ -177,11 +182,18 @@ async function run(kind: ClientKind, t: Target, via: 'direct' | 'gateway', home:
   }
 }
 
+/** Events recorded in the ledger, in order. */
 function events(home: string): Record<string, unknown>[] {
-  return readFileSync(join(home, 'tortoisegate', 'events.jsonl'), 'utf8')
-    .split('\n')
-    .filter((l) => l !== '')
-    .map((l) => JSON.parse(l) as Record<string, unknown>);
+  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  try {
+    return (
+      db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {
+        event_json: string;
+      }[]
+    ).map((r) => JSON.parse(r.event_json) as Record<string, unknown>);
+  } finally {
+    db.close();
+  }
 }
 
 describe.each(Object.keys(TARGETS))('%s', (name) => {
@@ -258,6 +270,7 @@ describe('Streamable HTTP upstream (server-everything)', () => {
     );
     const c = await connect(kind, process.execPath, [CLI, 'serve', '--config', cfgPath], {
       XDG_STATE_HOME: home,
+      XDG_CONFIG_HOME: home,
     });
     try {
       const tools = await c.listTools();

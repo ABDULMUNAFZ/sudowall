@@ -40,24 +40,33 @@ Secrets never go in the file. Use `{ "fromEnv": "NAME" }`; the value is read fro
 
 ## Settings
 
-| Key                                       | Default                    | Meaning                                                                                                                                   |
-| ----------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `schemaVersion`                           | required, `1`              | Older versions are migrated; newer ones are refused                                                                                       |
-| `mode`                                    | `observe`                  | `observe` records what would happen and never blocks. `enforce` applies the deny list (and later the policy). `--mode` overrides it       |
-| `upstreams[]`                             | required, at least 1       | See below. Ids are unique slugs (`^[a-z0-9][a-z0-9-]{0,62}$`)                                                                             |
-| `listen`                                  | `{ "transport": "stdio" }` | Or `{ "transport": "streamable-http", "port": 0, "path": "/mcp" }`. HTTP always binds `127.0.0.1`; `0` picks a free port                  |
-| `namespacing.scheme`                      | `on-collision`             | `on-collision` prefixes a tool name only when two upstreams offer it; `always` prefixes all. See [ADR 0013](adr/0013-tool-namespacing.md) |
-| `namespacing.separator`                   | `__`                       | 1–4 of `A-Za-z0-9_.-`                                                                                                                     |
-| `deny.tools[]`                            | `[]`                       | `{ "server": glob = "*", "tool": glob }`. `*` matches any run of characters. Blocked in `enforce`; recorded as would-block in `observe`   |
-| `limits.maxMessageBytes`                  | 16 MiB                     | Largest JSON-RPC message from either side. Larger: -32002 (HTTP 413)                                                                      |
-| `limits.requestTimeoutMs`                 | 600000                     | Unanswered requests get -32003 and are cancelled upstream. `0` disables                                                                   |
-| `upstreamLifecycle.healthIntervalMs`      | 30000                      | Probe an idle upstream this often (`ping` or `server/discover`)                                                                           |
-| `upstreamLifecycle.healthTimeoutMs`       | 10000                      | A probe or handshake slower than this counts as failed                                                                                    |
-| `upstreamLifecycle.restartInitialDelayMs` | 250                        | First restart delay; doubles each time                                                                                                    |
-| `upstreamLifecycle.restartMaxDelayMs`     | 30000                      | Cap on the restart delay                                                                                                                  |
-| `upstreamLifecycle.restartMaxAttempts`    | 8                          | Consecutive failed restarts before the upstream is marked down                                                                            |
-| `upstreamLifecycle.shutdownGraceMs`       | 2000                       | Wait between closing stdin / SIGTERM and SIGKILL                                                                                          |
-| `events.jsonl`                            | `<stateDir>/events.jsonl`  | `{ "path", "rotateBytes": 64 MiB, "keepFiles": 10 }`                                                                                      |
+| Key                                       | Default                    | Meaning                                                                                                                                                                                        |
+| ----------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`                           | required, `1`              | Older versions are migrated; newer ones are refused                                                                                                                                            |
+| `mode`                                    | `observe`                  | `observe` records what would happen and never blocks. `enforce` applies the deny list (and later the policy). `--mode` overrides it                                                            |
+| `upstreams[]`                             | required, at least 1       | See below. Ids are unique slugs (`^[a-z0-9][a-z0-9-]{0,62}$`)                                                                                                                                  |
+| `listen`                                  | `{ "transport": "stdio" }` | Or `{ "transport": "streamable-http", "port": 0, "path": "/mcp" }`. HTTP always binds `127.0.0.1`; `0` picks a free port                                                                       |
+| `namespacing.scheme`                      | `on-collision`             | `on-collision` prefixes a tool name only when two upstreams offer it; `always` prefixes all. See [ADR 0013](adr/0013-tool-namespacing.md)                                                      |
+| `namespacing.separator`                   | `__`                       | 1–4 of `A-Za-z0-9_.-`                                                                                                                                                                          |
+| `deny.tools[]`                            | `[]`                       | `{ "server": glob = "*", "tool": glob }`. `*` matches any run of characters. Blocked in `enforce`; recorded as would-block in `observe`                                                        |
+| `limits.maxMessageBytes`                  | 16 MiB                     | Largest JSON-RPC message from either side. Larger: -32002 (HTTP 413)                                                                                                                           |
+| `limits.requestTimeoutMs`                 | 600000                     | Unanswered requests get -32003 and are cancelled upstream. `0` disables                                                                                                                        |
+| `upstreamLifecycle.healthIntervalMs`      | 30000                      | Probe an idle upstream this often (`ping` or `server/discover`)                                                                                                                                |
+| `upstreamLifecycle.healthTimeoutMs`       | 10000                      | A probe or handshake slower than this counts as failed                                                                                                                                         |
+| `upstreamLifecycle.restartInitialDelayMs` | 250                        | First restart delay; doubles each time                                                                                                                                                         |
+| `upstreamLifecycle.restartMaxDelayMs`     | 30000                      | Cap on the restart delay                                                                                                                                                                       |
+| `upstreamLifecycle.restartMaxAttempts`    | 8                          | Consecutive failed restarts before the upstream is marked down                                                                                                                                 |
+| `upstreamLifecycle.shutdownGraceMs`       | 2000                       | Wait between closing stdin / SIGTERM and SIGKILL                                                                                                                                               |
+| `events.jsonl`                            | off                        | `{ "path", "rotateBytes": 64 MiB, "keepFiles": 10 }`. Optional copy of the (redacted) events as JSON Lines; the ledger is always written                                                       |
+| `ledger.path`                             | `<stateDir>/ledger.db`     | Shared state database: ledger, and later the provenance index, approvals and policy state. All gateway processes of a user share it                                                            |
+| `ledger.keyDir`                           | `<configDir>`              | Holds `ledger-signing-key.pem` and `hmac-secret.key` (0600, created on first use)                                                                                                              |
+| `ledger.checkpoint.everyEntries`          | 256                        | Sign a checkpoint after this many unsigned entries                                                                                                                                             |
+| `ledger.checkpoint.everySeconds`          | 60                         | Sign a checkpoint when the oldest unsigned entry is this old. Pending entries are also signed on clean shutdown                                                                                |
+| `ledger.maxStoredResultBytes`             | 262144                     | Larger results (canonical JSON, after redaction) are stored as `null` with `truncated: true`; their hash is kept                                                                               |
+| `ledger.durability`                       | `process-crash`            | `process-crash` (WAL, synchronous=NORMAL) or `power-loss` (synchronous=FULL, one fsync per entry). See [ADR 0014](adr/0014-ledger-storage.md)                                                  |
+| `ledger.busyTimeoutMs`                    | 5000                       | How long a write waits for another gateway process's lock                                                                                                                                      |
+| `redaction.ruleVersion`                   | 1                          | Version of your own rules, 0–999. Events record `1000 × built-in version + this`                                                                                                               |
+| `redaction.rules[]`                       | `[]`                       | `{ "server": glob, "tool": glob, "target": "arguments"\|"result"\|"both", "path": JSON Pointer, "method": "removed"\|"hmac-sha256" }`. Applied before the built-in rules (`ledger-spec.md` §8) |
 
 ### Upstreams
 
@@ -73,14 +82,18 @@ Streamable HTTP: `{ "id", "transport": "streamable-http", "url", "headers": {} }
 
 ## State directory
 
-`$XDG_STATE_HOME/tortoisegate` (default `~/.local/state/tortoisegate`) on Linux, `~/Library/Application Support/tortoisegate` on macOS, `%LOCALAPPDATA%\tortoisegate` on Windows. It holds `events.jsonl` (mode 0600, directory 0700) and `names.json` (stable tool names).
+`$XDG_STATE_HOME/tortoisegate` (default `~/.local/state/tortoisegate`) on Linux, `~/Library/Application Support/tortoisegate` on macOS, `%LOCALAPPDATA%\tortoisegate` on Windows. It holds `ledger.db` (mode 0600, directory 0700) and `names.json` (stable tool names).
 
-**Phase 1 limit:** `events.jsonl` stores tool arguments and results (results up to 256 KiB) **without redaction**. It is local, owner-only, and never sent anywhere. Redaction before storage arrives with the ledger in Phase 2.
+## Config directory
+
+`$XDG_CONFIG_HOME/tortoisegate` (default `~/.config/tortoisegate`) on Linux, the same directory as the state on macOS, `%APPDATA%\tortoisegate` on Windows. It holds the installation keys (`ledger-signing-key.pem`, `hmac-secret.key`, both 0600). The gateway refuses key files that other users can read.
+
+Arguments and results are redacted before they are stored anywhere (`ledger-spec.md` §8). Nothing is sent off the machine.
 
 ## Not implemented yet
 
-These keys exist in the schema for later phases. If any is set, the gateway **refuses to start** (exit 3) rather than ignore protection you asked for: `redaction.rules` and `ledger` (Phase 2), `trust.trustedTools` (Phase 3), `policy` (Phase 4).
+These keys exist in the schema for later phases. If any is set, the gateway **refuses to start** (exit 3) rather than ignore protection you asked for: `trust.trustedTools` (Phase 3), `policy` (Phase 4).
 
 ## Exit codes
 
-`0` clean exit, `1` runtime error, `2` usage error, `3` config error.
+`0` clean exit, `1` runtime error, `2` usage error, `3` config error, `4` ledger verification failed (`tortoisegate ledger verify`).

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename } from 'node:path';
+import { ledgerCommand } from './ledger-cmd.js';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { TortoiseGateError, parseConfig } from '@tortoisegate/core';
@@ -12,7 +13,7 @@ import {
   type LogLevel,
 } from '@tortoisegate/gateway';
 
-export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3 } as const;
+export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3, verifyFailed: 4 } as const;
 
 const USAGE = `Tortoise Gate ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
@@ -22,6 +23,12 @@ Usage:
       of the server command. Speaks MCP on stdin/stdout; logs go to stderr.
   tortoisegate serve --config <file>
       Run the gateway as configured (one or more upstreams; stdio or HTTP on 127.0.0.1).
+  tortoisegate ledger verify [--db <file>] [--key-dir <dir> | --public-key <base64url>]
+      Check the hash chain and signed checkpoints. Prints OK, or the first bad entry and why.
+  tortoisegate ledger inspect <seq | event id> [--db <file>]
+  tortoisegate ledger export [--db <file>] [--out <file>]
+      Write the ledger as JSON Lines (docs/ledger-spec.md section 6).
+  tortoisegate ledger key show [--key-dir <dir>]
   tortoisegate --version
   tortoisegate --help
 
@@ -29,9 +36,13 @@ Options:
   --config <file>     JSON config file (see docs/configuration.md)
   --mode <mode>       observe (default: log only) or enforce (apply the deny list)
   --log-level <lvl>   debug | info | warn | error (default: info)
+  --db <file>         state database (default: <state dir>/ledger.db)
+  --key-dir <dir>     installation key directory (default: <config dir>)
+
+Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verification failed.
 `;
 
-class UsageError extends Error {}
+export class UsageError extends Error {}
 
 function readConfigFile(path: string): unknown {
   let text: string;
@@ -126,6 +137,10 @@ export async function main(argv: string[]): Promise<number> {
       config: { type: 'string' },
       mode: { type: 'string' },
       'log-level': { type: 'string' },
+      db: { type: 'string' },
+      'key-dir': { type: 'string' },
+      'public-key': { type: 'string' },
+      out: { type: 'string' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -146,6 +161,14 @@ export async function main(argv: string[]): Promise<number> {
     throw new UsageError(`--mode must be observe or enforce, not "${values.mode}"`);
   }
   const log = createLogger({ level, base: { component: 'tortoisegate' } });
+  if (command === 'ledger') {
+    return ledgerCommand(positionals.slice(1), {
+      db: values.db,
+      keyDir: values['key-dir'],
+      publicKey: values['public-key'],
+      out: values.out,
+    });
+  }
 
   let raw: Record<string, unknown>;
   if (command === 'wrap') {

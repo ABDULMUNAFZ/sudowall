@@ -174,23 +174,36 @@ export const ConfigSchema = z
       .prefault({}),
     /** Policy engine config (Phase 4). */
     policy: z.strictObject({ path: z.string().min(1) }).optional(),
-    /** Ledger config (Phase 2). */
+    /** Ledger: the default event store (`docs/ledger-spec.md`). */
     ledger: z
       .strictObject({
-        path: z.string().min(1),
+        /** SQLite database shared by every gateway process of this user. Default `<stateDir>/ledger.db`. */
+        path: z.string().min(1).optional(),
+        /** Directory holding the signing key and HMAC secret (mode 0700). Default: the config dir. */
+        keyDir: z.string().min(1).optional(),
         checkpoint: z
           .strictObject({
             everyEntries: z.int().min(1).max(65536).default(256),
             everySeconds: z.int().min(1).max(86400).default(60),
           })
           .prefault({}),
-        /** Stored result size limit in bytes of canonical JSON; larger results are truncated. */
+        /** Stored result size limit in bytes of canonical JSON; larger results are not stored. */
         maxStoredResultBytes: z.int().min(1024).default(262144),
+        /**
+         * `process-crash` (SQLite WAL, synchronous=NORMAL): a committed entry survives the gateway
+         * being killed, but the last entries may be lost if the OS crashes or power fails.
+         * `power-loss` (synchronous=FULL): every commit is fsynced; costs one fsync per entry.
+         * See ADR 0014.
+         */
+        durability: z.enum(['process-crash', 'power-loss']).default('process-crash'),
+        /** How long a writer waits for another gateway process holding the write lock. */
+        busyTimeoutMs: z.int().min(0).max(60_000).default(5_000),
       })
-      .optional(),
+      .prefault({}),
     redaction: z
       .strictObject({
-        ruleVersion: z.int().nonnegative().default(1),
+        /** Version of your own rules (0-999). Recorded as 1000 x built-in version + this (ADR 0014). */
+        ruleVersion: z.int().min(0).max(999).default(1),
         rules: z.array(RedactionRuleSchema).default([]),
       })
       .prefault({}),

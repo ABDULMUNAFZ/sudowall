@@ -1,4 +1,3 @@
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { TortoiseGateError, type Config } from '@tortoisegate/core';
 import { checkEnvReferences } from './env.js';
@@ -7,19 +6,16 @@ import type { Logger } from './log.js';
 import { FileNameStore, type NameStore } from './namespacing.js';
 import { StaticDenyListPipeline, type DecisionPipeline } from './pipeline.js';
 import { Session } from './session.js';
-import { JsonlFileSink, ValidatingSink, type EventSink } from './sinks.js';
+import {
+  FanoutSink,
+  JsonlFileSink,
+  LedgerSink,
+  PreparingSink,
+  ValidatingSink,
+  type EventSink,
+} from './sinks.js';
+import { GatewayStore, defaultStateDir, storePaths } from './store.js';
 import { StdioServerChannel } from './stdio.js';
-
-/** Per-user state directory (XDG on Linux; macOS and Windows equivalents). */
-export function defaultStateDir(env: NodeJS.ProcessEnv = process.env): string {
-  if (process.platform === 'win32') {
-    return join(env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'), 'tortoisegate');
-  }
-  if (process.platform === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'tortoisegate');
-  }
-  return join(env['XDG_STATE_HOME'] ?? join(homedir(), '.local', 'state'), 'tortoisegate');
-}
 
 export interface GatewayOptions {
   config: Config;
@@ -29,13 +25,24 @@ export interface GatewayOptions {
   nameStore?: NameStore;
   stateDir?: string;
   env?: NodeJS.ProcessEnv;
+  /** Shared state (keys, ledger). Created from the config when absent. */
+  store?: GatewayStore;
 }
 
-export function createSink(config: Config, stateDir: string): EventSink {
+/**
+ * The default event path: validate, redact, then append to the signed ledger and, if configured,
+ * to a JSON Lines file as well.
+ */
+export function createSink(config: Config, store: GatewayStore): EventSink {
+  const sinks: EventSink[] = [new LedgerSink(() => store.ledger())];
   const j = config.events.jsonl;
-  const path = j?.path ?? join(stateDir, 'events.jsonl');
+  if (j !== undefined) sinks.push(new JsonlFileSink(j.path, j.rotateBytes, j.keepFiles));
   return new ValidatingSink(
-    new JsonlFileSink(path, j?.rotateBytes ?? 64 * 1024 * 1024, j?.keepFiles ?? 10),
+    new PreparingSink(
+      () => store.redactor(),
+      config.ledger.maxStoredResultBytes,
+      sinks.length === 1 ? (sinks[0] as EventSink) : new FanoutSink(sinks),
+    ),
   );
 }
 
@@ -53,8 +60,6 @@ export interface RunningGateway {
  */
 export function unimplementedConfig(config: Config): string[] {
   const out: string[] = [];
-  if (config.redaction.rules.length > 0) out.push('redaction.rules (Phase 2)');
-  if (config.ledger !== undefined) out.push('ledger (Phase 2)');
   if (config.trust.trustedTools.length > 0) out.push('trust.trustedTools (Phase 3)');
   if (config.policy !== undefined) out.push('policy (Phase 4)');
   return out;
@@ -74,8 +79,18 @@ export async function runGateway(
     );
   }
   checkEnvReferences(config.upstreams, opts.env ?? process.env);
-  const stateDir = opts.stateDir ?? defaultStateDir(opts.env);
-  const sink = opts.sink ?? createSink(config, stateDir);
+  const env = opts.env ?? process.env;
+  const stateDir = opts.stateDir ?? defaultStateDir(env);
+  const store = opts.store ?? new GatewayStore(storePaths(config, env, stateDir), config, log);
+  const inner = opts.sink ?? createSink(config, store);
+  // Closing the sink also signs pending ledger entries and closes the state database.
+  const sink: EventSink = {
+    write: (e) => inner.write(e),
+    close: async () => {
+      await inner.close();
+      store.close();
+    },
+  };
   const pipeline = opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools);
   const nameStore = opts.nameStore ?? new FileNameStore(join(stateDir, 'names.json'));
   const base = { config, pipeline, sink, log, nameStore, ...(opts.env ? { env: opts.env } : {}) };

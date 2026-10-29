@@ -186,6 +186,7 @@ export const event: fc.Arbitrary<Event> = fc.oneof(
         rawSha256: fc.option(sha256, { nil: null }),
         error: fc.option(fc.record({ code: fc.integer(), message: fc.string() }), { nil: null }),
         result: fc.option(jsonValue, { nil: null }),
+        redaction,
         truncated: fc.boolean(),
         resultSha256: fc.option(sha256, { nil: null }),
         source: fc.option(source, { nil: null }),

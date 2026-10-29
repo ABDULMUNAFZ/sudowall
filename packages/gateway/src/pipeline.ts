@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import type { DecisionAction, JsonObject, ServerRef, ToolResultEvent } from '@tortoisegate/core';
+import {
+  globMatch,
+  type DecisionAction,
+  type JsonObject,
+  type ServerRef,
+  type ToolResultEvent,
+} from '@tortoisegate/core';
+
+export { globMatch };
 
 /** Everything the decision path may look at for one tool call. No I/O handles, no clock. */
 export interface ToolCallContext {
@@ -36,24 +44,6 @@ export interface DecisionPipeline {
 export interface ToolSelector {
   server: string;
   tool: string;
-}
-
-/** `*` matches any run of characters; everything else is literal. */
-export function globMatch(glob: string, value: string): boolean {
-  const parts = glob.split('*');
-  if (parts.length === 1) return glob === value;
-  const first = parts[0] ?? '';
-  const last = parts[parts.length - 1] ?? '';
-  if (!value.startsWith(first) || value.length < first.length + last.length) return false;
-  if (!value.endsWith(last)) return false;
-  let pos = first.length;
-  const end = value.length - last.length;
-  for (const mid of parts.slice(1, -1)) {
-    const i = value.indexOf(mid, pos);
-    if (i === -1 || i + mid.length > end) return false;
-    pos = i + mid.length;
-  }
-  return true;
 }
 
 /**
