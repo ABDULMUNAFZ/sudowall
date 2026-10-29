@@ -15,6 +15,17 @@ const ALLOWED = new Set([
   'CC-BY-4.0',
   'Python-2.0',
   'Unlicense',
+  'Zlib',
+]);
+
+// Packages whose package.json does not name an SPDX licence, reviewed by hand. Keyed by exact
+// version, so an upgrade fails the check until someone reviews it again.
+const REVIEWED = new Map([
+  // package.json says "SEE LICENSE IN LICENSE" but ships no LICENSE file; README "License"
+  // section: "This MCP server is licensed under the MIT License." Test-only dev dependencies.
+  ['@modelcontextprotocol/server-everything@2.1.0', 'MIT'],
+  ['@modelcontextprotocol/server-filesystem@2.1.0', 'MIT'],
+  ['@modelcontextprotocol/server-memory@2.0.1', 'MIT'],
 ]);
 
 const DEV_ONLY_EXTRA = new Set(['MPL-2.0']);
@@ -33,8 +44,13 @@ function check(scopeFlag, allowed) {
   const bad = [];
   for (const [license, pkgs] of Object.entries(byLicense)) {
     if (isAllowed(license, allowed)) continue;
-    for (const p of pkgs)
-      bad.push(`${p.name}@${(p.versions ?? [p.version]).join(',')}: ${license}`);
+    for (const p of pkgs) {
+      for (const v of p.versions ?? [p.version]) {
+        const reviewed = REVIEWED.get(`${p.name}@${v}`);
+        if (reviewed !== undefined && isAllowed(reviewed, allowed)) continue;
+        bad.push(`${p.name}@${v}: ${license}`);
+      }
+    }
   }
   return { bad, types: Object.keys(byLicense).length };
 }
