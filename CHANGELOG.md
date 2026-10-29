@@ -1,0 +1,30 @@
+# Changelog
+
+All notable changes to Tortoise Gate. Versions follow [semantic versioning](https://semver.org/).
+
+## 0.1.0 (2026-10-30)
+
+First public release. Alpha: working end to end and tested, but young. Do not put it in front of real funds yet.
+
+### What works
+
+- **MCP gateway** for stdio and Streamable HTTP, on protocol revisions 2025-11-25 and 2026-07-28, in front of one or several upstream servers. Messages are forwarded byte for byte; the HTTP frontend binds 127.0.0.1 only and checks Host, Origin and a per-run bearer token.
+- **Source tracking**: values in tool results (EVM addresses, emails, URLs, amounts with context) are indexed by keyed hash, and later tool-call arguments are matched exactly, normalised, or as lookalikes (confusables, zero-width tricks, address poisoning).
+- **Deterministic policy** in YAML: allow, ask or block, each with an explanation; money-moving template.
+- **Approvals** in a local web UI, bound to the exact arguments, with a default-deny timeout.
+- **Tamper-evident ledger**: hash-chained SQLite log with Ed25519-signed Merkle checkpoints and `tortoisegate ledger verify`.
+- **Incident reports**: `tortoisegate incident <id>` and the UI's Explain panel trace each value in a call to the tool result it came from, with ledger proof. Optional TigerGraph backend.
+- **One npm package** with `tortoisegate demo` (self-contained walkthrough on a private local chain) and `tortoisegate init`.
+
+### Verified
+
+- 350 unit, property and integration tests, 3 browser tests, and a smoke test that installs the packed package into a path with spaces on Ubuntu and macOS.
+- Conformance against the official MCP reference servers with SDK clients v1 and v2, and Claude Code.
+- Added latency per tool call measured in `docs/performance.md`.
+
+### Known limits
+
+- Only tool calls that pass through the gate are checked, and only MCP today.
+- Matching catches structured values, not instructions an agent rewords.
+- The ledger proves the record was not edited, not that the agent behaved well.
+- macOS and Linux only; Windows is untested.

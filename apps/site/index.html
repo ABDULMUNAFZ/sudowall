@@ -493,6 +493,11 @@
                   <td>A real transaction on the local chain.</td>
                 </tr>
                 <tr>
+                  <td>Ask why the first payment was paused</td>
+                  <td class="v allow">Explain</td>
+                  <td>The address is traced to the invoice email and the call that read it.</td>
+                </tr>
+                <tr>
                   <td>Edit the record afterwards</td>
                   <td class="v block">Caught</td>
                   <td><code>ledger verify</code> names the exact entry that changed.</td>
@@ -511,6 +516,34 @@
           </div>
         </section>
 
+        <section aria-labelledby="why">
+          <div class="prose">
+            <h2 id="why">Ask why, after the fact</h2>
+            <p>
+              Every decision can be explained. Click Explain in the local UI, or run
+              <code>tortoisegate incident</code>, and Tortoise Gate traces each value in the call
+              back to the tool result it came from and the earlier call that read it. It also shows
+              that the ledger entries behind the answer verify.
+            </p>
+          </div>
+          <pre><code>$ tortoisegate incident 5
+Decision: ask; human denied it in the cli; outcome: denied
+Rules: ask-untrusted-recipient, ask-first-seen-recipient
+
+Where its values came from:
+  /to = 0xFe5c…91ed (evm-address): exact match with untrusted content from files/read_text_file
+    which was the result of files/read_text_file (event c826f674…, allow)
+
+Ledger: OK, 13 entries verified, signed up to entry 13.
+Entries this report rests on: 3, 4, 5, 6, 7; all covered by a signed checkpoint.</code></pre>
+          <div class="prose">
+            <p>
+              The same questions can run on TigerGraph if you connect one. That is opt-in, and only
+              ids, verdicts and keyed hashes are sent, never your tool arguments or results.
+            </p>
+          </div>
+        </section>
+
         <section aria-labelledby="use">
           <div class="prose">
             <h2 id="use">Put it in front of your agent</h2>
@@ -522,7 +555,8 @@
           </div>
           <pre><code>npx tortoisegate init
 claude mcp add my-server -- npx -y tortoisegate wrap --config &lt;config&gt; -- &lt;your server command&gt;
-npx tortoisegate ui --config &lt;config&gt;</code></pre>
+npx tortoisegate ui --config &lt;config&gt;
+npx tortoisegate incident &lt;event id&gt;</code></pre>
         </section>
 
         <section aria-labelledby="limits">
