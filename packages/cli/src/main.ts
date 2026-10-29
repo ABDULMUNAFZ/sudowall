@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { demoCommand } from './demo.js';
+import { initCommand } from './init-cmd.js';
 import { ledgerCommand } from './ledger-cmd.js';
 import { uiCommand } from './ui-cmd.js';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +21,12 @@ export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3, verifyFailed: 4 } 
 const USAGE = `Tortoise Gate ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
 Usage:
+  tortoisegate demo [--ci] [--keep] [--no-open]
+      Two-minute walkthrough on a private local test chain: a scripted agent (no LLM) reads
+      poisoned emails and tries three payments; you decide the paused one in the approval UI;
+      the ledger is verified, then shown catching an edit. Installs the pinned Anvil if missing.
+  tortoisegate init [--template <name>] [--dir <dir>] [--force]
+      Write a starter config (observe mode) and a policy template to your config directory.
   tortoisegate wrap [--config <file>] [--mode observe|enforce] -- <command> [args...]
       Run one stdio MCP server behind the gate. Put this in your MCP client's config in place
       of the server command. Speaks MCP on stdin/stdout; logs go to stderr.
@@ -42,6 +50,12 @@ Options:
   --log-level <lvl>   debug | info | warn | error (default: info)
   --db <file>         state database (default: <state dir>/ledger.db)
   --key-dir <dir>     installation key directory (default: <config dir>)
+  --template <name>   init: policy template to copy (default: money-moving)
+  --dir <dir>         init: where to write config.json and policy.yaml (default: <config dir>)
+  --force             init: overwrite existing files
+  --ci                demo: deny the paused payment automatically and exit when done
+  --keep              demo: keep the demo's temporary files
+  --no-open           demo: do not open the approval UI in a browser
 
 Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verification failed.
 `;
@@ -147,6 +161,12 @@ export async function main(argv: string[]): Promise<number> {
       'public-key': { type: 'string' },
       out: { type: 'string' },
       port: { type: 'string' },
+      template: { type: 'string' },
+      dir: { type: 'string' },
+      force: { type: 'boolean' },
+      ci: { type: 'boolean' },
+      keep: { type: 'boolean' },
+      'no-open': { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -173,6 +193,24 @@ export async function main(argv: string[]): Promise<number> {
       keyDir: values['key-dir'],
       publicKey: values['public-key'],
       out: values.out,
+    });
+  }
+
+  if (command === 'init') {
+    if (positionals.length > 1) throw new UsageError('init takes no arguments');
+    return initCommand({
+      template: values.template,
+      force: values.force === true,
+      dir: values.dir,
+    });
+  }
+
+  if (command === 'demo') {
+    if (positionals.length > 1) throw new UsageError('demo takes no arguments');
+    return demoCommand({
+      ci: values.ci === true,
+      keep: values.keep === true,
+      open: values['no-open'] !== true && process.stdout.isTTY,
     });
   }
 

@@ -17,11 +17,14 @@
     "format": "prettier --write .",
     "secrets": "gitleaks git --no-banner --redact .",
     "check:licenses": "node scripts/check-licenses.mjs",
-    "demo:setup": "pnpm build && node examples/scripted-agent/dist/setup.js"
+    "demo:setup": "pnpm build && node examples/scripted-agent/dist/setup.js",
+    "package": "pnpm build && node scripts/build-package.mjs",
+    "smoke:package": "node scripts/smoke-package.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
     "fast-check": "4.10.2",

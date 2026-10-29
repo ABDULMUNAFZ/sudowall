@@ -12,6 +12,7 @@ export default tseslint.config(
       'planning/**',
       '**/test-results/**',
       '**/playwright-report/**',
+      'release/**',
     ],
   },
   js.configs.recommended,

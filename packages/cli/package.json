@@ -1,6 +1,6 @@
 {
   "name": "tortoisegate",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Tortoise Gate: open-source firewall for AI agents. Nothing moves until it's checked.",
   "license": "Apache-2.0",
@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/main.d.ts",
       "import": "./dist/main.js"
+    },
+    "./demo-config": {
+      "types": "./dist/demo-config.d.ts",
+      "import": "./dist/demo-config.js"
     },
     "./package.json": "./package.json"
   },
@@ -26,21 +30,21 @@
     "bench:latency": "node bench/latency.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@tortoisegate/core": "workspace:*",
     "@tortoisegate/gateway": "workspace:*",
     "@tortoisegate/ledger": "workspace:*",
+    "@tortoisegate/policy": "workspace:*",
     "@tortoisegate/web-ui": "workspace:*"
   },
   "bin": {
     "tortoisegate": "./dist/main.js"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@modelcontextprotocol/server-everything": "2.1.0",
-    "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@modelcontextprotocol/server-memory": "2.0.1",
-    "@tortoisegate/policy": "workspace:*",
     "@types/better-sqlite3": "9.6.0",
     "better-sqlite3": "13.0.3"
   }

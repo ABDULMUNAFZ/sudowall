@@ -2,6 +2,8 @@ packages:
   - 'packages/*'
   - 'apps/*'
   - 'examples/*'
+allowBuilds:
+  esbuild: false
 minimumReleaseAgeExclude:
   - '@modelcontextprotocol/server-everything@2.1.0'
   - '@modelcontextprotocol/server-filesystem@2.1.0'

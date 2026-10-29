@@ -4,3 +4,4 @@ coverage/
 planning/
 test-results
 playwright-report
+release/

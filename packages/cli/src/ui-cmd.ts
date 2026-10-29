@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 import { LedgerConfigSchema, TortoiseGateError, UiConfigSchema } from '@tortoisegate/core';
 import { startUiServer, storePaths, type Logger } from '@tortoisegate/gateway';
+import { webUiDir } from './assets.js';
 import { UsageError } from './errors.js';
 
 export interface UiFlags {
@@ -10,12 +9,6 @@ export interface UiFlags {
   db: string | undefined;
   keyDir: string | undefined;
   port: string | undefined;
-}
-
-/** The built web app shipped as the @tortoisegate/web-ui workspace package. */
-function webUiDir(): string {
-  const require = createRequire(import.meta.url);
-  return join(dirname(require.resolve('@tortoisegate/web-ui/package.json')), 'dist');
 }
 
 function readConfigObject(path: string): Record<string, unknown> {

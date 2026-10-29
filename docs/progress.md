@@ -33,3 +33,11 @@ Checkpoint notes per step (done, tests, time).
 - Done: `examples/evm-mcp` (real MCP server, `get_balance` and `send_funds` with viem; local Anvil by default, Base Sepolia only with both env vars; chain allowlist 31337/84532 checked at start and before every signature; amounts as strings; key never logged); `scripts/install-foundry.sh` (pinned v1.8.6, SHA-256 checked); `demo/` inbox (hidden-instruction invoice, lookalike payout email); `pnpm demo:setup` (Anvil, funding, config with both upstreams in enforce mode and the money-moving template with one allowlisted address, printed Claude Code commands); `docs/demo.md` with a recorded real-model run; README quickstart and limits; ADR 0018; Foundry in CI.
 - Tests: `examples/evm-mcp` 7 tests on real Anvil (send, balance, refusal of chain 1, bad amounts and checksums); `examples/scripted-agent` e2e (scripted agent, no LLM; real gateway, filesystem server, EVM server and Anvil): ask then deny with balance unchanged, lookalike block, allowlisted payment with receipt and balance change, ledger sequence, verify OK, tampered DB exit 4. Manual Claude Code 2.1.312 run: model refused the injection by itself in run 1; with the user vouching for the emails, ask, deny and block worked; allowlisted payment mined; verify OK then `HASH_MISMATCH` at the edited entry.
 - Time: 17:26 to 17:55 (box 1.5 h).
+
+## 2026-10-30: launch readiness (run on macOS 26, Intel)
+
+### Step A: installable package, `init` and `demo`
+
+- Done: `scripts/build-package.mjs` bundles our own code into one `tortoisegate` package (third-party libraries stay pinned dependencies; the build fails if any `node_modules` file is bundled); `tortoisegate init` (observe-mode config and policy template, no overwrite without `--force`); `tortoisegate demo` (finds or installs Anvil, private chain on a free port, gateway, approval UI, scripted agent, verify and tamper check, full cleanup; `--ci`); demo config moved into the CLI and shared with the scripted-agent test; `scripts/smoke-package.mjs` and a CI job on Ubuntu and macOS; ADR 0019.
+- Tests: 338 tests green (5 new for `init` and `demo --ci`); smoke test on the packed tarball from a path with spaces: `--version`, `init`, `init` refusal, `wrap` in front of the filesystem server, `ledger verify`, `demo --ci`, all ok.
+- Time: about 1.5 h (box 2.5 h).

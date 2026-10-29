@@ -14,9 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@tortoisegate/example-evm-mcp": "workspace:*",
-    "@tortoisegate/policy": "workspace:*",
     "tortoisegate": "workspace:*"
   },
   "devDependencies": {
