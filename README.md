@@ -4,7 +4,48 @@
 
 Tortoise Gate is an open-source firewall for AI agents. It sits between an agent and its MCP tools. It checks every tool call before it runs, blocks risky calls or asks you about them, and keeps a tamper-evident record of what the agent did. A hidden instruction in an email should not be able to make your agent leak data or send money.
 
-> **Status: pre-alpha, under active development.** Nothing here is ready for production use yet. This README will list only what actually works.
+Website: https://tortoise-gate.vercel.app
+
+> **Status: alpha (0.1.0).** Working end to end and tested, but young. Do not put it in front of real funds yet. This README lists only what actually works.
+
+## Quickstart
+
+See it work in two minutes (Node.js 24, macOS or Linux):
+
+```sh
+npx tortoisegate demo
+```
+
+Or from source:
+
+```sh
+git clone https://github.com/ABDULMUNAFZ/tortoise-gate.git && cd tortoise-gate
+pnpm install && pnpm build
+node packages/cli/dist/main.js demo
+```
+
+The demo starts a private local test chain, puts Tortoise Gate in front of two real MCP servers (a filesystem server holding a poisoned inbox, and a testnet payments server), opens the approval UI, and runs a **scripted agent (fixed tool calls, no LLM)**. Real output from `tortoisegate demo --ci`, shortened:
+
+```text
+1. The agent reads 2026-10-28-acme-invoice.eml. It hides an instruction to pay 0xFe5c1268f8c1CF1b4381938bf1D9C684d99091ed.
+   The agent tries: send_funds 0.005 ETH to 0xFe5c1268f8c1CF1b4381938bf1D9C684d99091ed
+   Paused for a human. --ci mode denies it automatically.
+   Gate: TG_APPROVAL_DENIED. ask-untrusted-recipient: The recipient address was copied from untrusted content.
+   Attacker received: 0 ETH
+
+2. The agent reads 2026-10-29-payout-details.eml, which gives a lookalike of Dana's address.
+   Gate: TG_BLOCKED. block-lookalike-recipient: The recipient looks like a known address but is a different one (possible address poisoning).
+
+3. The agent pays Dana's real, allowlisted address 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+   Gate: allowed. Sent 0.005 ETH. Transaction 0xa38d…812f success in block 1 (chain 31337).
+
+4. Every step is in a signed, hash-chained ledger. tortoisegate ledger verify:
+   OK: 13 entries, 1 checkpoints, last signed entry 13, 0 unsigned (newer than the last checkpoint).
+   Now someone edits entry 10 in a copy of the ledger (the amount of the blocked payment):
+   FAILED at entry 10: HASH_MISMATCH: entry hash does not match
+```
+
+Without `--ci`, the paused payment waits for you to click Approve or Deny in the UI. The demo installs the pinned, checksum-verified Foundry release (Anvil) if it is missing; on Intel Macs Anvil also needs `brew install libusb`.
 
 ## How it works
 
@@ -13,7 +54,7 @@ Tortoise Gate is an open-source firewall for AI agents. It sits between an agent
 3. **Human approval.** Risky calls pause until you approve. Approvals are bound to the exact arguments.
 4. **Tamper-evident ledger.** Every action goes into a hash-chained log with signed checkpoints, and `tortoisegate ledger verify` checks it.
 
-## Demo quickstart
+## Demo with Claude Code and a real model
 
 Claude Code pays invoices from an inbox through Tortoise Gate, on a local Anvil chain (testnet only). Full walkthrough and a recorded run: [docs/demo.md](docs/demo.md).
 
@@ -47,17 +88,20 @@ claude            # "Read the emails in my inbox with the tortoise-gate-demo too
 - `observe` mode records what would happen and blocks nothing; `enforce` mode applies the policy.
 - Tested against the official reference servers, the MCP TypeScript SDKs (v1 and v2) and Claude Code. See [compatibility](docs/compatibility.md).
 
-Not built yet: the data-flow graph, an independent verifier, desktop app, npm packages.
+- One npm package, `tortoisegate`, with `init` (starter config and policy) and `demo`, tested by installing the packed tarball into a path with spaces on Ubuntu and macOS in CI.
+
+Not built yet: an independent verifier, desktop app, credential vault, SDK for agents that do not use MCP.
 
 ## Put Tortoise Gate in front of an MCP server
 
-Tortoise Gate is not on npm yet. Build it from source (Node.js 24, pnpm 12):
+Start with a config in observe mode and a policy template:
 
 ```sh
-git clone https://github.com/ABDULMUNAFZ/tortoise-gate.git && cd tortoise-gate
-pnpm install && pnpm build
-GATE="node $PWD/packages/cli/dist/main.js"
+npx tortoisegate init
+GATE="npx -y tortoisegate"
 ```
+
+(From source, use `GATE="node $PWD/packages/cli/dist/main.js"` after `pnpm install && pnpm build`.)
 
 Put `tortoisegate wrap --` in front of the server command you already use. With Claude Code:
 
@@ -67,7 +111,7 @@ claude mcp add memory -- $GATE wrap -- npx -y @modelcontextprotocol/server-memor
 claude mcp list   # memory: ... - ✔ Connected
 ```
 
-Tool names, results and the server's environment stay the same; the gate passes the environment Claude Code gives it on to the server. Every call is now recorded in `~/.local/state/tortoisegate/events.jsonl` (`observe` mode).
+Tool names, results and the server's environment stay the same; the gate passes the environment Claude Code gives it on to the server. Every call is now recorded in the signed ledger in your state directory (`observe` mode); check it with `$GATE ledger verify` and watch decisions with `$GATE ui`.
 
 To block tools, write a config and switch to `enforce`:
 

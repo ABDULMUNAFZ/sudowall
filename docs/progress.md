@@ -41,3 +41,9 @@ Checkpoint notes per step (done, tests, time).
 - Done: `scripts/build-package.mjs` bundles our own code into one `tortoisegate` package (third-party libraries stay pinned dependencies; the build fails if any `node_modules` file is bundled); `tortoisegate init` (observe-mode config and policy template, no overwrite without `--force`); `tortoisegate demo` (finds or installs Anvil, private chain on a free port, gateway, approval UI, scripted agent, verify and tamper check, full cleanup; `--ci`); demo config moved into the CLI and shared with the scripted-agent test; `scripts/smoke-package.mjs` and a CI job on Ubuntu and macOS; ADR 0019.
 - Tests: 338 tests green (5 new for `init` and `demo --ci`); smoke test on the packed tarball from a path with spaces: `--version`, `init`, `init` refusal, `wrap` in front of the filesystem server, `ledger verify`, `demo --ci`, all ok.
 - Time: about 1.5 h (box 2.5 h).
+
+### Steps B to D: UI polish, landing page, README and pitch
+
+- Done: UI header line, plural-correct ledger summary ("No signed checkpoint yet" instead of "entry none"), empty decision list; landing page `apps/site` (static, no cookies or third-party requests, 360 px and dark mode checked in a browser) deployed on Vercel at https://tortoise-gate.vercel.app because the owner's GitHub Pages custom domain points at another site; GitHub Pages disabled again; "tried it" issue form; README quickstart with real demo output; `docs/pitch.md` (90-second script, 3-minute pitch, honest answers); `docs/users.md`; repo homepage, topics, secret scanning and push protection set.
+- Tests: Playwright 3 passed locally with the new header and ledger checks; live site returns 200 and serves no dotfiles.
+- Time: about 1.5 h (boxes 1 h + 1.5 h + 1 h).

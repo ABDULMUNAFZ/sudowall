@@ -30,3 +30,4 @@ demo/.state/
 
 # publishable package build (scripts/build-package.mjs)
 release/
+.vercel/

@@ -5,3 +5,4 @@ planning/
 test-results
 playwright-report
 release/
+.vercel/
