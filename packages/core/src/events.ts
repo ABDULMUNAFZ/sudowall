@@ -144,4 +144,6 @@ export const EventSchema = z.discriminatedUnion('type', [
 export type Event = z.infer<typeof EventSchema>;
 export type EventType = Event['type'];
 export type ToolCallEvent = z.infer<typeof ToolCallEventSchema>;
+export type ServerRef = z.infer<typeof ServerRefSchema>;
+export type ClientInfo = z.infer<typeof ClientInfoSchema>;
 export type ToolResultEvent = z.infer<typeof ToolResultEventSchema>;

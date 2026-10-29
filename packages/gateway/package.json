@@ -31,5 +31,9 @@
     "@modelcontextprotocol/server-everything": "2.1.0",
     "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@modelcontextprotocol/server-memory": "2.0.1"
+  },
+  "dependencies": {
+    "@tortoisegate/core": "workspace:*",
+    "zod": "4.6.7"
   }
 }

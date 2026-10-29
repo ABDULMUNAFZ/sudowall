@@ -10,8 +10,8 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
     }
   },
   "files": [
@@ -22,5 +22,12 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tortoisegate/core": "workspace:*",
+    "@tortoisegate/gateway": "workspace:*"
+  },
+  "bin": {
+    "tortoisegate": "./dist/main.js"
   }
 }
