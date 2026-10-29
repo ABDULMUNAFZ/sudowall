@@ -53,10 +53,61 @@ function readConfigFile(path: string): unknown {
   }
 }
 
-/** Derives an upstream id slug from the wrapped command (e.g. "npx" + "@x/server-memory" -> "server-memory"). */
+/** Launchers whose first argument names the real server. */
+const LAUNCHERS = new Set([
+  'node',
+  'nodejs',
+  'npx',
+  'bunx',
+  'bun',
+  'deno',
+  'pnpm',
+  'pnpx',
+  'yarn',
+  'npm',
+  'dlx',
+  'exec',
+  'run',
+  'uv',
+  'uvx',
+  'tool',
+  'pipx',
+  'python',
+  'python3',
+  'py',
+  'docker',
+  'podman',
+]);
+/** File names that say nothing about the server; the directory above names it instead. */
+const GENERIC_FILES = new Set(['index', 'main', 'cli', 'server', 'bin', 'app', 'mcp']);
+const GENERIC_DIRS = new Set(['dist', 'build', 'lib', 'src', 'bin', 'out']);
+
+/**
+ * Derives a stable upstream id from the wrapped command line, e.g.
+ * `npx -y @modelcontextprotocol/server-memory` -> `server-memory`,
+ * `node /x/server-everything/dist/index.js stdio` -> `server-everything`.
+ */
 export function upstreamIdFor(command: string, args: readonly string[]): string {
-  const pkg = args.find((a) => !a.startsWith('-')) ?? command;
-  const slug = basename(pkg.split('@').filter(Boolean).pop() ?? pkg)
+  const words = [command, ...args].filter((a) => !a.startsWith('-'));
+  const name =
+    words.find(
+      (w) =>
+        !LAUNCHERS.has(
+          basename(w)
+            .replace(/\.(exe|cmd)$/i, '')
+            .toLowerCase(),
+        ),
+    ) ?? command;
+  const parts = name
+    .replace(/(?<=.)@[^/@]*$/, '') // version suffix: pkg@1.2.3
+    .split(/[\\/]/)
+    .filter((p) => p !== '' && !p.startsWith('@'));
+  let pick = (parts.at(-1) ?? name).replace(/\.(m?js|cjs|ts|py|exe|cmd|sh)$/i, '');
+  for (let k = parts.length - 2; GENERIC_FILES.has(pick.toLowerCase()) && k >= 0; k--) {
+    const dir = parts[k] ?? '';
+    if (!GENERIC_DIRS.has(dir.toLowerCase())) pick = dir;
+  }
+  const slug = pick
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '')

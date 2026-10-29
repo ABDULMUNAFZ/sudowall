@@ -54,6 +54,8 @@ const key = (server: string, name: string) => `${server}\u0000${name}`;
  * - `on-collision`: a name is prefixed only if more than one upstream offers it. A name that was
  *   already assigned (persisted) keeps its assignment, so a server that adds a clashing tool
  *   later cannot take over or rename a tool the client already knows.
+ * - A bare name shaped like another server's namespace (`<otherServer><sep>...`) is always
+ *   prefixed with its own server id, so it cannot impersonate that server.
  * Exposed names are always unique; a leftover clash gets a numeric suffix.
  */
 export class Namespacer {
@@ -73,6 +75,11 @@ export class Namespacer {
     const owners = new Map<string, number>();
     for (const l of lists)
       for (const n of new Set(l.names)) owners.set(n, (owners.get(n) ?? 0) + 1);
+    const servers = lists.map((l) => l.server);
+    // A bare name that looks like another server's namespace (`<other><sep>...`) is never
+    // exposed as-is: it could impersonate that server's prefixed tools.
+    const impersonates = (server: string, exposed: string) =>
+      servers.some((s) => s !== server && exposed.startsWith(`${s}${this.opts.separator}`));
     const taken = new Set<string>();
     this.forward = new Map();
     this.reverse = new Map();
@@ -89,13 +96,17 @@ export class Namespacer {
     for (const l of lists) {
       for (const name of new Set(l.names)) {
         const prior = this.assigned[key(l.server, name)];
-        if (prior !== undefined && !taken.has(prior)) place(l.server, name, prior);
+        if (prior !== undefined && !taken.has(prior) && !impersonates(l.server, prior))
+          place(l.server, name, prior);
         else pending.push({ server: l.server, name });
       }
     }
     for (const { server, name } of pending) {
       const prefixed =
-        this.opts.scheme === 'always' || (owners.get(name) ?? 0) > 1 || taken.has(name);
+        this.opts.scheme === 'always' ||
+        (owners.get(name) ?? 0) > 1 ||
+        taken.has(name) ||
+        impersonates(server, name);
       place(server, name, prefixed ? `${server}${this.opts.separator}${name}` : name);
     }
     this.store.save(this.assigned);

@@ -34,3 +34,11 @@ export function buildEnv(
   for (const [k, v] of Object.entries(spec.env)) out[k] = resolveEnvValue(v, gatewayEnv);
   return out;
 }
+
+/** Throws `MissingEnvError` for the first `{ fromEnv }` reference that is not set. */
+export function checkEnvReferences(upstreams: readonly Upstream[], env: NodeJS.ProcessEnv): void {
+  for (const u of upstreams) {
+    const values = u.transport === 'stdio' ? Object.values(u.env) : Object.values(u.headers);
+    for (const v of values) resolveEnvValue(v, env);
+  }
+}

@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { Config } from '@tortoisegate/core';
+import { TortoiseGateError, type Config } from '@tortoisegate/core';
+import { checkEnvReferences } from './env.js';
 import { HttpFrontend } from './http-frontend.js';
 import type { Logger } from './log.js';
 import { FileNameStore, type NameStore } from './namespacing.js';
@@ -46,11 +47,33 @@ export interface RunningGateway {
   stop(): Promise<void>;
 }
 
+/**
+ * Config sections that parse but are not implemented yet. Starting with them set would silently
+ * drop protection the user asked for (for example, redaction before storage), so it is refused.
+ */
+export function unimplementedConfig(config: Config): string[] {
+  const out: string[] = [];
+  if (config.redaction.rules.length > 0) out.push('redaction.rules (Phase 2)');
+  if (config.ledger !== undefined) out.push('ledger (Phase 2)');
+  if (config.trust.trustedTools.length > 0) out.push('trust.trustedTools (Phase 3)');
+  if (config.policy !== undefined) out.push('policy (Phase 4)');
+  return out;
+}
+
 /** Runs the gateway in the transport the config asks for. */
 export async function runGateway(
   opts: GatewayOptions & { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream },
 ): Promise<RunningGateway> {
   const { config, log } = opts;
+  const missing = unimplementedConfig(config);
+  if (missing.length > 0) {
+    throw new TortoiseGateError(
+      'INVALID_CONFIG',
+      `this version of Tortoise Gate does not implement: ${missing.join(', ')}. ` +
+        'Remove these settings; they would otherwise be ignored.',
+    );
+  }
+  checkEnvReferences(config.upstreams, opts.env ?? process.env);
   const stateDir = opts.stateDir ?? defaultStateDir(opts.env);
   const sink = opts.sink ?? createSink(config, stateDir);
   const pipeline = opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools);

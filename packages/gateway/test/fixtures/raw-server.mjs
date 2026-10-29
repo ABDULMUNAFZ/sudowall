@@ -14,7 +14,7 @@ if (process.env.CRASH_ON_START === '1') process.exit(3);
 
 const prefix = process.env.TOOLS_PREFIX ?? '';
 const record = process.env.RECORD_FILE;
-const tools = ['echo', 'slow', 'crash', 'huge', 'notify', 'sample'].map((n) => ({
+const tools = ['echo', 'slow', 'crash', 'huge', 'notify', 'sample', 'mrtr'].map((n) => ({
   name: `${prefix}${n}`,
   description: `test tool ${n}`,
   inputSchema: { type: 'object' },
@@ -111,6 +111,22 @@ function handle(line) {
           params: { messages: [], maxTokens: 1 },
         });
         return;
+      }
+      if (name === 'mrtr') {
+        // A 2026-07-28 multi round-trip request asking the client to elicit input.
+        return send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: {
+            resultType: 'input_required',
+            inputRequests: {
+              q: {
+                method: 'elicitation/create',
+                params: { message: 'PIN?', requestedSchema: { type: 'object' } },
+              },
+            },
+          },
+        });
       }
       if (name === 'notify') {
         const token = msg.params?._meta?.progressToken;

@@ -2,7 +2,7 @@ import { request } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { parseConfig } from '@tortoisegate/core';
-import { runGateway, type RunningGateway } from '../src/gateway.js';
+import { runGateway, unimplementedConfig, type RunningGateway } from '../src/gateway.js';
 import { silentLogger } from '../src/log.js';
 import { MemoryNameStore } from '../src/namespacing.js';
 import { MemorySink } from '../src/sinks.js';
@@ -134,4 +134,37 @@ describe('HTTP frontend with real SDK clients', () => {
       expect(sink.events.some((e) => e.type === 'tool.result')).toBe(true);
     });
   }
+});
+
+describe('config sections not implemented yet', () => {
+  it('refuses to start rather than silently ignore them', async () => {
+    const config = parseConfig({
+      schemaVersion: 1,
+      upstreams: [rawUpstream('raw')],
+      redaction: { rules: [{ path: '/password', method: 'removed' }] },
+      policy: { path: 'p.yaml' },
+    });
+    expect(unimplementedConfig(config)).toEqual(['redaction.rules (Phase 2)', 'policy (Phase 4)']);
+    await expect(
+      runGateway({ config, log: silentLogger, sink: new MemorySink(), stateDir: tempDir() }),
+    ).rejects.toThrow(/does not implement: redaction\.rules/);
+  });
+});
+
+describe('environment references', () => {
+  it('refuses to start when a { fromEnv } variable is not set', async () => {
+    const config = parseConfig({
+      schemaVersion: 1,
+      upstreams: [{ ...rawUpstream('raw'), env: { TOKEN: { fromEnv: 'TG_TEST_UNSET_VAR' } } }],
+    });
+    await expect(
+      runGateway({
+        config,
+        log: silentLogger,
+        sink: new MemorySink(),
+        stateDir: tempDir(),
+        env: {},
+      }),
+    ).rejects.toThrow(/TG_TEST_UNSET_VAR is referenced by the config but is not set/);
+  });
 });

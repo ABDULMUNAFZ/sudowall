@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { GATEWAY_VERSION } from '@tortoisegate/gateway';
+import { upstreamIdFor } from '../src/main.js';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const MEMORY = fileURLToPath(
@@ -34,6 +35,27 @@ function events(home: string): Record<string, unknown>[] {
     .filter((l) => l !== '')
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 }
+
+describe('upstream id for a wrapped command', () => {
+  it.each([
+    ['npx', ['-y', '@modelcontextprotocol/server-memory'], 'server-memory'],
+    ['npx', ['-y', '@modelcontextprotocol/server-memory@2.0.1'], 'server-memory'],
+    [
+      'node',
+      ['/x/node_modules/@scope/server-everything/dist/index.js', 'stdio'],
+      'server-everything',
+    ],
+    ['/x/server-everything/dist/index.js', ['stdio'], 'server-everything'],
+    ['uvx', ['mcp-server-fetch'], 'mcp-server-fetch'],
+    ['python3', ['-m', 'weather_server'], 'weather-server'],
+    ['docker', ['run', '-i', '--rm', 'ghcr.io/github/github-mcp-server'], 'github-mcp-server'],
+    ['./my-server', [], 'my-server'],
+    ['node', [], 'node'],
+    ['@@@', [], 'upstream'],
+  ])('%s %j -> %s', (cmd, args, id) => {
+    expect(upstreamIdFor(cmd, args)).toBe(id);
+  });
+});
 
 describe('tortoisegate command line', () => {
   it('prints the version and exits 0', () => {
@@ -72,6 +94,19 @@ describe('tortoisegate command line', () => {
     const bad = cli(['serve', '--config', join(dir, 'bad.json')]);
     expect(bad.code).toBe(3);
     expect(bad.stderr).toMatch(/not valid JSON/);
+
+    writeFileSync(
+      join(dir, 'env.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        upstreams: [
+          { id: 'x', transport: 'stdio', command: 'x', env: { T: { fromEnv: 'TG_NOPE' } } },
+        ],
+      }),
+    );
+    const env = cli(['serve', '--config', join(dir, 'env.json')]);
+    expect(env.code).toBe(3);
+    expect(env.stderr).toMatch(/TG_NOPE is referenced by the config but is not set/);
 
     writeFileSync(join(dir, 'schema.json'), '{"schemaVersion":1,"upstreams":[],"mode":"loose"}');
     const schema = cli(['serve', '--config', join(dir, 'schema.json')]);

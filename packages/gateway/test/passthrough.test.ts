@@ -97,6 +97,23 @@ describe('byte fidelity (passthrough)', () => {
     });
   });
 
+  it('turns a 2026-07-28 input_required result into an explicit error and records it', async () => {
+    h = startSession({ upstreams: [rawUpstream('raw')] });
+    const meta =
+      '"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}';
+    h.client.push(
+      `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"mrtr","arguments":{},${meta}}}`,
+    );
+    const res = await h.client.response('9');
+    expect(res['result']).toBeUndefined();
+    expect(res['error']).toMatchObject({
+      code: -32601,
+      message: expect.stringMatching(/input_required/) as unknown,
+    });
+    expect(h.client.received.some((r) => r.text.includes('elicitation/create'))).toBe(false);
+    expect(results(h).at(-1)).toMatchObject({ outcome: 'protocol-error' });
+  });
+
   it('refuses server-initiated sampling with an explicit error and never shows it to the client', async () => {
     h = startSession({ upstreams: [rawUpstream('raw')] });
     await handshake(h.client);
