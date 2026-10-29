@@ -111,7 +111,7 @@ In a sink rule every leaf names a sink argument with `arg`; in a server/tool rul
 
 ### 5.3 Actions and approvals
 
-_Deferred:_ a per-rule `approval` block. Approval timeouts and the timeout outcome come from the gateway config (`approvals`, step D).
+_Deferred:_ a per-rule `approval` block. Approval timeouts and the timeout outcome come from the gateway config (`approvals`, `configuration.md`; [UI and approvals](ui.md)).
 
 `reason` is static text plus the placeholders `{rule}`, `{sink}` and `{arg}`. It never interpolates argument values; the UI shows the values next to the reason from the event.
 

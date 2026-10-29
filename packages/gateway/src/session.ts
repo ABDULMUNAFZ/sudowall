@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   SCHEMA_VERSION,
+  canonicalSha256,
   rawGet,
   type ClientInfo,
   type Config,
@@ -18,6 +19,7 @@ import type { Channel, CloseReason, Related } from './channel.js';
 import { RpcCode, classify, errorResponse, resultResponse, type Message } from './jsonrpc.js';
 import type { Logger } from './log.js';
 import { MemoryNameStore, Namespacer, type NameStore } from './namespacing.js';
+import type { ApprovalChannel, ApprovalOutcome } from './approvals.js';
 import type { DecisionPipeline, PipelineVerdict } from './pipeline.js';
 import type { EventSink } from './sinks.js';
 import { applyEdits, nodeValue, setMember, type Edit } from './splice.js';
@@ -43,7 +45,11 @@ const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
 export const DECISION_META_KEY = 'tortoisegate/decision';
 
 export type GateCode =
-  'TG_BLOCKED' | 'TG_APPROVAL_DENIED' | 'TG_APPROVAL_UNAVAILABLE' | 'TG_LEDGER_UNAVAILABLE';
+  | 'TG_BLOCKED'
+  | 'TG_APPROVAL_DENIED'
+  | 'TG_APPROVAL_TIMEOUT'
+  | 'TG_APPROVAL_UNAVAILABLE'
+  | 'TG_LEDGER_UNAVAILABLE';
 
 interface Pending {
   method: string;
@@ -72,6 +78,8 @@ export interface SessionOptions {
   nameStore?: NameStore;
   now?: () => Date;
   env?: NodeJS.ProcessEnv;
+  /** Where `ask` calls wait for a human. Without one, `ask` fails closed. */
+  approvals?: ApprovalChannel;
 }
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -866,15 +874,76 @@ export class Session {
       return;
     }
     if (decision.effective === 'ask') {
-      // No approval channel exists until Phase 5: fail closed.
-      this.blockCall(
-        p,
-        m,
-        'TG_APPROVAL_UNAVAILABLE',
-        `${decision.reason} Approval is required but no approval channel is available.`,
-        decision.matchedRules,
-      );
-      return;
+      const approvals = this.opts.approvals;
+      if (approvals === undefined) {
+        this.blockCall(
+          p,
+          m,
+          'TG_APPROVAL_UNAVAILABLE',
+          `${decision.reason} Approval is required but no approval channel is available.`,
+          decision.matchedRules,
+        );
+        return;
+      }
+      let outcome: ApprovalOutcome;
+      try {
+        outcome = await approvals.request(
+          { call: event, argumentsSha256: canonicalSha256(event.arguments) },
+          () => this.gone(p),
+        );
+      } catch (e) {
+        this.log.error('APPROVAL FAILED: approval could not be requested', {
+          eventId: event.id,
+          error: (e as Error).message,
+        });
+        if (this.gone(p)) return;
+        this.blockCall(
+          p,
+          m,
+          'TG_APPROVAL_UNAVAILABLE',
+          `${decision.reason} Approval is required but the approval store failed.`,
+          decision.matchedRules,
+        );
+        return;
+      }
+      if (outcome.outcome === 'cancelled') return;
+      const timedOut = outcome.outcome === 'timed-out';
+      const release =
+        outcome.outcome === 'approved' || (timedOut && this.cfg.approvals.onTimeout === 'allow');
+      const resolved = await this.writeResolved(event, outcome, release);
+      if (this.gone(p)) return;
+      if (!resolved && mode === 'enforce') {
+        this.blockCall(
+          p,
+          m,
+          'TG_LEDGER_UNAVAILABLE',
+          'The approval could not be recorded, so the action was not run.',
+          [],
+        );
+        return;
+      }
+      if (!release) {
+        if (timedOut) {
+          this.blockCall(
+            p,
+            m,
+            'TG_APPROVAL_TIMEOUT',
+            `${decision.reason} No one approved this action within ${String(this.cfg.approvals.timeoutSeconds)} s.`,
+            decision.matchedRules,
+            'timeout',
+          );
+        } else {
+          this.blockCall(
+            p,
+            m,
+            'TG_APPROVAL_DENIED',
+            `${decision.reason} The user denied this action.`,
+            decision.matchedRules,
+            'denied',
+          );
+        }
+        return;
+      }
     }
     if (!up.send(forwardText)) {
       this.finish(p);
@@ -890,6 +959,41 @@ export class Session {
     }
   }
 
+  /** True once a call has been answered, cancelled, or its session closed (checked across awaits). */
+  private gone(p: Pending): boolean {
+    return p.cancelled || this.closed || !this.pending.has(p.clientIdKey);
+  }
+
+  /** Records an approval decision in the ledger. False if it could not be recorded. */
+  private async writeResolved(
+    call: ToolCallEvent,
+    o: ApprovalOutcome,
+    released: boolean,
+  ): Promise<boolean> {
+    try {
+      await this.opts.sink.write({
+        schemaVersion: SCHEMA_VERSION,
+        id: randomUUID(),
+        ts: this.now().toISOString(),
+        sessionId: this.id,
+        type: 'approval.resolved',
+        approvalId: o.approvalId,
+        callEventId: call.id,
+        argumentsSha256: canonicalSha256(call.arguments),
+        outcome: o.outcome === 'cancelled' ? 'denied' : o.outcome,
+        resultingAction: released ? 'allow' : 'block',
+        channel: o.channel,
+      });
+      return true;
+    } catch (e) {
+      this.log.error('EVENT SINK FAILED: approval decision could not be recorded', {
+        approvalId: o.approvalId,
+        error: (e as Error).message,
+      });
+      return false;
+    }
+  }
+
   /** Answers a call the gateway refused, as a tool result with isError (the model sees why). */
   private blockCall(
     p: Pending,
@@ -897,6 +1001,7 @@ export class Session {
     code: GateCode,
     reason: string,
     rules: { ruleId: string }[],
+    outcome: 'blocked' | 'denied' | 'timeout' = 'blocked',
   ): void {
     this.finish(p);
     const result: Record<string, unknown> = {
@@ -912,7 +1017,7 @@ export class Session {
     };
     if (this.clientEra === 'modern') result['resultType'] = 'complete';
     this.client.send(resultResponse(m.idKey, result), { requestIdKey: m.idKey, final: true });
-    void this.recordResult(p, 'blocked', null, null, null);
+    void this.recordResult(p, outcome, null, null, null);
   }
 
   // ---------------------------------------------------------------- upstream -> client

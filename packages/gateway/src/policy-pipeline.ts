@@ -85,7 +85,7 @@ export class PolicyPipeline implements DecisionPipeline {
     ];
   }
 
-  private describe(sourceId: string): string | undefined {
+  describeSource(sourceId: string): string | undefined {
     const list = this.listNames(sourceId);
     if (list !== undefined) return list;
     const s = this.deps.provenance().index.describe(sourceId);
@@ -114,7 +114,7 @@ export class PolicyPipeline implements DecisionPipeline {
       const ev = evaluatePolicy(this.policy, call, {
         report,
         state: this.deps.state(),
-        describe: (id) => this.describe(id),
+        describe: (id) => this.describeSource(id),
         onErrorNonSink: this.deps.onErrorNonSink,
       });
       result = {

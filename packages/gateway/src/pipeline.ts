@@ -63,6 +63,8 @@ export interface DecisionPipeline {
   onContent?(content: ObservedContent): void;
   /** Called once a forwarded call returned a successful result (updates policy state). */
   onExecuted?(call: ToolCallEvent): void;
+  /** Names a provenance source for people (server/tool, or a policy list); never content. */
+  describeSource?(sourceId: string): string | undefined;
   /** Events to record when a session starts (for example `policy.loaded`). */
   sessionEvents?(sessionId: string, now: Date): Event[];
 }

@@ -6,7 +6,8 @@ import { parseConfig, type ConfigInput, type Event } from '@tortoisegate/core';
 import type { Channel, CloseReason, Related } from '../src/channel.js';
 import { silentLogger } from '../src/log.js';
 import { MemoryNameStore, type NameStore } from '../src/namespacing.js';
-import { StaticDenyListPipeline } from '../src/pipeline.js';
+import type { ApprovalChannel } from '../src/approvals.js';
+import { StaticDenyListPipeline, type DecisionPipeline } from '../src/pipeline.js';
 import { Session } from '../src/session.js';
 import { MemorySink } from '../src/sinks.js';
 
@@ -115,7 +116,12 @@ export interface Harness {
 
 export function startSession(
   input: Omit<ConfigInput, 'schemaVersion'>,
-  opts: { nameStore?: NameStore; sink?: MemorySink } = {},
+  opts: {
+    nameStore?: NameStore;
+    sink?: MemorySink;
+    pipeline?: DecisionPipeline;
+    approvals?: ApprovalChannel;
+  } = {},
 ): Harness {
   const config = parseConfig({
     schemaVersion: 1,
@@ -132,10 +138,11 @@ export function startSession(
     config,
     client,
     clientTransport: 'stdio',
-    pipeline: new StaticDenyListPipeline(config.deny.tools),
+    pipeline: opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools),
     sink,
     log: silentLogger,
     nameStore: opts.nameStore ?? new MemoryNameStore(),
+    ...(opts.approvals === undefined ? {} : { approvals: opts.approvals }),
   });
   session.start();
   return { session, client, sink, events: sink.events };

@@ -10,6 +10,7 @@ import {
 } from '@tortoisegate/ledger';
 import { PolicyStateStore } from '@tortoisegate/policy';
 import { ProvenanceEngine } from '@tortoisegate/provenance';
+import { ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
 
 /** Per-user state directory (XDG on Linux; macOS and Windows equivalents). */
@@ -63,6 +64,7 @@ export class GatewayStore {
   private redactorCache: Redactor | undefined;
   private provenanceCache: ProvenanceEngine | undefined;
   private policyStateCache: PolicyStateStore | undefined;
+  private approvalsCache: ApprovalStore | undefined;
   private closed = false;
 
   constructor(
@@ -122,6 +124,12 @@ export class GatewayStore {
       deriveKey(this.keys().hmacSecret, 'policy-state'),
     );
     return this.policyStateCache;
+  }
+
+  /** Approvals, in the shared state database (decided in `tortoisegate ui`). */
+  approvals(): ApprovalStore {
+    this.approvalsCache ??= new ApprovalStore(this.ledger().db);
+    return this.approvalsCache;
   }
 
   /** Signs pending entries and closes the database. */

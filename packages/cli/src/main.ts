@@ -2,6 +2,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { ledgerCommand } from './ledger-cmd.js';
+import { uiCommand } from './ui-cmd.js';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { TortoiseGateError, parseConfig } from '@tortoisegate/core';
@@ -29,6 +30,9 @@ Usage:
   tortoisegate ledger export [--db <file>] [--out <file>]
       Write the ledger as JSON Lines (docs/ledger-spec.md section 6).
   tortoisegate ledger key show [--key-dir <dir>]
+  tortoisegate ui [--config <file>] [--port <n>] [--db <file>] [--key-dir <dir>]
+      Serve the local web UI on 127.0.0.1: live decisions, approvals, ledger Verify.
+      Prints the address to open; it contains this run's access token.
   tortoisegate --version
   tortoisegate --help
 
@@ -42,7 +46,8 @@ Options:
 Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verification failed.
 `;
 
-export class UsageError extends Error {}
+export { UsageError } from './errors.js';
+import { UsageError } from './errors.js';
 
 function readConfigFile(path: string): unknown {
   let text: string;
@@ -141,6 +146,7 @@ export async function main(argv: string[]): Promise<number> {
       'key-dir': { type: 'string' },
       'public-key': { type: 'string' },
       out: { type: 'string' },
+      port: { type: 'string' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -168,6 +174,15 @@ export async function main(argv: string[]): Promise<number> {
       publicKey: values['public-key'],
       out: values.out,
     });
+  }
+
+  if (command === 'ui') {
+    if (positionals.length > 1) throw new UsageError('ui takes no arguments');
+    await uiCommand(
+      { config: values.config, db: values.db, keyDir: values['key-dir'], port: values.port },
+      log,
+    );
+    return EXIT.ok;
   }
 
   let raw: Record<string, unknown>;

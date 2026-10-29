@@ -1,0 +1,218 @@
+:root {
+  --bg: #f7f6f2;
+  --panel: #ffffff;
+  --text: #1d1f1c;
+  --muted: #646a62;
+  --line: #dcdcd4;
+  --accent: #2f6b4f;
+  --allow: #2f6b4f;
+  --ask: #9a6a00;
+  --block: #b3261e;
+  --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151715;
+    --panel: #1e211e;
+    --text: #e7e8e3;
+    --muted: #9ca39a;
+    --line: #333833;
+    --accent: #6fc39a;
+    --allow: #6fc39a;
+    --ask: #e2b33c;
+    --block: #ef7b72;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+h1 {
+  margin: 0;
+  font-size: 22px;
+}
+h2 {
+  font-size: 16px;
+  margin: 32px 0 12px;
+}
+.top {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.tagline,
+.muted,
+.note {
+  color: var(--muted);
+}
+.count {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--ask);
+  color: var(--bg);
+  text-align: center;
+  font-size: 13px;
+}
+.cards {
+  display: grid;
+  gap: 12px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ask);
+  border-radius: 8px;
+  padding: 16px;
+}
+.card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+.countdown {
+  color: var(--muted);
+  font-weight: 400;
+}
+.key {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 12px 0;
+}
+.key .evidence {
+  display: contents;
+}
+dt {
+  color: var(--muted);
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  padding: 8px;
+  border-radius: 6px;
+}
+.hash {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.reason {
+  margin: 8px 0;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+button {
+  font: inherit;
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+button.approve {
+  background: var(--allow);
+  border-color: var(--allow);
+  color: var(--bg);
+}
+button.deny {
+  border-color: var(--block);
+  color: var(--block);
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ledger p {
+  margin: 4px 0 8px;
+}
+.ok {
+  color: var(--allow);
+}
+.error {
+  color: var(--block);
+}
+.banner {
+  border: 1px solid var(--block);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+.feed {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.feed th,
+.feed td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.feed td:last-child {
+  overflow-wrap: anywhere;
+}
+.badge {
+  font-weight: 600;
+}
+.badge.allow {
+  color: var(--allow);
+}
+.badge.ask {
+  color: var(--ask);
+}
+.badge.block {
+  color: var(--block);
+}
+.empty {
+  max-width: 560px;
+}
+@media (max-width: 640px) {
+  .feed th:first-child,
+  .feed td:first-child {
+    display: none;
+  }
+  .key {
+    grid-template-columns: 1fr;
+  }
+}

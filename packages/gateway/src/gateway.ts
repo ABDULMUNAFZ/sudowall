@@ -1,6 +1,7 @@
 import { join } from 'node:path';
-import { TortoiseGateError, type Config } from '@tortoisegate/core';
+import { TortoiseGateError, type Config, type ToolCallEvent } from '@tortoisegate/core';
 import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@tortoisegate/policy';
+import { DbApprovalChannel, type ApprovalChannel, type ApprovalDetails } from './approvals.js';
 import { checkEnvReferences } from './env.js';
 import { HttpFrontend } from './http-frontend.js';
 import type { Logger } from './log.js';
@@ -29,6 +30,34 @@ export interface GatewayOptions {
   env?: NodeJS.ProcessEnv;
   /** Shared state (keys, ledger). Created from the config when absent. */
   store?: GatewayStore;
+  /** Where `ask` calls wait. Default: approvals in the shared state database. */
+  approvals?: ApprovalChannel;
+}
+
+/** What the approval UI shows for a call: the ledger's redacted arguments and named sources. */
+export function approvalDetails(
+  call: ToolCallEvent,
+  store: GatewayStore,
+  pipeline: DecisionPipeline,
+): ApprovalDetails {
+  const redacted = store.redactor().redactEvent(call);
+  const name = (id: string) => {
+    // Explanations quote names in backticks; the UI shows them as plain text.
+    const named = pipeline.describeSource?.(id);
+    if (named !== undefined) return named.replace(/`/g, '');
+    const s = store.provenance().index.describe(id);
+    return s === undefined ? 'an earlier source' : `${s.serverId ?? '?'}/${s.origin ?? '?'}`;
+  };
+  return {
+    arguments: redacted.type === 'tool.call' ? redacted.arguments : {},
+    matchedRules: call.decision.matchedRules,
+    evidence: (call.provenance?.matches ?? []).map((m) => ({
+      argPath: m.argPath,
+      match: m.matchType === 'near' ? `near: ${m.nearKind}` : m.matchType,
+      label: m.sourceLabel,
+      sources: [...new Set(m.evidence.map((e) => name(e.sourceId)))],
+    })),
+  };
 }
 
 /**
@@ -102,7 +131,23 @@ export async function runGateway(
   const pipeline = opts.pipeline ?? createPipeline(config, store);
   if (policyPipeline) log.info('policy loaded', { path: config.policy?.path });
   const nameStore = opts.nameStore ?? new FileNameStore(join(stateDir, 'names.json'));
-  const base = { config, pipeline, sink, log, nameStore, ...(opts.env ? { env: opts.env } : {}) };
+  const approvals =
+    opts.approvals ??
+    new DbApprovalChannel(
+      () => store.approvals(),
+      config.approvals,
+      log,
+      (call) => approvalDetails(call, store, pipeline),
+    );
+  const base = {
+    config,
+    pipeline,
+    sink,
+    log,
+    nameStore,
+    approvals,
+    ...(opts.env ? { env: opts.env } : {}),
+  };
 
   if (config.listen.transport === 'stdio') {
     const channel = new StdioServerChannel(

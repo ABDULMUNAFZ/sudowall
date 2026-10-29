@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { existsSync } from 'node:fs';
+import { ApprovalStore } from '@tortoisegate/gateway';
 import { openStateDb } from '@tortoisegate/ledger';
 import { parsePolicyYaml } from '@tortoisegate/policy';
 
@@ -92,6 +94,26 @@ function setup() {
   return { home, inbox, cfg };
 }
 
+/** Denies every pending approval, as a person would in the UI, until stopped. */
+function denyApprovals(home: string): () => void {
+  const path = join(home, 'tortoisegate', 'ledger.db');
+  const timer = setInterval(() => {
+    if (!existsSync(path)) return;
+    const db = openStateDb(path);
+    try {
+      const store = new ApprovalStore(db);
+      for (const a of store.pending(Date.now())) {
+        store.resolve(a.id, 'denied', a.argumentsSha256, 'web-ui', Date.now());
+      }
+    } finally {
+      db.close();
+    }
+  }, 50);
+  return () => {
+    clearInterval(timer);
+  };
+}
+
 async function call(
   home: string,
   cfg: string,
@@ -109,6 +131,7 @@ async function call(
       stderr: 'ignore',
     }),
   );
+  const stop = denyApprovals(home);
   try {
     return (await client.callTool({ name: tool, arguments: args })) as {
       isError?: boolean;
@@ -116,6 +139,7 @@ async function call(
       _meta?: Record<string, { code: string; ruleIds: string[]; eventId: string }>;
     };
   } finally {
+    stop();
     await client.close();
   }
 }
@@ -132,9 +156,9 @@ describe('policy enforcement through the gateway', () => {
 
     const injected = await call(home, cfg, everything, 'echo', { message: ATTACKER });
     expect(injected.isError).toBe(true);
-    // Approvals arrive in the next step; until then an ask fails closed.
+    // The helper denies it in the approval store, as the user would in the UI.
     expect(decisionOf(injected)).toMatchObject({
-      code: 'TG_APPROVAL_UNAVAILABLE',
+      code: 'TG_APPROVAL_DENIED',
       ruleIds: ['ask-untrusted', 'ask-first-seen'],
     });
     expect(injected.content[0]?.text).toContain(
@@ -171,6 +195,15 @@ describe('policy enforcement through the gateway', () => {
       ['echo', 'allow'],
     ]);
     for (const c of calls) expect(c.decision.policySha256).toBe(sha);
+    // The approval decision is a ledger event bound to the asked call.
+    expect(ev.filter((e) => e['type'] === 'approval.resolved')).toEqual([
+      expect.objectContaining({
+        callEventId: calls[1]?.id,
+        outcome: 'denied',
+        resultingAction: 'block',
+        channel: 'web-ui',
+      }),
+    ]);
     // A blocked result's eventId resolves to the recorded call.
     expect(calls.map((c) => c.id)).toContain(decisionOf(lookalike)?.eventId);
     // The ledger still verifies.
@@ -186,10 +219,10 @@ describe('policy enforcement through the gateway', () => {
     const friend = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359';
     const first = await call(home, cfg, everything, 'echo', { message: friend });
     expect(decisionOf(first)).toMatchObject({
-      code: 'TG_APPROVAL_UNAVAILABLE',
+      code: 'TG_APPROVAL_DENIED',
       ruleIds: ['ask-first-seen'],
     });
-    // Not executed, so still first seen.
+    // Denied, so not executed and still first seen.
     const again = await call(home, cfg, everything, 'echo', { message: friend });
     expect(decisionOf(again)?.ruleIds).toEqual(['ask-first-seen']);
     // Observe mode forwards the call; the successful result records the recipient.

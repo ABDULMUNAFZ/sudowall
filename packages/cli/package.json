@@ -27,7 +27,8 @@
   "dependencies": {
     "@tortoisegate/core": "workspace:*",
     "@tortoisegate/gateway": "workspace:*",
-    "@tortoisegate/ledger": "workspace:*"
+    "@tortoisegate/ledger": "workspace:*",
+    "@tortoisegate/web-ui": "workspace:*"
   },
   "bin": {
     "tortoisegate": "./dist/main.js"

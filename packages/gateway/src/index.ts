@@ -14,3 +14,5 @@ export * from './session.js';
 export * from './gateway.js';
 export * from './store.js';
 export * from './policy-pipeline.js';
+export * from './approvals.js';
+export * from './ui-server.js';
