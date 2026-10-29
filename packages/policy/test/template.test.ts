@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { openStateDb } from '@tortoisegate/ledger';
 import { ProvenanceEngine, evmChecksum } from '@tortoisegate/provenance';
 import { describe, expect, it } from 'vitest';
@@ -18,8 +19,8 @@ import {
   type CallInput,
 } from '../src/index.js';
 
-const TEMPLATE = new URL('../templates/money-moving.yaml', import.meta.url).pathname;
-const DOC = new URL('../../../docs/policy-templates.md', import.meta.url).pathname;
+const TEMPLATE = fileURLToPath(new URL('../templates/money-moving.yaml', import.meta.url));
+const DOC = fileURLToPath(new URL('../../../docs/policy-templates.md', import.meta.url));
 const NOW = new Date('2026-10-29T12:00:00.000Z');
 
 /** Returns `addr` with its middle hex digits replaced: same first 4 and last 4 digits. */
