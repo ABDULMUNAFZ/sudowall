@@ -22,5 +22,15 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "@tortoisegate/core": "workspace:*",
+    "@tortoisegate/ledger": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "better-sqlite3": "13.0.3"
   }
 }

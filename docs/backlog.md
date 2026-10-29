@@ -30,6 +30,11 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 
 ## Provenance and policy
 
+- Free-text n-gram matching for reworded content; phone numbers, IBANs, Solana and Bitcoin addresses.
+- Full Unicode UTS #39 confusables data instead of the curated subset.
+- Pruning of provenance index rows older than the window.
+- Ledger events for resource reads and prompt contents, so their evidence resolves to a ledger entry.
+
 - Calldata decoding (viem) and transaction simulation for EVM sinks.
 - Solana and Bitcoin sink recognition.
 - Policy simulation UI ("what would this change have blocked?").

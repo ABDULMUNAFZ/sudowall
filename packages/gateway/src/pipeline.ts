@@ -3,9 +3,13 @@ import {
   globMatch,
   type DecisionAction,
   type JsonObject,
+  type JsonValue,
+  type ProvenanceReport,
   type ServerRef,
+  type Source,
   type ToolResultEvent,
 } from '@tortoisegate/core';
+import type { ProvenanceEngine } from '@tortoisegate/provenance';
 
 export { globMatch };
 
@@ -30,15 +34,44 @@ export interface PipelineVerdict {
   matchedRules: { ruleId: string; action: DecisionAction }[];
   reason: string;
   policySha256: string;
+  /** Provenance of the argument values, stored with the decision. */
+  provenance?: ProvenanceReport | null;
+}
+
+/** Content a server returned outside a tool call (resource read, prompt). */
+export interface ObservedContent {
+  kind: 'resource' | 'prompt';
+  serverId: string;
+  origin: string;
+  content: JsonValue;
+  observedAt: Date;
 }
 
 /**
- * The seam the policy engine (Phase 4) plugs into. `decideToolCall` must be deterministic and
- * must not do network or LLM calls. `onToolResult` observes results (for provenance, Phase 3).
+ * The seam the policy engine plugs into. `decideToolCall` must be deterministic and must not do
+ * network or LLM calls. `onToolResult` and `onContent` record what servers returned (provenance);
+ * they run before the response reaches the client, so a later call can be matched against it.
  */
 export interface DecisionPipeline {
   decideToolCall(ctx: ToolCallContext): PipelineVerdict;
-  onToolResult?(event: ToolResultEvent): void;
+  /** Returns the provenance source recorded for this result, if any. */
+  onToolResult?(event: ToolResultEvent): Source | null;
+  onContent?(content: ObservedContent): void;
+}
+
+/** Records tool results and other content in the provenance index. */
+export function observeResult(engine: ProvenanceEngine, event: ToolResultEvent): Source | null {
+  const content: JsonValue | null =
+    event.result ?? (event.error === null ? null : { error: event.error.message });
+  if (content === null) return null;
+  return engine.observe({
+    eventId: event.id,
+    kind: 'tool-result',
+    serverId: event.server.id,
+    origin: event.tool,
+    content,
+    observedAt: new Date(event.ts),
+  });
 }
 
 export interface ToolSelector {
@@ -53,13 +86,26 @@ export interface ToolSelector {
 export class StaticDenyListPipeline implements DecisionPipeline {
   private readonly hash: string;
 
-  constructor(private readonly deny: readonly ToolSelector[]) {
+  constructor(
+    private readonly deny: readonly ToolSelector[],
+    /** When given, every call gets a provenance report and every result is indexed. */
+    private readonly provenance?: () => ProvenanceEngine,
+  ) {
     this.hash = createHash('sha256')
       .update(JSON.stringify({ kind: 'static-deny-list', deny }))
       .digest('hex');
   }
 
+  onToolResult(event: ToolResultEvent): Source | null {
+    return this.provenance === undefined ? null : observeResult(this.provenance(), event);
+  }
+
+  onContent(c: ObservedContent): void {
+    this.provenance?.().observe({ eventId: null, ...c });
+  }
+
   decideToolCall(ctx: ToolCallContext): PipelineVerdict {
+    const provenance = this.provenance?.().analyze(ctx.arguments, { now: ctx.now }) ?? null;
     const matched = this.deny
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => globMatch(s.server, ctx.server.id) && globMatch(s.tool, ctx.tool))
@@ -70,6 +116,7 @@ export class StaticDenyListPipeline implements DecisionPipeline {
         matchedRules: matched,
         reason: `Tool "${ctx.tool}" on server "${ctx.server.id}" is on the deny list.`,
         policySha256: this.hash,
+        provenance,
       };
     }
     return {
@@ -77,6 +124,7 @@ export class StaticDenyListPipeline implements DecisionPipeline {
       matchedRules: [],
       reason: 'No deny-list entry matched; allowed (no policy engine is configured yet).',
       policySha256: this.hash,
+      provenance,
     };
   }
 }

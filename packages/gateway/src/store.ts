@@ -8,6 +8,7 @@ import {
   loadOrCreateKeys,
   type InstallationKeys,
 } from '@tortoisegate/ledger';
+import { ProvenanceEngine } from '@tortoisegate/provenance';
 import type { Logger } from './log.js';
 
 /** Per-user state directory (XDG on Linux; macOS and Windows equivalents). */
@@ -59,6 +60,7 @@ export class GatewayStore {
   private keysCache: InstallationKeys | undefined;
   private ledgerCache: Ledger | undefined;
   private redactorCache: Redactor | undefined;
+  private provenanceCache: ProvenanceEngine | undefined;
   private closed = false;
 
   constructor(
@@ -98,6 +100,17 @@ export class GatewayStore {
       });
     }
     return this.ledgerCache;
+  }
+
+  /** The provenance index, in the shared state database. */
+  provenance(): ProvenanceEngine {
+    this.provenanceCache ??= new ProvenanceEngine({
+      db: this.ledger().db,
+      key: deriveKey(this.keys().hmacSecret, 'provenance-index'),
+      trusted: this.config.trust.trustedTools,
+      windowSeconds: this.config.provenance.windowSeconds,
+    });
+    return this.provenanceCache;
   }
 
   /** Signs pending entries and closes the database. */

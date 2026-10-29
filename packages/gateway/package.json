@@ -35,6 +35,7 @@
   "dependencies": {
     "@tortoisegate/core": "workspace:*",
     "@tortoisegate/ledger": "workspace:*",
+    "@tortoisegate/provenance": "workspace:*",
     "zod": "4.6.7"
   }
 }

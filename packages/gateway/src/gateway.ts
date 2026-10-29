@@ -60,7 +60,6 @@ export interface RunningGateway {
  */
 export function unimplementedConfig(config: Config): string[] {
   const out: string[] = [];
-  if (config.trust.trustedTools.length > 0) out.push('trust.trustedTools (Phase 3)');
   if (config.policy !== undefined) out.push('policy (Phase 4)');
   return out;
 }
@@ -91,7 +90,8 @@ export async function runGateway(
       store.close();
     },
   };
-  const pipeline = opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools);
+  const pipeline =
+    opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools, () => store.provenance());
   const nameStore = opts.nameStore ?? new FileNameStore(join(stateDir, 'names.json'));
   const base = { config, pipeline, sink, log, nameStore, ...(opts.env ? { env: opts.env } : {}) };
 

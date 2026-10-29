@@ -172,6 +172,19 @@ export const ConfigSchema = z
         trustedTools: z.array(z.strictObject({ server: GlobSchema, tool: GlobSchema })).default([]),
       })
       .prefault({}),
+    provenance: z
+      .strictObject({
+        /**
+         * Only content observed within this many seconds can match a tool-call value. Longer
+         * windows catch slower attacks but raise the chance of an unrelated old match.
+         */
+        windowSeconds: z
+          .int()
+          .min(60)
+          .max(90 * 86400)
+          .default(86400),
+      })
+      .prefault({}),
     /** Policy engine config (Phase 4). */
     policy: z.strictObject({ path: z.string().min(1) }).optional(),
     /** Ledger: the default event store (`docs/ledger-spec.md`). */

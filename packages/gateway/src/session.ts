@@ -57,6 +57,8 @@ interface Pending {
   cancelled: boolean;
   /** Edits applied to the upstream's response before it goes to the client. */
   rewrite: ((m: Message) => string) | undefined;
+  /** For resources/read and prompts/get: the URI or name, so the content can be indexed. */
+  content: { kind: 'resource' | 'prompt'; origin: string } | undefined;
 }
 
 export interface SessionOptions {
@@ -832,7 +834,7 @@ export class Session {
       arguments: args as JsonObject,
       // Filled in by the storage layer before the event is hashed or stored.
       redaction: { ruleVersion: 0, applied: [] },
-      provenance: null,
+      provenance: verdict.provenance ?? null,
       decision,
     };
     p.toolCall = { event, startedAt: Date.now() };
@@ -966,10 +968,14 @@ export class Session {
             { start: idNode.start, end: idNode.end, replacement: p.clientIdText },
           ]);
       }
-      this.client.send(text, { requestIdKey: p.clientIdKey, final: true });
+      // Index what the server returned before the client sees it, so the client's next call
+      // (from this or any other gateway process) is matched against it.
       if (p.toolCall !== undefined) {
         void this.recordResult(p, outcome, resultValue, sha256(m.text), error);
+      } else if (p.content !== undefined && resultNode !== undefined) {
+        this.observeContent(up, p.content, nodeValue(m.text, resultNode) as JsonValue);
       }
+      this.client.send(text, { requestIdKey: p.clientIdKey, final: true });
       return;
     }
     if (m.kind === 'request') {
@@ -1119,6 +1125,7 @@ export class Session {
       toolCall: undefined,
       cancelled: false,
       rewrite,
+      content: contentOrigin(m),
     };
     const timeout = this.cfg.limits.requestTimeoutMs;
     if (timeout > 0) {
@@ -1230,8 +1237,36 @@ export class Session {
       source: null,
       durationMs: Date.now() - call.startedAt,
     };
-    this.opts.pipeline.onToolResult?.(event);
+    try {
+      event.source = this.opts.pipeline.onToolResult?.(event) ?? null;
+    } catch (e) {
+      this.log.error('PROVENANCE FAILED: tool result could not be indexed', {
+        eventId: event.id,
+        error: (e as Error).message,
+      });
+    }
     return this.write(event);
+  }
+
+  private observeContent(
+    up: UpstreamConnection,
+    c: { kind: 'resource' | 'prompt'; origin: string },
+    content: JsonValue,
+  ): void {
+    try {
+      this.opts.pipeline.onContent?.({
+        kind: c.kind,
+        serverId: up.id,
+        origin: c.origin,
+        content,
+        observedAt: this.now(),
+      });
+    } catch (e) {
+      this.log.error('PROVENANCE FAILED: content could not be indexed', {
+        upstream: up.id,
+        error: (e as Error).message,
+      });
+    }
   }
 
   private emitStarted(): void {
@@ -1279,6 +1314,18 @@ export class Session {
     });
     await this.client.close();
   }
+}
+
+/** The resource URI or prompt name of a request whose result is content to index. */
+function contentOrigin(
+  m: Extract<Message, { kind: 'request' }>,
+): { kind: 'resource' | 'prompt'; origin: string } | undefined {
+  const field =
+    m.method === 'resources/read' ? 'uri' : m.method === 'prompts/get' ? 'name' : undefined;
+  if (field === undefined) return undefined;
+  const n = rawGet(m.root, 'params', field);
+  if (n?.kind !== 'string' || n.value === '') return undefined;
+  return { kind: m.method === 'resources/read' ? 'resource' : 'prompt', origin: n.value };
 }
 
 function toClientInfo(v: unknown): ClientInfo | null {

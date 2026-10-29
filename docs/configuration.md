@@ -65,6 +65,8 @@ Secrets never go in the file. Use `{ "fromEnv": "NAME" }`; the value is read fro
 | `ledger.maxStoredResultBytes`             | 262144                     | Larger results (canonical JSON, after redaction) are stored as `null` with `truncated: true`; their hash is kept                                                                               |
 | `ledger.durability`                       | `process-crash`            | `process-crash` (WAL, synchronous=NORMAL) or `power-loss` (synchronous=FULL, one fsync per entry). See [ADR 0014](adr/0014-ledger-storage.md)                                                  |
 | `ledger.busyTimeoutMs`                    | 5000                       | How long a write waits for another gateway process's lock                                                                                                                                      |
+| `trust.trustedTools[]`                    | `[]`                       | `{ "server": glob, "tool": glob }`. Output of matching tools is labelled `trusted-tool`; everything else is untrusted. Resources and prompts need `"tool": "*"` ([provenance](provenance.md))  |
+| `provenance.windowSeconds`                | 86400                      | Only content observed this recently can match a tool-call value ([provenance](provenance.md#time-window))                                                                                      |
 | `redaction.ruleVersion`                   | 1                          | Version of your own rules, 0–999. Events record `1000 × built-in version + this`                                                                                                               |
 | `redaction.rules[]`                       | `[]`                       | `{ "server": glob, "tool": glob, "target": "arguments"\|"result"\|"both", "path": JSON Pointer, "method": "removed"\|"hmac-sha256" }`. Applied before the built-in rules (`ledger-spec.md` §8) |
 
@@ -92,7 +94,7 @@ Arguments and results are redacted before they are stored anywhere (`ledger-spec
 
 ## Not implemented yet
 
-These keys exist in the schema for later phases. If any is set, the gateway **refuses to start** (exit 3) rather than ignore protection you asked for: `trust.trustedTools` (Phase 3), `policy` (Phase 4).
+These keys exist in the schema for later phases. If any is set, the gateway **refuses to start** (exit 3) rather than ignore protection you asked for: `policy` (Phase 4).
 
 ## Exit codes
 

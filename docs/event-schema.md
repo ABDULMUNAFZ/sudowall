@@ -55,10 +55,13 @@ Written **before** the call is forwarded (write-ahead).
 
 ### ProvenanceReport
 
-| Field            | Type          | Notes                                      |
-| ---------------- | ------------- | ------------------------------------------ |
-| `sessionTainted` | boolean       | Untrusted content has entered this session |
-| `matches[]`      | ArgumentMatch | One per (argument value, match) found      |
+| Field            | Type          | Notes                                                                  |
+| ---------------- | ------------- | ---------------------------------------------------------------------- |
+| `sessionTainted` | boolean       | Untrusted content was observed within the provenance window (ADR 0015) |
+| `values[]`       | ArgumentValue | Every structured value found in the arguments                          |
+| `matches[]`      | ArgumentMatch | One per (argument value, match) found                                  |
+
+ArgumentValue: `{argPath, valueKind, origin: "matched" | "unknown-origin", evmChecksum?: "valid" | "invalid" | "none"}`. `unknown-origin` means the value matched no observed content; the gateway never sees the user's prompt, so this is not "trusted".
 
 ArgumentMatch:
 

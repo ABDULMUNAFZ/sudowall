@@ -148,6 +148,7 @@ export class Ledger {
   private readonly everySeconds: number;
   private readonly now: () => Date;
   private readonly timer: NodeJS.Timeout;
+  private readonly walTimer: NodeJS.Timeout;
   private closed = false;
   private readonly stmts;
 
@@ -194,6 +195,18 @@ export class Ledger {
       Math.max(250, (this.everySeconds * 1000) / 4),
     );
     this.timer.unref();
+    // SQLite's automatic WAL checkpoint runs inside a commit and fsyncs the database file, which
+    // put 5-20 ms stalls on the tool-call path (measured on btrfs). Checkpoint on a timer instead,
+    // off the request path; the WAL stays bounded by about one second of writes.
+    db.pragma('wal_autocheckpoint = 0');
+    this.walTimer = setInterval(() => {
+      try {
+        db.pragma('wal_checkpoint(PASSIVE)');
+      } catch (e) {
+        opts.onError?.(e as Error);
+      }
+    }, 1000);
+    this.walTimer.unref();
   }
 
   static open(opts: LedgerOptions): Ledger {
@@ -327,8 +340,10 @@ export class Ledger {
     if (this.closed) return;
     this.closed = true;
     clearInterval(this.timer);
+    clearInterval(this.walTimer);
     try {
       this.checkpoint();
+      this.db.pragma('wal_checkpoint(PASSIVE)');
     } finally {
       this.db.close();
     }

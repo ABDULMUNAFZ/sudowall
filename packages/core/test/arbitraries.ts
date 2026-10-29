@@ -81,8 +81,19 @@ export const argumentMatch: fc.Arbitrary<ArgumentMatch> = fc.oneof(
     .map(([b, nearKind]) => ({ ...b, matchType: 'near' as const, nearKind })),
 );
 
+const argumentValue = fc.record(
+  {
+    argPath: pointer,
+    valueKind: fc.constantFrom('evm-address', 'email', 'url', 'amount'),
+    origin: fc.constantFrom('matched', 'unknown-origin'),
+    evmChecksum: fc.constantFrom('valid', 'invalid', 'none'),
+  },
+  { requiredKeys: ['argPath', 'valueKind', 'origin'] },
+);
+
 export const provenance: fc.Arbitrary<ProvenanceReport> = fc.record({
   sessionTainted: fc.boolean(),
+  values: fc.array(argumentValue, { maxLength: 3 }),
   matches: fc.array(argumentMatch, { maxLength: 3 }),
 });
 

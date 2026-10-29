@@ -248,6 +248,9 @@ importers:
       '@tortoisegate/ledger':
         specifier: workspace:*
         version: link:../ledger
+      '@tortoisegate/provenance':
+        specifier: workspace:*
+        version: link:../provenance
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -294,7 +297,27 @@ importers:
 
   packages/policy: {}
 
-  packages/provenance: {}
+  packages/provenance:
+    dependencies:
+      '@noble/hashes':
+        specifier: 1.8.0
+        version: 1.8.0
+      '@tortoisegate/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tortoisegate/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: 9.6.0
+        version: 9.6.0
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
 
 packages:
 
@@ -440,6 +463,10 @@ packages:
   '@modelcontextprotocol/server@2.4.0':
     resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
     engines: {node: '>=20'}
+
+  '@noble/hashes@1.8.0':
+    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
+    engines: {node: ^14.21.3 || >=16}
 
   '@oxc-project/types@0.155.0':
     resolution: {integrity: sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==}
@@ -1746,6 +1773,8 @@ snapshots:
     dependencies:
       '@modelcontextprotocol/core': 2.4.0
       zod: 4.6.7
+
+  '@noble/hashes@1.8.0': {}
 
   '@oxc-project/types@0.155.0': {}
 

@@ -29,6 +29,17 @@ Same benchmark, after the ledger became the default event sink: every call appen
 
 With `synchronous = FULL` one commit alone costs 3.7 ms at the median on this disk (measured with a 500-commit loop), which is why `power-loss` durability is opt-in.
 
+## With provenance (Step B)
+
+Every call now also runs provenance analysis, and every result is indexed (one more transaction). The first run on btrfs showed added p99 of 4.7 ms (observe) and 14.4 ms (enforce): SQLite's automatic WAL checkpoint ran inside commits on the request path and fsynced the database. WAL checkpoints now run on a 1-second timer instead (`wal_autocheckpoint = 0` plus a passive checkpoint), which moves that cost off the request path. A call that coincides with the timer can still wait for it (the max column).
+
+| state directory on | run               | p50 ms | p99 ms | max ms | added p50 ms | added p99 ms |
+| ------------------ | ----------------- | ------ | ------ | ------ | ------------ | ------------ |
+| btrfs on NVMe      | direct            | 0.126  | 0.467  | 2.597  | -            | -            |
+| btrfs on NVMe      | gateway (observe) | 0.682  | 1.662  | 40.057 | 0.556        | 1.194        |
+| btrfs on NVMe      | gateway (enforce) | 0.720  | 1.697  | 45.876 | 0.594        | 1.230        |
+| tmpfs              | gateway (enforce) | 0.570  | 1.589  | 4.211  | 0.442        | 1.073        |
+
 ## CI gate
 
 The `latency-benchmark` job in `.github/workflows/ci.yml` runs the same benchmark with `--gate`. Both runs happen in the same job on the same runner. The job fails if the gateway adds more than **2 ms at the median** or **20 ms at p99** over the direct run. Gating on overhead relative to the direct run keeps the gate meaningful on noisy shared runners. Absolute numbers from CI are written to the job summary but are not gated.

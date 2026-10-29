@@ -63,7 +63,7 @@ describe('event schema', () => {
         'a'.repeat(64) +
         '","arguments":{"__proto__":{"polluted":true}},' +
         '"redaction":{"ruleVersion":1,"applied":[]},' +
-        '"provenance":{"sessionTainted":false,"matches":[]},' +
+        '"provenance":{"sessionTainted":false,"values":[],"matches":[]},' +
         '"decision":{"verdict":"allow","effective":"allow","mode":"observe","matchedRules":[],' +
         '"reason":"default","policySha256":"' +
         '0'.repeat(64) +
