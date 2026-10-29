@@ -13,26 +13,32 @@ import { ProvenanceEngine } from '@tortoisegate/provenance';
 import { ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
 
-/** Per-user state directory (XDG on Linux; macOS and Windows equivalents). */
+/**
+ * Per-user state directory (XDG on Linux; macOS and Windows equivalents).
+ * An explicitly set XDG_STATE_HOME wins on every non-Windows platform, so
+ * users and tests can relocate state on macOS too.
+ */
 export function defaultStateDir(env: NodeJS.ProcessEnv = process.env): string {
   if (process.platform === 'win32') {
     return join(env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'), 'tortoisegate');
   }
+  if (env['XDG_STATE_HOME']) return join(env['XDG_STATE_HOME'], 'tortoisegate');
   if (process.platform === 'darwin') {
     return join(homedir(), 'Library', 'Application Support', 'tortoisegate');
   }
-  return join(env['XDG_STATE_HOME'] ?? join(homedir(), '.local', 'state'), 'tortoisegate');
+  return join(homedir(), '.local', 'state', 'tortoisegate');
 }
 
-/** Per-user config directory, which holds the installation keys. */
+/** Per-user config directory, which holds the installation keys. Same XDG rule as above. */
 export function defaultConfigDir(env: NodeJS.ProcessEnv = process.env): string {
   if (process.platform === 'win32') {
     return join(env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'), 'tortoisegate');
   }
+  if (env['XDG_CONFIG_HOME']) return join(env['XDG_CONFIG_HOME'], 'tortoisegate');
   if (process.platform === 'darwin') {
     return join(homedir(), 'Library', 'Application Support', 'tortoisegate');
   }
-  return join(env['XDG_CONFIG_HOME'] ?? join(homedir(), '.config'), 'tortoisegate');
+  return join(homedir(), '.config', 'tortoisegate');
 }
 
 export interface StorePaths {

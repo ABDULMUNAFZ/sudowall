@@ -13,6 +13,12 @@ import { MemorySink } from '../src/sinks.js';
 
 export const RAW_SERVER = fileURLToPath(new URL('./fixtures/raw-server.mjs', import.meta.url));
 
+// Gateways started in tests must never create installation keys or state in the developer's real
+// config and state directories, so point both at a throwaway directory for this test process.
+const TEST_HOME = mkdtempSync(join(tmpdir(), 'tg-gw-home-'));
+process.env['XDG_CONFIG_HOME'] = TEST_HOME;
+process.env['XDG_STATE_HOME'] = TEST_HOME;
+
 /** In-memory MCP client side of a session: push raw text in, read raw text out. */
 export class TestClient implements Channel {
   readonly received: { text: string; related: Related | undefined }[] = [];
