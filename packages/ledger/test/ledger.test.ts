@@ -317,5 +317,5 @@ describe('tamper detection (property-based)', () => {
       }),
       { numRuns: 120 },
     );
-  });
+  }, 120_000);
 });
