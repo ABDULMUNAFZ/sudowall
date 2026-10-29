@@ -21,7 +21,7 @@ Expected outcomes:
 
 ## Run it
 
-Requirements: Node.js 24, pnpm 12, Claude Code. Anvil is installed if missing (`scripts/install-foundry.sh`: pinned Foundry v1.8.6, SHA-256 checked).
+Requirements: Node.js 24, pnpm 12, Claude Code. Anvil is installed if missing (`scripts/install-foundry.sh`: pinned Foundry v1.8.6, SHA-256 checked). On macOS on Intel, Foundry's Anvil also needs libusb (`brew install libusb`); without it Anvil exits with `Library not loaded: /usr/local/opt/libusb/lib/libusb-1.0.0.dylib`.
 
 ```sh
 pnpm install

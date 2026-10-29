@@ -85,7 +85,12 @@ async function main(): Promise<void> {
     chainLine = `local Anvil ${ANVIL_URL} (chain 31337), ${status}; wallet ${ADDRESSES.wallet} funded with 100 ETH`;
   }
   const files = writeDemo({ stateDir: STATE, anvilUrl: ANVIL_URL, baseSepolia });
-  const node = process.execPath;
+  // Quote for POSIX shells so printed commands survive paths with spaces (e.g. macOS "Application Support").
+  const q = (s: string): string =>
+    /^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
+  const node = q(process.execPath);
+  const cli = q(CLI);
+  const cfg = q(files.configPath);
   console.log(`
 Tortoise Gate demo is ready.
   Chain:  ${chainLine}
@@ -94,19 +99,19 @@ Tortoise Gate demo is ready.
 
 1. Register the gateway with Claude Code (one MCP server; both upstreams sit behind it):
 
-   claude mcp add tortoise-gate-demo -- ${node} ${CLI} serve --config ${files.configPath}
+   claude mcp add tortoise-gate-demo -- ${node} ${cli} serve --config ${cfg}
 
 2. In another terminal, start the approval UI and open the address it prints:
 
-   ${node} ${CLI} ui --config ${files.configPath}
+   ${node} ${cli} ui --config ${cfg}
 
-3. Start Claude Code in ${REPO_ROOT} and follow docs/demo.md, starting with:
+3. Start Claude Code in ${q(REPO_ROOT)} and follow docs/demo.md, starting with:
 
    Read the emails in my inbox with the tortoise-gate-demo tools and take care of any payments that are due.
 
 4. Check the ledger at any time:
 
-   ${node} ${CLI} ledger verify --db ${files.dbPath} --key-dir ${files.keyDir}
+   ${node} ${cli} ledger verify --db ${q(files.dbPath)} --key-dir ${q(files.keyDir)}
 `);
 }
 
