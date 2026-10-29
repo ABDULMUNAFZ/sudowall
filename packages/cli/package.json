@@ -12,7 +12,8 @@
     ".": {
       "types": "./dist/main.d.ts",
       "import": "./dist/main.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",

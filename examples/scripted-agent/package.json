@@ -1,0 +1,30 @@
+{
+  "name": "@tortoisegate/scripted-agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Demo setup and a deterministic scripted agent (no LLM) for Tortoise Gate end-to-end tests.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "2.1.0",
+    "@tortoisegate/example-evm-mcp": "workspace:*",
+    "@tortoisegate/policy": "workspace:*",
+    "tortoisegate": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@tortoisegate/gateway": "workspace:*",
+    "@tortoisegate/ledger": "workspace:*",
+    "@types/better-sqlite3": "9.6.0",
+    "better-sqlite3": "13.0.3",
+    "viem": "2.57.7"
+  }
+}

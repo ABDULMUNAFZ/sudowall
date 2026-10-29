@@ -11,21 +11,43 @@ Tortoise Gate is an open-source firewall for AI agents. It sits between an agent
 1. **Source tracking.** Every tool output is labelled trusted or untrusted. When a later call uses an address, email, URL or amount that appeared in untrusted content, or a lookalike of one, the call is flagged.
 2. **Deterministic rules.** A YAML policy decides allow, ask or block. No AI judge is in the decision path.
 3. **Human approval.** Risky calls pause until you approve. Approvals are bound to the exact arguments.
-4. **Tamper-evident ledger.** Every action goes into a hash-chained log with signed checkpoints, and an independent verifier checks it.
+4. **Tamper-evident ledger.** Every action goes into a hash-chained log with signed checkpoints, and `tortoisegate ledger verify` checks it.
+
+## Demo quickstart
+
+Claude Code pays invoices from an inbox through Tortoise Gate, on a local Anvil chain (testnet only). Full walkthrough and a recorded run: [docs/demo.md](docs/demo.md).
+
+```sh
+git clone https://github.com/ABDULMUNAFZ/tortoise-gate.git && cd tortoise-gate
+pnpm install
+pnpm demo:setup   # builds, starts Anvil (installs a pinned Foundry if missing), writes demo/.state
+# Run the two commands it prints: `claude mcp add tortoise-gate-demo -- ...` and `... ui --config ...`
+claude            # "Read the emails in my inbox with the tortoise-gate-demo tools and pay what is due."
+# Injected address: paused in the UI for you. Lookalike of an allowlisted address: blocked.
+# Allowlisted address: paid on Anvil. Then run the printed `ledger verify` command.
+```
 
 ## Honest limits
 
 - It only checks calls that pass through the gate. It starts with MCP-based agents.
 - It catches structured values copied exactly or nearly exactly (addresses, emails, URLs, amounts, identifiers). It does not catch fully reworded free-text attacks.
-- The ledger proves history was not edited. It does not prove the agent behaved well.
+- The ledger proves history was not edited. It does not prove the agent behaved well. Someone who can rewrite the whole database and holds the signing key can forge a new history. Signing protects against edits without the key, not against the key holder.
+- An approval is only as good as the person giving it. The gate shows where a value came from; it cannot tell whether a payment is legitimate.
+- The money-moving template knows `send_funds`-style tools with `to` and `amount` arguments. Other payment tools need their own sink definitions.
+- In the demo, a capable model often refuses the injected payment by itself. The gate is the control that does not depend on the model noticing.
+- Testnet only: the EVM example server refuses every chain except Anvil (31337) and Base Sepolia (84532).
 
 ## What works today
 
 - An MCP gateway for stdio and Streamable HTTP, on both protocol revisions (2025-11-25 and 2026-07-28), for one or several upstream servers. It forwards messages byte for byte.
-- `observe` mode records every tool call and result to a local JSONL file. `enforce` mode applies a static deny list of tools.
+- Source tracking: values from untrusted tool output (addresses, emails, URLs, amounts) and lookalikes of them are matched in later tool calls. See [provenance](docs/provenance.md).
+- A deterministic YAML policy (allow, ask, block, each with an explanation), with a money-moving template. See [policy DSL](docs/policy-dsl.md) and [templates](docs/policy-templates.md).
+- Approvals for `ask` calls in a local web UI (`tortoisegate ui`), bound to the exact arguments. See [UI](docs/ui.md).
+- A hash-chained, signed, append-only ledger in SQLite with `tortoisegate ledger verify`. See [ledger spec](docs/ledger-spec.md).
+- `observe` mode records what would happen and blocks nothing; `enforce` mode applies the policy.
 - Tested against the official reference servers, the MCP TypeScript SDKs (v1 and v2) and Claude Code. See [compatibility](docs/compatibility.md).
 
-Source tracking, policies, approvals and the signed ledger are not built yet.
+Not built yet: the data-flow graph, an independent verifier, desktop app, npm packages.
 
 ## Put Tortoise Gate in front of an MCP server
 

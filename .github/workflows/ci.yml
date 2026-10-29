@@ -26,6 +26,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Anvil (local chain) for the EVM example server and the scripted-agent demo test.
+      - name: Install Foundry (pinned, checksum verified)
+        run: |
+          bash scripts/install-foundry.sh
+          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build

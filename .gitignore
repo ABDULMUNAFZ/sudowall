@@ -26,3 +26,4 @@ planning/
 *.log
 test-results/
 playwright-report/
+demo/.state/

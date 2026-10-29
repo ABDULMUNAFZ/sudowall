@@ -1,0 +1,38 @@
+{
+  "name": "@tortoisegate/example-evm-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example MCP server with get_balance and send_funds on a local Anvil chain or Base Sepolia. Testnets only.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "tortoisegate-evm-mcp": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/chain.d.ts",
+      "import": "./dist/chain.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "viem": "2.57.7",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}

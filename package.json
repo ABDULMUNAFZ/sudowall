@@ -13,10 +13,11 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "eslint . && prettier --check .",
+    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js . && prettier --check .",
     "format": "prettier --write .",
     "secrets": "gitleaks git --no-banner --redact .",
-    "check:licenses": "node scripts/check-licenses.mjs"
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "demo:setup": "pnpm build && node examples/scripted-agent/dist/setup.js"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
