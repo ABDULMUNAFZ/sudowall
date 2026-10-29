@@ -1,0 +1,26 @@
+# dependencies and build output
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# secrets and local state: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.db
+*.db-wal
+*.db-shm
+.tortoisegate/
+
+# private planning notes (not part of the open-source repo)
+planning/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Blocks any commit that contains a secret. Fails closed if gitleaks is missing.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed; refusing to commit." >&2
+  echo "Install it: https://github.com/gitleaks/gitleaks#installing" >&2
+  exit 1
+fi
+exec gitleaks git --pre-commit --staged --redact --no-banner .
