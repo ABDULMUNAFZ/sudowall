@@ -1,10 +1,12 @@
 import { join } from 'node:path';
 import { TortoiseGateError, type Config } from '@tortoisegate/core';
+import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@tortoisegate/policy';
 import { checkEnvReferences } from './env.js';
 import { HttpFrontend } from './http-frontend.js';
 import type { Logger } from './log.js';
 import { FileNameStore, type NameStore } from './namespacing.js';
 import { StaticDenyListPipeline, type DecisionPipeline } from './pipeline.js';
+import { PolicyPipeline } from './policy-pipeline.js';
 import { Session } from './session.js';
 import {
   FanoutSink,
@@ -54,14 +56,28 @@ export interface RunningGateway {
   stop(): Promise<void>;
 }
 
-/**
- * Config sections that parse but are not implemented yet. Starting with them set would silently
- * drop protection the user asked for (for example, redaction before storage), so it is refused.
- */
-export function unimplementedConfig(config: Config): string[] {
-  const out: string[] = [];
-  if (config.policy !== undefined) out.push('policy (Phase 4)');
-  return out;
+/** Loads `config.policy.path`; a missing or invalid policy refuses to start (exit 3). */
+export function loadConfiguredPolicy(config: Config): CompiledPolicy | undefined {
+  if (config.policy === undefined) return undefined;
+  try {
+    return loadPolicyFile(config.policy.path);
+  } catch (e) {
+    if (e instanceof PolicyError) throw new TortoiseGateError('INVALID_CONFIG', e.message);
+    throw e;
+  }
+}
+
+/** The decision pipeline for a config: the policy engine if a policy is set, else the deny list. */
+export function createPipeline(config: Config, store: GatewayStore): DecisionPipeline {
+  const policy = loadConfiguredPolicy(config);
+  if (policy === undefined) {
+    return new StaticDenyListPipeline(config.deny.tools, () => store.provenance());
+  }
+  return new PolicyPipeline(policy, config.deny.tools, {
+    provenance: () => store.provenance(),
+    state: () => store.policyState(),
+    onErrorNonSink: config.failure.onPolicyErrorNonSink,
+  });
 }
 
 /** Runs the gateway in the transport the config asks for. */
@@ -69,15 +85,8 @@ export async function runGateway(
   opts: GatewayOptions & { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream },
 ): Promise<RunningGateway> {
   const { config, log } = opts;
-  const missing = unimplementedConfig(config);
-  if (missing.length > 0) {
-    throw new TortoiseGateError(
-      'INVALID_CONFIG',
-      `this version of Tortoise Gate does not implement: ${missing.join(', ')}. ` +
-        'Remove these settings; they would otherwise be ignored.',
-    );
-  }
   checkEnvReferences(config.upstreams, opts.env ?? process.env);
+  const policyPipeline = opts.pipeline === undefined && config.policy !== undefined;
   const env = opts.env ?? process.env;
   const stateDir = opts.stateDir ?? defaultStateDir(env);
   const store = opts.store ?? new GatewayStore(storePaths(config, env, stateDir), config, log);
@@ -90,8 +99,8 @@ export async function runGateway(
       store.close();
     },
   };
-  const pipeline =
-    opts.pipeline ?? new StaticDenyListPipeline(config.deny.tools, () => store.provenance());
+  const pipeline = opts.pipeline ?? createPipeline(config, store);
+  if (policyPipeline) log.info('policy loaded', { path: config.policy?.path });
   const nameStore = opts.nameStore ?? new FileNameStore(join(stateDir, 'names.json'));
   const base = { config, pipeline, sink, log, nameStore, ...(opts.env ? { env: opts.env } : {}) };
 

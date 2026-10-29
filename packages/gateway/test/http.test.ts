@@ -1,8 +1,10 @@
 import { request } from 'node:http';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { parseConfig } from '@tortoisegate/core';
-import { runGateway, unimplementedConfig, type RunningGateway } from '../src/gateway.js';
+import { runGateway, type RunningGateway } from '../src/gateway.js';
 import { silentLogger } from '../src/log.js';
 import { MemoryNameStore } from '../src/namespacing.js';
 import { MemorySink } from '../src/sinks.js';
@@ -136,18 +138,24 @@ describe('HTTP frontend with real SDK clients', () => {
   }
 });
 
-describe('config sections not implemented yet', () => {
-  it('refuses to start rather than silently ignore them', async () => {
-    const config = parseConfig({
-      schemaVersion: 1,
-      upstreams: [rawUpstream('raw')],
-      redaction: { rules: [{ path: '/password', method: 'removed' }] },
-      policy: { path: 'p.yaml' },
-    });
-    expect(unimplementedConfig(config)).toEqual(['policy (Phase 4)']);
-    await expect(
-      runGateway({ config, log: silentLogger, sink: new MemorySink(), stateDir: tempDir() }),
-    ).rejects.toThrow(/does not implement: policy/);
+describe('policy config', () => {
+  it('refuses to start when the policy file is missing or invalid', async () => {
+    const dir = tempDir();
+    const bad = join(dir, 'bad.yaml');
+    writeFileSync(bad, 'schema: tortoise-gate/policy@1\nname: p\nversion: 0\n');
+    for (const [path, msg] of [
+      [join(dir, 'missing.yaml'), /cannot read policy file/],
+      [bad, /invalid policy[\s\S]*version/],
+    ] as const) {
+      const config = parseConfig({
+        schemaVersion: 1,
+        upstreams: [rawUpstream('raw')],
+        policy: { path },
+      });
+      await expect(
+        runGateway({ config, log: silentLogger, sink: new MemorySink(), stateDir: dir }),
+      ).rejects.toThrow(msg);
+    }
   });
 });
 

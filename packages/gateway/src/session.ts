@@ -790,7 +790,7 @@ export class Session {
     const rawSha256 = sha256(m.text);
     const now = this.now();
     let verdict: PipelineVerdict;
-    let policyError: Decision['policyError'] = null;
+    let policyError: Decision['policyError'];
     try {
       verdict = this.opts.pipeline.decideToolCall({
         sessionId: this.id,
@@ -801,6 +801,7 @@ export class Session {
         rawSha256,
         now,
       });
+      policyError = verdict.policyError ?? null;
     } catch (e) {
       policyError = { code: 'PIPELINE_ERROR', message: (e as Error).message };
       verdict = {
@@ -1245,6 +1246,16 @@ export class Session {
         error: (e as Error).message,
       });
     }
+    if (outcome === 'ok') {
+      try {
+        this.opts.pipeline.onExecuted?.(call.event);
+      } catch (e) {
+        this.log.error('POLICY STATE FAILED: executed call could not be recorded', {
+          eventId: call.event.id,
+          error: (e as Error).message,
+        });
+      }
+    }
     return this.write(event);
   }
 
@@ -1282,6 +1293,15 @@ export class Session {
       protocolVersion: this.clientProtocol,
       transport: this.opts.clientTransport,
     });
+    try {
+      for (const e of this.opts.pipeline.sessionEvents?.(this.id, this.now()) ?? []) {
+        void this.write(e);
+      }
+    } catch (e) {
+      this.log.error('PIPELINE FAILED: session events could not be built', {
+        error: (e as Error).message,
+      });
+    }
     this.log.info('session started', {
       client: this.clientInfo,
       protocolVersion: this.clientProtocol,

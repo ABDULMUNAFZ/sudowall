@@ -40,6 +40,23 @@ Every call now also runs provenance analysis, and every result is indexed (one m
 | btrfs on NVMe      | gateway (enforce) | 0.720  | 1.697  | 45.876 | 0.594        | 1.230        |
 | tmpfs              | gateway (enforce) | 0.570  | 1.589  | 4.211  | 0.442        | 1.073        |
 
+## With the policy engine (Step C)
+
+The benchmark now echoes an allowlisted EVM address, so every call extracts a structured value, analyses it and indexes the result. A fourth run loads a money-moving style policy that treats `echo` as a payment sink (four rules: lookalike, untrusted, first seen, allowlist), so every call runs the full evaluation and returns `allow`.
+
+The first run with repeated values failed the gate (added p50 13 ms with the policy): every call's result added another row for the same address, and each lookup returned all of them. Provenance now keeps only the 16 newest rows per (value, exact text, label) group (`provenance.md`), which bounds the lookup.
+
+Measured 2026-10-29 on the same laptop, state directory on btrfs, 2,000 calls after 200 warm-up calls:
+
+| run                       | p50 ms | p99 ms | max ms | added p50 ms | added p99 ms |
+| ------------------------- | ------ | ------ | ------ | ------------ | ------------ |
+| direct                    | 0.133  | 0.442  | 3.023  | -            | -            |
+| gateway (observe)         | 0.905  | 1.766  | 54.318 | 0.772        | 1.324        |
+| gateway (enforce)         | 0.971  | 2.000  | 62.161 | 0.837        | 1.559        |
+| gateway (enforce, policy) | 1.117  | 2.166  | 50.529 | 0.983        | 1.724        |
+
+Policy evaluation itself adds about 0.15 ms at the median over the deny-list pipeline. The max column is a call that coincided with the WAL checkpoint timer.
+
 ## CI gate
 
 The `latency-benchmark` job in `.github/workflows/ci.yml` runs the same benchmark with `--gate`. Both runs happen in the same job on the same runner. The job fails if the gateway adds more than **2 ms at the median** or **20 ms at p99** over the direct run. Gating on overhead relative to the direct run keeps the gate meaningful on noisy shared runners. Absolute numbers from CI are written to the job summary but are not gated.

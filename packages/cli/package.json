@@ -38,6 +38,7 @@
     "@modelcontextprotocol/server-everything": "2.1.0",
     "@modelcontextprotocol/server-filesystem": "2.1.0",
     "@modelcontextprotocol/server-memory": "2.0.1",
+    "@tortoisegate/policy": "workspace:*",
     "@types/better-sqlite3": "9.6.0",
     "better-sqlite3": "13.0.3"
   }

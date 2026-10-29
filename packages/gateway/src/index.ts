@@ -13,3 +13,4 @@ export * from './upstream.js';
 export * from './session.js';
 export * from './gateway.js';
 export * from './store.js';
+export * from './policy-pipeline.js';

@@ -35,6 +35,9 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 - Pruning of provenance index rows older than the window.
 - Ledger events for resource reads and prompt contents, so their evidence resolves to a ledger entry.
 
+- Policy DSL features deferred in ADR 0016: annotation selectors, `unit: { path }`, `window_total_gt` (per-day spend windows), `rate_gt`, per-rule approval blocks, "always allow this recipient" from the UI, more templates.
+- Argument-echo awareness: a tool result that repeats the call's own arguments (a payment receipt) is indexed as untrusted content, so a later call with the same value matches `provenance: untrusted` (ADR 0016).
+- Policy hot reload (today a policy change needs a gateway restart; each start records `policy.loaded`).
 - Calldata decoding (viem) and transaction simulation for EVM sinks.
 - Solana and Bitcoin sink recognition.
 - Policy simulation UI ("what would this change have blocked?").

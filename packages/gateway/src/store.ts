@@ -8,6 +8,7 @@ import {
   loadOrCreateKeys,
   type InstallationKeys,
 } from '@tortoisegate/ledger';
+import { PolicyStateStore } from '@tortoisegate/policy';
 import { ProvenanceEngine } from '@tortoisegate/provenance';
 import type { Logger } from './log.js';
 
@@ -61,6 +62,7 @@ export class GatewayStore {
   private ledgerCache: Ledger | undefined;
   private redactorCache: Redactor | undefined;
   private provenanceCache: ProvenanceEngine | undefined;
+  private policyStateCache: PolicyStateStore | undefined;
   private closed = false;
 
   constructor(
@@ -111,6 +113,15 @@ export class GatewayStore {
       windowSeconds: this.config.provenance.windowSeconds,
     });
     return this.provenanceCache;
+  }
+
+  /** Policy state (`first_seen`), in the shared state database. */
+  policyState(): PolicyStateStore {
+    this.policyStateCache ??= new PolicyStateStore(
+      this.ledger().db,
+      deriveKey(this.keys().hmacSecret, 'policy-state'),
+    );
+    return this.policyStateCache;
   }
 
   /** Signs pending entries and closes the database. */

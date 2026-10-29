@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Latency added by Tortoise Gate per tool call.
 //
-// Runs the same sequential tools/call loop against the reference `everything` server twice in
-// one process: directly, then through `tortoisegate wrap` (observe and enforce). The gate is on
+// Runs the same sequential tools/call loop against the reference `everything` server in one
+// process: directly, then through `tortoisegate wrap` (observe, enforce with the deny list, and
+// enforce with a money-moving style policy that treats `echo` as a payment sink). The gate is on
 // the overhead relative to the direct run on the same machine, so it holds on fast and slow
 // runners alike.
 //
@@ -35,6 +36,49 @@ const EVERYTHING = fileURLToPath(
   new URL('../node_modules/@modelcontextprotocol/server-everything/dist/index.js', import.meta.url),
 );
 
+const TRUSTED = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+const POLICY = `schema: tortoise-gate/policy@1
+name: bench
+version: 1
+lists:
+  trusted: { kind: evm-address, values: ['${TRUSTED}'] }
+sinks:
+  - id: pay
+    tool: echo
+    args:
+      to: { path: /message, kind: evm-address }
+rules:
+  - id: block-lookalike
+    match: { sink: pay }
+    when:
+      all:
+        - { arg: to, near: [address-poisoning, confusable, zero-width, split] }
+        - not: { arg: to, in_list: trusted }
+    action: block
+    reason: Lookalike recipient.
+  - id: ask-untrusted
+    match: { sink: pay }
+    when:
+      all:
+        - { arg: to, provenance: { label: untrusted } }
+        - not: { arg: to, in_list: trusted }
+    action: ask
+    reason: Recipient from untrusted content.
+  - id: ask-first-seen
+    match: { sink: pay }
+    when:
+      all:
+        - { arg: to, first_seen: true }
+        - not: { arg: to, in_list: trusted }
+    action: ask
+    reason: First payment to this recipient.
+  - id: allow-trusted
+    match: { sink: pay }
+    when: { arg: to, in_list: trusted }
+    action: allow
+    reason: Allowlisted recipient.
+`;
+
 const pct = (sorted, p) =>
   sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
 
@@ -43,7 +87,8 @@ async function measure(label, args, env) {
   await client.connect(
     new StdioClientTransport({ command: process.execPath, args, env, stderr: 'ignore' }),
   );
-  const call = () => client.callTool({ name: 'echo', arguments: { message: 'x'.repeat(64) } });
+  // An allowlisted address: the policy run evaluates every rule and allows the call.
+  const call = () => client.callTool({ name: 'echo', arguments: { message: TRUSTED } });
   for (let i = 0; i < warmup; i++) await call();
   const samples = [];
   for (let i = 0; i < calls; i++) {
@@ -59,6 +104,9 @@ async function measure(label, args, env) {
 const home = mkdtempSync(join(tmpdir(), 'tg-bench-'));
 const cfg = join(home, 'enforce.json');
 writeFileSync(cfg, JSON.stringify({ deny: { tools: [{ tool: 'never-called' }] } }));
+const policyCfg = join(home, 'policy.json');
+writeFileSync(join(home, 'policy.yaml'), POLICY);
+writeFileSync(policyCfg, JSON.stringify({ policy: { path: 'policy.yaml' } }));
 const env = { PATH: process.env.PATH ?? '', XDG_STATE_HOME: home, XDG_CONFIG_HOME: home };
 
 try {
@@ -69,7 +117,12 @@ try {
     [CLI, 'wrap', '--mode', 'enforce', '--config', cfg, '--', EVERYTHING, 'stdio'],
     env,
   );
-  const rows = [direct, observe, enforce];
+  const policy = await measure(
+    'gateway (enforce, policy)',
+    [CLI, 'wrap', '--mode', 'enforce', '--config', policyCfg, '--', EVERYTHING, 'stdio'],
+    env,
+  );
+  const rows = [direct, observe, enforce, policy];
   const fmt = (n) => n.toFixed(3);
   console.log(
     `calls=${calls} warmup=${warmup} node=${process.version} ${process.platform}/${process.arch}`,

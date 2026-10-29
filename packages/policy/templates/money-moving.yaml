@@ -1,0 +1,77 @@
+# Tortoise Gate policy template: an agent that can move money (EVM `send_funds`).
+# Documented in docs/policy-templates.md. Copy it, then fill in the lists.
+#
+# Verdict per case (most restrictive matching rule wins):
+#   recipient resembles a known address (lookalike) ...... block
+#   recipient on blocked-recipients ....................... block
+#   recipient copied from untrusted content ............... ask
+#   first payment to a recipient not on the allowlist ..... ask
+#   amount above the per-call limit (0.01 ETH) ............ ask
+#   allowlisted recipient within the limit ................ allow
+#   any other send_funds call (no rule matched) ........... ask (defaults.sink)
+schema: tortoise-gate/policy@1
+name: money-moving
+version: 1
+defaults:
+  sink: ask
+  other: allow
+lists:
+  # Quote addresses: an unquoted 0x... is a YAML number.
+  trusted-recipients:
+    kind: evm-address
+    values: []
+  blocked-recipients:
+    kind: evm-address
+    values: []
+sinks:
+  - id: evm-transfer
+    server: '*'
+    tool: send_funds
+    args:
+      to: { path: /to, kind: evm-address }
+      amount: { path: /amount, kind: amount, unit: { value: ETH } }
+rules:
+  - id: block-lookalike-recipient
+    description: Address poisoning or a disguised copy of a known address
+    match: { sink: evm-transfer }
+    when:
+      all:
+        - { arg: to, near: [address-poisoning, confusable, zero-width, split] }
+        - not: { arg: to, in_list: trusted-recipients }
+    action: block
+    reason: The recipient looks like a known address but is a different one (possible address poisoning).
+  - id: block-denylisted-recipient
+    match: { sink: evm-transfer }
+    when: { arg: to, in_list: blocked-recipients }
+    action: block
+    reason: The recipient is on the blocked-recipients list.
+  - id: ask-untrusted-recipient
+    description: Recipient copied from content the agent read (prompt injection)
+    match: { sink: evm-transfer }
+    when:
+      all:
+        - { arg: to, provenance: { label: untrusted } }
+        - not: { arg: to, in_list: trusted-recipients }
+    action: ask
+    reason: The recipient address was copied from untrusted content.
+  - id: ask-first-seen-recipient
+    match: { sink: evm-transfer }
+    when:
+      all:
+        - { arg: to, first_seen: true }
+        - not: { arg: to, in_list: trusted-recipients }
+    action: ask
+    reason: First payment to this recipient.
+  - id: ask-above-limit
+    match: { sink: evm-transfer }
+    when: { arg: amount, amount_gt: '0.01' }
+    action: ask
+    reason: The amount is above the per-call limit of 0.01 ETH.
+  - id: allow-trusted-within-limit
+    match: { sink: evm-transfer }
+    when:
+      all:
+        - { arg: to, in_list: trusted-recipients }
+        - not: { arg: amount, amount_gt: '0.01' }
+    action: allow
+    reason: Payment within the per-call limit to an allowlisted recipient.

@@ -2,11 +2,13 @@ import { createHash } from 'node:crypto';
 import {
   globMatch,
   type DecisionAction,
+  type Event,
   type JsonObject,
   type JsonValue,
   type ProvenanceReport,
   type ServerRef,
   type Source,
+  type ToolCallEvent,
   type ToolResultEvent,
 } from '@tortoisegate/core';
 import type { ProvenanceEngine } from '@tortoisegate/provenance';
@@ -36,6 +38,8 @@ export interface PipelineVerdict {
   policySha256: string;
   /** Provenance of the argument values, stored with the decision. */
   provenance?: ProvenanceReport | null;
+  /** Set when the policy could not be evaluated and the failure stance gave the verdict. */
+  policyError?: { code: string; message: string } | null;
 }
 
 /** Content a server returned outside a tool call (resource read, prompt). */
@@ -57,6 +61,10 @@ export interface DecisionPipeline {
   /** Returns the provenance source recorded for this result, if any. */
   onToolResult?(event: ToolResultEvent): Source | null;
   onContent?(content: ObservedContent): void;
+  /** Called once a forwarded call returned a successful result (updates policy state). */
+  onExecuted?(call: ToolCallEvent): void;
+  /** Events to record when a session starts (for example `policy.loaded`). */
+  sessionEvents?(sessionId: string, now: Date): Event[];
 }
 
 /** Records tool results and other content in the provenance index. */

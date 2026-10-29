@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { ledgerCommand } from './ledger-cmd.js';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -204,6 +204,10 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (values.mode !== undefined) raw['mode'] = values.mode;
   const config = parseConfig(raw);
+  // A relative policy path is relative to the config file that names it.
+  if (config.policy !== undefined && values.config !== undefined) {
+    config.policy.path = resolve(dirname(values.config), config.policy.path);
+  }
 
   const gw = await runGateway({ config, log });
   if (gw.http !== undefined) {
