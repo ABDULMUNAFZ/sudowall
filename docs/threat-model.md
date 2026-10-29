@@ -1,0 +1,56 @@
+# Threat model
+
+Scope: the Tortoise Gate gateway, CLI, local web UI and ledger running on one user's machine, protecting MCP-based agents. Method: assets → attackers → attack paths (STRIDE-tagged) → mitigations → residual risk.
+
+## Assets
+
+| Asset                                              | Why it matters                                            |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| Funds reachable by agent tools                     | Direct financial loss (first market: money-moving agents) |
+| Credentials used by upstream servers               | Account takeover, data access                             |
+| User data reachable by tools (email, files, repos) | Exfiltration                                              |
+| Integrity of the ledger                            | Evidence after an incident                                |
+| Integrity of policy and config                     | Silently weakening policy disables protection             |
+| The approval channel                               | A forged approval is equivalent to no gate                |
+
+## Attackers
+
+| Id  | Attacker                                     | Capabilities                                                                                                | Not assumed                                                         |
+| --- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| A1  | **Injected content**                         | Writes text the agent reads (email, web page, issue, on-chain memo, tool output)                            | No code execution on the machine                                    |
+| A2  | **Malicious MCP server**                     | Controls one upstream's outputs, tool names, descriptions and annotations; may lie about everything         | No access to other upstreams or the gateway process                 |
+| A3  | **Compromised agent**                        | The model follows A1's instructions; may call any tool with any arguments, retry, split values, encode them | Cannot bypass the gate for tools that are only reachable through it |
+| A4  | **Malicious web page in the user's browser** | Sends requests to `127.0.0.1` ports (CSRF, DNS rebinding)                                                   | No local code execution                                             |
+| A5  | **Local malware as the same OS user**        | Reads and writes the user's files and processes                                                             | Out of scope as an adversary we defeat; see residual risk           |
+
+## Attack paths and mitigations
+
+| #   | Path                                                                                                          | STRIDE                            | Mitigation                                                                                                                                                          | Phase   |
+| --- | ------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| T1  | A1 plants an address, email or URL; A3 copies it into a payment or send call                                  | Tampering, elevation of privilege | Value-level provenance flags the argument as matching untrusted content; policy blocks or asks                                                                      | 3, 4    |
+| T2  | A1 plants a lookalike address (address poisoning: same prefix and suffix) or confusable or zero-width variant | Spoofing                          | Near-match detection (`address-poisoning`, `confusable`, `zero-width`); policy blocks                                                                               | 3, 4, 7 |
+| T3  | A3 sends a value never seen before (from the model's memory or a reworded instruction)                        | Elevation of privilege            | Not caught by provenance (honest limit). Covered by `first_seen` → ask, amount and window limits, lists                                                             | 4       |
+| T4  | A3 drains funds through many small calls                                                                      | Elevation of privilege            | `window_total_gt` and `rate_gt`, with state rebuilt from the ledger so restarts don't reset limits                                                                  | 4       |
+| T5  | A2 names its tool like a trusted server's tool (shadowing)                                                    | Spoofing                          | With more than one upstream, every tool is namespaced `<serverId>__<tool>`                                                                                          | 1       |
+| T6  | A2 marks a destructive tool `readOnlyHint: true`                                                              | Spoofing                          | Annotations may only tighten policy; `allow` rules cannot select on them                                                                                            | 4       |
+| T7  | A2 or A1 puts instructions in a tool description or result to make the agent exfiltrate                       | Information disclosure            | Outputs are labelled untrusted; sinks on outbound tools (email, HTTP, URL args) with provenance rules. Free-text exfiltration is only partly covered (honest limit) | 3, 4    |
+| T8  | A2 sends sampling, elicitation or roots requests to steer the client                                          | Elevation of privilege            | Unsupported in the deadline build: not advertised; explicit error if sent                                                                                           | 1       |
+| T9  | A3 alters arguments after a human approves                                                                    | Tampering                         | Approval bound to the SHA-256 of the exact canonical arguments; any change voids it; one use only                                                                   | 5       |
+| T10 | A4 calls the local web UI API to approve a pending call                                                       | Spoofing, CSRF                    | Bind `127.0.0.1` only; require a loopback `Host` (defeats DNS rebinding); per-session random token in a header; no CORS; no state change via GET                    | 6       |
+| T11 | Someone edits `ledger.db` to hide an action                                                                   | Tampering, repudiation            | Hash chain + signed checkpoints + independent verifier report the first bad `seq`                                                                                   | 2       |
+| T12 | Secrets end up in logs or the ledger                                                                          | Information disclosure            | Redaction before hashing and storage; secrets come from env vars, not config; error messages never include argument values                                          | 2, 5    |
+| T13 | The gateway crashes or the policy errors during a risky call                                                  | Denial of service → fail open     | Sink calls fail closed; non-sink stance is explicit config (default block); ledger write failure blocks the call                                                    | 1, 2, 4 |
+| T14 | An action executes but is never recorded                                                                      | Repudiation                       | Write-ahead: `tool.call` is committed before forwarding                                                                                                             | 2       |
+| T15 | A huge payload or deeply nested JSON slows the gate or crashes it                                             | Denial of service                 | JSON depth limit (256), payload size limit, stored-result truncation, bounded session index with eviction                                                           | 0, 1, 3 |
+| T16 | Supply-chain compromise of a dependency                                                                       | All                               | Pinned exact versions, minimal deps, `pnpm audit` and secret scan in CI, licence check, SBOM; signed releases later                                                 | 0, 9    |
+| T17 | Demo money-moving code touches mainnet                                                                        | Financial loss                    | Testnet only; mainnet chain IDs refused in code; testnet key from env, never logged                                                                                 | 7       |
+
+## Residual risks and honest limits
+
+- **Bypass.** The gate only sees calls routed through it. An agent with other tools, its own HTTP access, or the raw credentials can act around it. Removing raw secrets from agent configs (vault, post-deadline) narrows this. Until then, upstream secrets live in environment variables that the agent host may also be able to read.
+- **Reworded attacks.** Provenance catches structured values copied exactly or nearly exactly. It does not catch an instruction the model rephrases, or a value it computes or re-encodes, such as base64 or arithmetic on amounts. Limits, lists and first-seen rules reduce, but do not remove, this risk.
+- **Local malware (A5)** running as the same user can edit the policy, config and ledger, and read the signing key. The ledger then still detects edits made _without_ the key. Only off-machine copies of checkpoints (export, or later on-chain anchoring) defend against a key-holding attacker.
+- **The unsigned tail.** Entries after the last checkpoint can be truncated without detection.
+- **Precision.** Integers above 2^53 are already rounded by the JSON parser, and the gateway forwards what the SDK parsed. Amount rules fail closed on unsafe integers. Money tools should take decimal strings.
+- **The approver.** A human who approves a malicious action is not stopped. The UI must show the evidence plainly to reduce this risk.
+- **Malicious upstream for its own domain.** A compromised upstream server can misuse its own credentials directly, without going through the agent. The gate does not protect against that.

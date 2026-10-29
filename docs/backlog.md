@@ -1,0 +1,39 @@
+# Backlog
+
+Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
+
+## Packages not yet created
+
+- `packages/vault`: OS keychain credential storage, secret injection into upstreams, migration of secrets out of client configs.
+- `packages/sdk`: guard wrappers and an `observe()` API for non-MCP agents; framework adapters; Python SDK.
+- `apps/desktop`: Electron wrapper around the local web UI; macOS signing and notarisation, then Windows and Linux.
+- `apps/cloud-api`, `apps/cloud-web`: team control plane (proprietary, separate repo).
+
+## Gateway
+
+- Forwarding of sampling, elicitation and roots (server-initiated requests and 2026-07-28 MRTR `input_required`) with inspection.
+- Tasks extension (`io.modelcontextprotocol/tasks`).
+- Preserving integers above 2^53 exactly (raw JSON forwarding) instead of failing closed on them.
+
+## Ledger
+
+- Signing-key rotation within one ledger (`tg-ledger/2`).
+- Move the signing and redaction keys into the OS keychain.
+- Optional on-chain anchoring of checkpoint roots (testnet first, audited contract).
+
+## Provenance and policy
+
+- Calldata decoding (viem) and transaction simulation for EVM sinks.
+- Solana and Bitcoin sink recognition.
+- Policy simulation UI ("what would this change have blocked?").
+
+## Supply chain and release
+
+- SBOM published with each release (`pnpm sbom --sbom-format cyclonedx`); signed artifacts and provenance attestations.
+- Reproducible builds.
+
+## Product
+
+- Weekly summary report.
+- Opt-in, documented, redacted crash reports.
+- Shared threat-intelligence feed (only after a privacy and abuse design).
