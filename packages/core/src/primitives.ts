@@ -29,6 +29,8 @@ export function isJsonValue(v: unknown, depth = 0): v is JsonValue {
       return Number.isFinite(v);
     case 'object':
       if (v === null) return true;
+      // Lossless numbers from parseLossless (see raw-json.ts) serialise as their source digits.
+      if (JSON.isRawJSON(v)) return true;
       if (Array.isArray(v)) return v.every((x) => isJsonValue(x, depth + 1));
       return isPlainObject(v) && Object.values(v).every((x) => isJsonValue(x, depth + 1));
     default:

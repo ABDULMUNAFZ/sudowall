@@ -22,5 +22,14 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@modelcontextprotocol/server-everything": "2.1.0",
+    "@modelcontextprotocol/server-filesystem": "2.1.0",
+    "@modelcontextprotocol/server-memory": "2.0.1"
   }
 }

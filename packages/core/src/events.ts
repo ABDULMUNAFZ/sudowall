@@ -71,10 +71,13 @@ export const ToolCallEventSchema = z.strictObject({
   /** Tool name as the upstream server knows it (not the namespaced name the client saw). */
   tool: z.string().min(1),
   requestId: RequestIdSchema,
+  /** SHA-256 of the exact JSON-RPC message text the client sent (a commitment to the raw bytes). */
+  rawSha256: Sha256HexSchema,
   /** Arguments after redaction. */
   arguments: JsonObjectSchema,
   redaction: RedactionSchema,
-  provenance: ProvenanceReportSchema,
+  /** Null when no provenance analysis ran (the provenance engine arrives in Phase 3). */
+  provenance: ProvenanceReportSchema.nullable(),
   decision: DecisionSchema,
 });
 
@@ -93,6 +96,10 @@ export const ToolResultEventSchema = z.strictObject({
     'timeout',
     'cancelled',
   ]),
+  /** SHA-256 of the exact JSON-RPC response text the upstream sent; null if it never answered. */
+  rawSha256: Sha256HexSchema.nullable(),
+  /** JSON-RPC error from the upstream (protocol-error outcome); null otherwise. */
+  error: z.strictObject({ code: z.int(), message: z.string() }).nullable(),
   /** Result after redaction; null when the call never reached the upstream. */
   result: JsonValueSchema.nullable(),
   /** True when `result` was cut to the configured storage limit. */

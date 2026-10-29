@@ -59,7 +59,9 @@ describe('event schema', () => {
       '{"schemaVersion":1,"id":"6b3f1c1e-8a2e-4b8e-9a51-0e7c3f6f1a10","ts":"2026-10-29T07:00:00.000Z",' +
         '"sessionId":"6b3f1c1e-8a2e-4b8e-9a51-0e7c3f6f1a11","type":"tool.call","client":null,' +
         '"server":{"id":"evm","name":null,"version":null,"transport":"stdio"},"tool":"send_funds",' +
-        '"requestId":1,"arguments":{"__proto__":{"polluted":true}},' +
+        '"requestId":1,"rawSha256":"' +
+        'a'.repeat(64) +
+        '","arguments":{"__proto__":{"polluted":true}},' +
         '"redaction":{"ruleVersion":1,"applied":[]},' +
         '"provenance":{"sessionTainted":false,"matches":[]},' +
         '"decision":{"verdict":"allow","effective":"allow","mode":"observe","matchedRules":[],' +

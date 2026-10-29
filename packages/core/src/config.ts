@@ -23,12 +23,45 @@ const UpstreamUrlSchema = z.url().refine(
   { message: 'upstream URL must be https, or http to 127.0.0.1 / localhost / [::1]' },
 );
 
+/**
+ * Environment variables a stdio upstream inherits from the gateway by default. Anything else
+ * must be listed in `inheritEnv` or set in `env`, so secrets in the gateway's environment are
+ * not handed to every upstream.
+ */
+export const DEFAULT_INHERITED_ENV = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TZ',
+  'TMPDIR',
+  'TERM',
+  // Windows equivalents needed for processes to start.
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'PATHEXT',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'USERPROFILE',
+  'TEMP',
+  'TMP',
+] as const;
+
+const EnvNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
 export const StdioUpstreamSchema = z.strictObject({
   id: ServerIdSchema,
   transport: z.literal('stdio'),
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
-  env: z.record(z.string(), EnvValueSchema).default({}),
+  env: z.record(EnvNameSchema, EnvValueSchema).default({}),
+  /** Gateway environment variables passed through. `"*"` passes everything (used by `wrap`). */
+  inheritEnv: z.union([z.literal('*'), z.array(EnvNameSchema)]).default([...DEFAULT_INHERITED_ENV]),
   cwd: z.string().min(1).optional(),
 });
 
@@ -48,6 +81,11 @@ export type Upstream = z.infer<typeof UpstreamSchema>;
 /** Glob over names: `*` matches any run of characters; everything else is literal. */
 const GlobSchema = z.string().min(1);
 
+export const ToolSelectorSchema = z.strictObject({
+  server: GlobSchema.default('*'),
+  tool: GlobSchema,
+});
+
 export const RedactionRuleSchema = z.strictObject({
   server: GlobSchema.default('*'),
   tool: GlobSchema.default('*'),
@@ -63,24 +101,93 @@ export const ConfigSchema = z
     /** Observe by default: log what would happen, block nothing, until the user opts in. */
     mode: ModeSchema.default('observe'),
     upstreams: z.array(UpstreamSchema).min(1),
+    /** How the gateway listens for its MCP client. */
+    listen: z
+      .discriminatedUnion('transport', [
+        z.strictObject({ transport: z.literal('stdio') }),
+        z.strictObject({
+          transport: z.literal('streamable-http'),
+          /** Always bound to 127.0.0.1; 0 picks a free port. */
+          port: z.int().min(0).max(65535).default(0),
+          path: z.string().startsWith('/').default('/mcp'),
+        }),
+      ])
+      .default({ transport: 'stdio' }),
+    namespacing: z
+      .strictObject({
+        /** `on-collision`: prefix only tools whose names clash; `always`: prefix every tool. */
+        scheme: z.enum(['on-collision', 'always']).default('on-collision'),
+        separator: z
+          .string()
+          .regex(/^[A-Za-z0-9_.-]{1,4}$/)
+          .default('__'),
+      })
+      .prefault({}),
+    /** Tools that are always blocked in enforce mode (recorded as would-block in observe mode). */
+    deny: z.strictObject({ tools: z.array(ToolSelectorSchema).default([]) }).prefault({}),
+    limits: z
+      .strictObject({
+        /** Largest single JSON-RPC message accepted from either side, in bytes. */
+        maxMessageBytes: z
+          .int()
+          .min(1024)
+          .max(256 * 1024 * 1024)
+          .default(16 * 1024 * 1024),
+        /** A request with no response after this long is answered with an error. 0 disables. */
+        requestTimeoutMs: z
+          .int()
+          .min(0)
+          .default(10 * 60 * 1000),
+      })
+      .prefault({}),
+    upstreamLifecycle: z
+      .strictObject({
+        healthIntervalMs: z.int().min(1000).default(30_000),
+        healthTimeoutMs: z.int().min(100).default(10_000),
+        restartInitialDelayMs: z.int().min(10).default(250),
+        restartMaxDelayMs: z.int().min(10).default(30_000),
+        /** Consecutive failed restarts before the upstream is marked down for good. */
+        restartMaxAttempts: z.int().min(0).default(8),
+        /** Grace period between SIGTERM and SIGKILL on shutdown. */
+        shutdownGraceMs: z.int().min(0).default(2_000),
+      })
+      .prefault({}),
+    events: z
+      .strictObject({
+        jsonl: z
+          .strictObject({
+            path: z.string().min(1),
+            rotateBytes: z
+              .int()
+              .min(4096)
+              .default(64 * 1024 * 1024),
+            keepFiles: z.int().min(1).max(1000).default(10),
+          })
+          .optional(),
+      })
+      .prefault({}),
     trust: z
       .strictObject({
         /** Tools whose output is labelled `trusted-tool`. Everything else is `untrusted`. */
         trustedTools: z.array(z.strictObject({ server: GlobSchema, tool: GlobSchema })).default([]),
       })
       .prefault({}),
-    policy: z.strictObject({ path: z.string().min(1) }),
-    ledger: z.strictObject({
-      path: z.string().min(1),
-      checkpoint: z
-        .strictObject({
-          everyEntries: z.int().min(1).max(65536).default(256),
-          everySeconds: z.int().min(1).max(86400).default(60),
-        })
-        .prefault({}),
-      /** Stored result size limit in bytes of canonical JSON; larger results are truncated. */
-      maxStoredResultBytes: z.int().min(1024).default(262144),
-    }),
+    /** Policy engine config (Phase 4). */
+    policy: z.strictObject({ path: z.string().min(1) }).optional(),
+    /** Ledger config (Phase 2). */
+    ledger: z
+      .strictObject({
+        path: z.string().min(1),
+        checkpoint: z
+          .strictObject({
+            everyEntries: z.int().min(1).max(65536).default(256),
+            everySeconds: z.int().min(1).max(86400).default(60),
+          })
+          .prefault({}),
+        /** Stored result size limit in bytes of canonical JSON; larger results are truncated. */
+        maxStoredResultBytes: z.int().min(1024).default(262144),
+      })
+      .optional(),
     redaction: z
       .strictObject({
         ruleVersion: z.int().nonnegative().default(1),

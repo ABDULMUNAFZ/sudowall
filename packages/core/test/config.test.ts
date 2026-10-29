@@ -26,7 +26,7 @@ describe('config schema', () => {
     expect(c.mode).toBe('observe');
     expect(c.failure.onPolicyErrorNonSink).toBe('block');
     expect(c.trust.trustedTools).toEqual([]);
-    expect(c.ledger.checkpoint).toEqual({ everyEntries: 256, everySeconds: 60 });
+    expect(c.ledger?.checkpoint).toEqual({ everyEntries: 256, everySeconds: 60 });
     expect(c.ui.port).toBe(0);
   });
 
@@ -99,5 +99,25 @@ describe('config schema', () => {
 
   it('requires at least one upstream', () => {
     expectInvalid({ ...minimal, upstreams: [] });
+  });
+});
+
+describe('gateway config defaults', () => {
+  it('listens on stdio, namespaces on collision, and passes only a minimal environment', () => {
+    const c = parseConfig(minimal);
+    expect(c.listen).toEqual({ transport: 'stdio' });
+    expect(c.namespacing).toEqual({ scheme: 'on-collision', separator: '__' });
+    expect(c.deny.tools).toEqual([]);
+    const up = c.upstreams[0];
+    if (up?.transport !== 'stdio') throw new Error('expected stdio upstream');
+    expect(up.inheritEnv).toContain('PATH');
+    expect(up.inheritEnv).not.toContain('AWS_SECRET_ACCESS_KEY');
+  });
+
+  it('rejects env names that are not valid variable names', () => {
+    expectInvalid({
+      ...minimal,
+      upstreams: [{ id: 'a', transport: 'stdio', command: 'x', inheritEnv: ['BAD NAME'] }],
+    });
   });
 });
