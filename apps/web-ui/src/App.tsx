@@ -7,7 +7,7 @@ import {
   type State,
   type VerifyResult,
 } from './api.js';
-import { visible, visibleJson } from './text.js';
+import { count, ledgerSummary, visible, visibleJson } from './text.js';
 
 const POLL_MS = 1000;
 
@@ -214,6 +214,10 @@ export function App() {
       <header className="top">
         <h1>Tortoise Gate</h1>
         <p className="tagline">Nothing moves until it&rsquo;s checked.</p>
+        <p className="about" data-testid="about">
+          Every tool call your AI agent makes through the gate is checked here. Risky ones wait for
+          your decision, and everything is kept in a tamper-evident record.
+        </p>
       </header>
       {error !== null && <p className="error banner">{error}</p>}
 
@@ -233,9 +237,8 @@ export function App() {
 
       <section aria-labelledby="ledger-h" className="ledger">
         <h2 id="ledger-h">Ledger</h2>
-        <p>
-          {state?.ledger.entries ?? 0} entries, last signed checkpoint covers up to entry{' '}
-          {state?.ledger.lastCheckpointSeq ?? 'none'}.
+        <p data-testid="ledger-summary">
+          {ledgerSummary(state?.ledger.entries ?? 0, state?.ledger.lastCheckpointSeq ?? null)}
         </p>
         <button type="button" onClick={runVerify} disabled={verifying} data-testid="verify">
           {verifying ? 'Verifying...' : 'Verify'}
@@ -243,7 +246,7 @@ export function App() {
         {verify !== null && (
           <p className={verify.ok ? 'ok' : 'error'} data-testid="verify-result">
             {verify.ok
-              ? `Verified: ${String(verify.entries)} entries, ${String(verify.checkpoints)} checkpoints, ${String(verify.unsignedTail)} not yet signed. Key ${verify.keyId}.`
+              ? `Verified: ${count(verify.entries, 'entry', 'entries')}, ${count(verify.checkpoints, 'checkpoint', 'checkpoints')}, ${String(verify.unsignedTail)} not yet signed. Key ${verify.keyId}.`
               : `FAILED${verify.seq !== undefined ? ` at entry ${String(verify.seq)}` : ''}: ${verify.kind}: ${verify.message}`}
             {!verify.signerChecked && ' (signer not checked: no local signing key)'}
           </p>
@@ -252,6 +255,9 @@ export function App() {
 
       <section aria-labelledby="feed-h">
         <h2 id="feed-h">Live decisions</h2>
+        {state !== null && state.feed.length === 0 && (
+          <p className="muted">No tool calls yet. Decisions appear here as your agent works.</p>
+        )}
         <table className="feed" data-testid="feed">
           <thead>
             <tr>

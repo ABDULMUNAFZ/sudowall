@@ -216,3 +216,9 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+.about {
+  margin: 0.25rem 0 0;
+  max-width: 60ch;
+  color: var(--muted);
+}

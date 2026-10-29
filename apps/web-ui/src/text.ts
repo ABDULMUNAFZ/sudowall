@@ -38,3 +38,17 @@ export function visible(s: string): string {
 export function visibleJson(v: unknown): string {
   return visible(JSON.stringify(v, null, 2));
 }
+
+/** "1 entry", "2 entries". */
+export const count = (n: number, one: string, many: string) =>
+  `${String(n)} ${n === 1 ? one : many}`;
+
+/** One line on the state of the ledger, in plain words. */
+export function ledgerSummary(entries: number, lastCheckpointSeq: number | null): string {
+  if (entries === 0) return 'No entries yet. Every tool call and decision will be recorded here.';
+  const recorded = `${count(entries, 'entry', 'entries')} recorded.`;
+  if (lastCheckpointSeq === null) {
+    return `${recorded} No signed checkpoint yet: one is written after a batch of entries, on a timer and when the gateway stops.`;
+  }
+  return `${recorded} Signed up to entry ${String(lastCheckpointSeq)}.`;
+}

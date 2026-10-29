@@ -151,6 +151,10 @@ test('a paused payment is approved in the UI and then runs', async ({ page }) =>
 
   await page.getByTestId('verify').click();
   await expect(page.getByTestId('verify-result')).toContainText(/^Verified: \d+ entries/);
+  // Plain-language header and ledger line (no "covers up to entry none" before a checkpoint).
+  await expect(page.getByTestId('about')).toContainText('checked here');
+  await expect(page.getByTestId('ledger-summary')).toContainText(/^\d+ entries recorded\. /);
+  await expect(page.getByTestId('ledger-summary')).not.toContainText('none');
   await agent.close();
 });
 
