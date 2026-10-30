@@ -25,6 +25,17 @@ export interface UiServerOptions {
   staticDir: string;
   log: Logger;
   now?: () => number;
+  /** Product context for the app's pages (mode, policy, protected agents, integrations). */
+  product?: ProductProvider;
+}
+
+/**
+ * Supplied by the CLI, which knows the config file and the MCP clients; the gateway only serves
+ * it. `info()` must return plain JSON. Without `setMode` the mode switch is read-only.
+ */
+export interface ProductProvider {
+  info(): unknown;
+  setMode?(mode: 'observe' | 'enforce'): void;
 }
 
 export interface RunningUi {
@@ -84,6 +95,38 @@ function hasTable(db: StateDb, name: string): boolean {
   );
 }
 
+/** Argument names worth showing in a one-line summary, most telling first. */
+const SUMMARY_KEYS = [
+  'to',
+  'recipient',
+  'email',
+  'address',
+  'amount',
+  'value',
+  'url',
+  'path',
+  'command',
+  'query',
+  'channel',
+  'repoName',
+  'subject',
+];
+
+/** Up to two short `name: value` pairs from (already redacted) arguments. */
+function argSummary(args: unknown): { name: string; value: string }[] {
+  if (args === null || typeof args !== 'object' || Array.isArray(args)) return [];
+  const a = args as Record<string, unknown>;
+  const out: { name: string; value: string }[] = [];
+  for (const k of SUMMARY_KEYS) {
+    const v = a[k];
+    if (typeof v !== 'string' && typeof v !== 'number') continue;
+    const s = String(v);
+    out.push({ name: k, value: s.length > 80 ? `${s.slice(0, 77)}...` : s });
+    if (out.length === 2) break;
+  }
+  return out;
+}
+
 interface FeedItem {
   seq: number;
   ts: string;
@@ -115,6 +158,7 @@ function feed(db: StateDb, limit: number): FeedItem[] {
         mode: d['mode'],
         reason: d['reason'],
         ruleIds: (d['matchedRules'] as { ruleId: string }[]).map((r) => r.ruleId),
+        summary: argSummary(e['arguments']),
       };
     }
     return {
@@ -238,6 +282,10 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       });
       return;
     }
+    if (req.method === 'GET' && path === '/api/product') {
+      send(res, 200, o.product === undefined ? null : o.product.info());
+      return;
+    }
     const inc = /^\/api\/incident\/([0-9a-f-]{36})$/.exec(path);
     if (req.method === 'GET' && inc !== null) {
       // Read-only, like /api/state. The graph is built in memory from the ledger and never leaves
@@ -286,6 +334,18 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       );
       o.log.info('approval decided in the UI', { approvalId: id, decision, result });
       send(res, result === 'ok' ? 200 : result === 'not-found' ? 404 : 409, { result });
+      return;
+    }
+    if (path === '/api/mode') {
+      const mode = body['mode'];
+      if (mode !== 'observe' && mode !== 'enforce') {
+        throw new HttpError(400, 'expected { mode: "observe" | "enforce" }');
+      }
+      if (o.product?.setMode === undefined)
+        throw new HttpError(409, 'the mode cannot be changed here');
+      o.product.setMode(mode);
+      o.log.info('mode changed in the UI', { mode });
+      send(res, 200, { result: 'ok', mode });
       return;
     }
     if (path === '/api/ledger/verify') {

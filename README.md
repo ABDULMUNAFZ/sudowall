@@ -109,7 +109,7 @@ claude            # "Read the emails in my inbox with the sudowall-demo tools an
 - An MCP gateway for stdio and Streamable HTTP, on both protocol revisions (2025-11-25 and 2026-07-28), for one or several upstream servers. It forwards messages byte for byte.
 - Source tracking: values from untrusted tool output (addresses, emails, URLs, amounts) and lookalikes of them are matched in later tool calls. See [provenance](docs/provenance.md).
 - A deterministic YAML policy (allow, ask, block, each with an explanation), with a money-moving template. See [policy DSL](docs/policy-dsl.md) and [templates](docs/policy-templates.md).
-- Approvals for `ask` calls in a local web UI (`sudowall ui`), bound to the exact arguments. See [UI](docs/ui.md).
+- A local app (`npx sudowall ui`): overview, activity in plain sentences, approvals bound to the exact arguments, your protected agents, the policy, the tamper-evident record and integrations, with a Watching only / Protecting switch. See [UI](docs/ui.md).
 - A hash-chained, signed, append-only ledger in SQLite with `sudowall ledger verify`. See [ledger spec](docs/ledger-spec.md).
 - `observe` mode records what would happen and blocks nothing; `enforce` mode applies the policy.
 - Tested against the official reference servers, the MCP TypeScript SDKs (v1 and v2) and Claude Code. See [compatibility](docs/compatibility.md).

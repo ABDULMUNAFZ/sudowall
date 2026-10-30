@@ -2,6 +2,14 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## 0.6.0 (2026-10-30)
+
+### Added
+
+- **The local app has pages:** Overview (protection state, the last 7 days, what was stopped), Activity (every action as a plain sentence, with filters), Approvals, Your agents (which servers in Claude Code, Claude Desktop and Cursor run through the gate), Policy (rules grouped as blocked, asks you, allowed), Record (ledger, checked on arrival) and Integrations (Dodo Payments, viaSocket and remote servers, TigerGraph, wallets). See [docs/ui.md](docs/ui.md).
+- **A protection switch** in the app (Watching only / Protecting) that rewrites only `"mode"` in the config.
+- `sudowall ui` uses the config `protect` and `init` write when `--config` is not given.
+
 ## 0.5.0 (2026-10-30)
 
 ### Added

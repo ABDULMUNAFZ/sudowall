@@ -16,6 +16,7 @@ import { ensureAnvil, rpc, balanceWei, startAnvil, type RunningAnvil } from './a
 import { cliEntry, demoAssets, webUiDir } from './assets.js';
 import { DEMO_ADDRESSES as A, DEMO_EMAILS, writeDemoConfig } from './demo-config.js';
 import { ledgerCommand } from './ledger-cmd.js';
+import { productProvider } from './product.js';
 
 export interface DemoFlags {
   /** Non-interactive: deny the paused payment automatically and exit when done (for CI). */
@@ -137,6 +138,11 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       port: 0,
       staticDir: webUiDir(),
       log: silentLogger,
+      product: productProvider({
+        configPath: files.configPath,
+        dbPath: files.dbPath,
+        readOnly: true,
+      }),
     });
     out(`Approval UI: ${ui.url}`);
     out("(The address carries this run's access token and only works on this machine.)\n");

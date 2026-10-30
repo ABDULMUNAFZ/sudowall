@@ -1,9 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
@@ -55,6 +55,11 @@ interface Env {
   url: string;
 }
 
+/** Opens a page from the navigation. */
+async function nav(page: Page, name: string) {
+  await page.getByRole('navigation').getByRole('link', { name, exact: true }).click();
+}
+
 async function setup(): Promise<Env> {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'tg-e2e-ui-')));
   const inbox = join(home, 'inbox');
@@ -73,7 +78,19 @@ async function setup(): Promise<Env> {
       approvals: { notify: false },
     }),
   );
-  const env = { PATH: process.env['PATH'] ?? '', XDG_STATE_HOME: home, XDG_CONFIG_HOME: home };
+  // A fake home: the "Your agents" page reads MCP client configs, never the real ones in tests.
+  mkdirSync(join(home, '.cursor'));
+  writeFileSync(
+    join(home, '.cursor', 'mcp.json'),
+    JSON.stringify({ mcpServers: { notes: { url: 'https://mcp.deepwiki.com/mcp' } } }),
+  );
+  const env = {
+    PATH: process.env['PATH'] ?? '',
+    HOME: home,
+    USERPROFILE: home,
+    XDG_STATE_HOME: home,
+    XDG_CONFIG_HOME: home,
+  };
   const ui = spawn(process.execPath, [CLI, 'ui', '--config', cfg], {
     env,
     stdio: ['ignore', 'pipe', 'inherit'],
@@ -145,14 +162,21 @@ test('a paused payment is approved in the UI and then runs', async ({ page }) =>
   expect(result.isError).toBeFalsy();
   expect(result.content[0]?.text).toContain(ATTACKER);
   await expect(card).toHaveCount(0);
+  // Plain-language header on the overview.
+  await expect(page.getByTestId('about')).toContainText('checked here');
+
+  await nav(page, 'Activity');
   const feed = page.getByTestId('feed');
   await expect(feed).toContainText('approved');
   await expect(feed).toContainText('server-everything/echo');
+  await expect(feed).toContainText('You approved it, so it ran.');
 
+  await nav(page, 'Record');
+  // The record page checks itself on arrival; the button checks again.
+  await expect(page.getByTestId('verify-result')).toContainText(/^Verified: \d+ entries/);
   await page.getByTestId('verify').click();
   await expect(page.getByTestId('verify-result')).toContainText(/^Verified: \d+ entries/);
-  // Plain-language header and ledger line (no "covers up to entry none" before a checkpoint).
-  await expect(page.getByTestId('about')).toContainText('checked here');
+  // No "covers up to entry none" before a checkpoint.
   await expect(page.getByTestId('ledger-summary')).toContainText(/^\d+ entries recorded\. /);
   await expect(page.getByTestId('ledger-summary')).not.toContainText('none');
   await agent.close();
@@ -172,7 +196,9 @@ test('a paused payment is denied in the UI and never runs', async ({ page }) => 
   const result = await pending;
   expect(result.isError).toBe(true);
   expect(result._meta?.['sudowall/decision']?.code).toBe('SW_APPROVAL_DENIED');
+  await nav(page, 'Activity');
   await expect(page.getByTestId('feed')).toContainText('denied');
+  await expect(page.getByTestId('feed')).toContainText('Paused for you');
   // Explain the paused call: the panel shows the rule and the verified ledger entries.
   await page
     .getByTestId('feed')
@@ -185,6 +211,40 @@ test('a paused payment is denied in the UI and never runs', async ({ page }) => 
   await expect(incident).toContainText('First payment to this recipient.');
   await expect(incident.getByTestId('incident-ledger')).toContainText(/^Ledger verified/);
   await agent.close();
+});
+
+test('every page explains the product in plain words', async ({ page }) => {
+  const env = await setup();
+  e = env;
+  await page.goto(env.url);
+  // Overview: protection state and the numbers.
+  await expect(page.getByTestId('mode')).toContainText('Protecting');
+  await expect(page.getByText('actions checked')).toBeVisible();
+
+  await nav(page, 'Your agents');
+  await expect(page.locator('main')).toContainText('Cursor');
+  await expect(page.locator('main')).toContainText('not protected');
+  await expect(page.locator('main')).toContainText('remote');
+
+  await nav(page, 'Policy');
+  await expect(page.locator('main')).toContainText('Asks you first');
+  await expect(page.locator('main')).toContainText('First payment to this recipient.');
+
+  await nav(page, 'Integrations');
+  for (const name of ['Dodo Payments', 'TigerGraph', 'viaSocket and remote servers']) {
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+  }
+
+  // The mode switch rewrites only "mode" in the config file.
+  await nav(page, 'Policy');
+  await page.getByRole('button', { name: 'Switch to watching only' }).click();
+  await expect(page.getByTestId('mode')).toContainText('Saved.');
+  await expect
+    .poll(() => (JSON.parse(readFileSync(env.cfg, 'utf8')) as { mode: string }).mode)
+    .toBe('observe');
+  expect((JSON.parse(readFileSync(env.cfg, 'utf8')) as { policy: unknown }).policy).toEqual({
+    path: 'policy.yaml',
+  });
 });
 
 test('without the token the UI shows no data', async ({ page }) => {

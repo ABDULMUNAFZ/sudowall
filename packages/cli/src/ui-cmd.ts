@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { LedgerConfigSchema, SudoWallError, UiConfigSchema } from '@sudowall/core';
-import { startUiServer, storePaths, type Logger } from '@sudowall/gateway';
+import { defaultConfigDir, startUiServer, storePaths, type Logger } from '@sudowall/gateway';
 import { webUiDir } from './assets.js';
 import { UsageError } from './errors.js';
+import { productProvider } from './product.js';
 
 export interface UiFlags {
   config: string | undefined;
@@ -41,12 +43,17 @@ export async function uiCommand(flags: UiFlags, log: Logger): Promise<void> {
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     throw new UsageError(`invalid --port ${String(flags.port)}`);
   }
+  // The pages show the config `protect` and `init` write unless --config names another one.
+  const defaultConfig = join(defaultConfigDir(), 'config.json');
+  const configPath = flags.config ?? (existsSync(defaultConfig) ? defaultConfig : undefined);
+  const dbPath = flags.db ?? paths.dbPath;
   const ui = await startUiServer({
-    dbPath: flags.db ?? paths.dbPath,
+    dbPath,
     keyDir: flags.keyDir ?? paths.keyDir,
     port,
     staticDir: webUiDir(),
     log,
+    product: productProvider({ configPath, dbPath }),
   });
   // The URL is the credential for this run: print it on stdout only, never into logs.
   process.stdout.write(`SudoWall UI: ${ui.url}\n`);

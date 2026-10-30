@@ -30,6 +30,8 @@ export type FeedItem =
       mode: string;
       reason: string;
       ruleIds: string[];
+      /** Up to two `name: value` pairs from the (redacted) arguments. */
+      summary: { name: string; value: string }[];
     }
   | {
       seq: number;
@@ -86,6 +88,55 @@ export interface Incident {
   };
   path: IncidentStep[];
   ledger: { ok: boolean; message: string; entries: number[]; allSigned: boolean };
+}
+
+/** Product context served by `sudowall ui` and the demo (packages/cli/src/product.ts). */
+export interface Product {
+  version: string;
+  config: {
+    path: string | null;
+    found: boolean;
+    mode: 'observe' | 'enforce';
+    canChangeMode: boolean;
+  };
+  policy:
+    | {
+        name: string;
+        path: string;
+        defaults: { sink: string; other: string };
+        rules: { id: string; action: string; reason: string; appliesTo: string }[];
+        lists: { id: string; kind: string; count: number }[];
+      }
+    | { error: string }
+    | null;
+  agents:
+    | {
+        clients: {
+          client: string;
+          file: string;
+          servers: {
+            name: string;
+            state: 'protected' | 'not protected' | 'skipped';
+            remote: boolean;
+            detail: string;
+          }[];
+        }[];
+        notFound: string[];
+      }
+    | { error: string };
+  activity: {
+    days: number;
+    calls: number;
+    observe: { wouldAsk: number; wouldBlock: number };
+    enforce: { asked: number; blocked: number };
+  } | null;
+  integrations: {
+    tigergraph: { configured: boolean };
+    templates: string[];
+    remoteServers: number;
+    dodoPayments: boolean;
+    viaSocket: boolean;
+  };
 }
 
 const TOKEN_KEY = 'sudowall-token';
@@ -160,6 +211,22 @@ export class Api {
     });
     if (!r.ok) throw new Error(`Could not load the explanation (HTTP ${String(r.status)}).`);
     return (await r.json()) as Incident;
+  }
+
+  async product(): Promise<Product | null> {
+    const r = await fetch('/api/product', {
+      headers: { Authorization: `Bearer ${this.token}` },
+      cache: 'no-store',
+    });
+    if (!r.ok) throw new Error(`Could not load settings (HTTP ${String(r.status)}).`);
+    return (await r.json()) as Product | null;
+  }
+
+  async setMode(mode: 'observe' | 'enforce'): Promise<void> {
+    const r = await this.post('/api/mode', { mode });
+    if (r.status !== 200) {
+      throw new Error((r.body as { error?: string }).error ?? `HTTP ${String(r.status)}`);
+    }
   }
 
   async verify(): Promise<VerifyResult> {
