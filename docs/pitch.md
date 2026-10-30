@@ -1,6 +1,6 @@
 # Pitch and demo script
 
-Every claim here matches what the code does today (0.1.0). If the code changes, change this file.
+Every claim here matches what the code does today (0.2.0). If the code changes, change this file.
 
 ## 90-second live demo
 
@@ -22,9 +22,9 @@ If the network is slow, record this run beforehand and play it; say that it is a
 
 1. **Problem (30 s).** Agents now act with our keys: email, payments, code. Prompt injection means anyone who can put text in front of an agent can try to steer it, and no model fixes that reliably. After an incident, teams cannot even show what the agent did.
 2. **Why now (15 s).** MCP made it easy to give agents many tools. Agents that move money are already live, and losses there are immediate.
-3. **What we built (40 s).** A firewall at the one place every action must pass: the tool call. It labels where data came from, catches values copied from untrusted content and lookalikes of trusted ones, applies fixed rules (no AI judge) to allow, ask or block, and keeps a tamper-evident record. One command to try, one line to put in front of an existing MCP server.
+3. **What we built (40 s).** A firewall at the one place every action must pass: the tool call. It labels where data came from, catches values copied from untrusted content and lookalikes of trusted ones, applies fixed rules (no AI judge) to allow, ask or block, and keeps a tamper-evident record. One command to try it (`npx tortoisegate demo`), one command to put it in front of the MCP servers you already use in Claude Code, Claude Desktop and Cursor (`npx tortoisegate protect`). It adds about 1 ms per tool call at the median.
 4. **Live demo (60 s).** The script above, shortened.
-5. **What is real and what is next (20 s).** Real today: the gateway for MCP over stdio and HTTP on both protocol versions, source tracking, the policy engine, approvals in a local UI, the signed ledger, the npm package, 330+ automated tests including a real-chain end-to-end test. Next: a graph view of incidents, an SDK for agents that do not use MCP, team policy and audit export.
+5. **What is real and what is next (20 s).** Real today: the gateway for MCP over stdio and HTTP on both protocol versions, source tracking, the policy engine, approvals in a local UI, the signed ledger, incident forensics on a data-flow graph (locally or on TigerGraph), one-command `protect` for Claude Code, Claude Desktop and Cursor, the npm package, and 369 automated tests including a real-chain end-to-end test. We also ran it in front of Claude Code with a real model: it stopped the injected payment and the lookalike, and let the real one through. Next: remote (URL) MCP servers, an SDK for agents that do not use MCP, team policy and audit export.
 6. **The ask (15 s).** Design partners building agents that move money or touch customer data, and funding to harden it for production.
 
 ## Honest answers to likely questions
@@ -32,6 +32,8 @@ If the network is slow, record this run beforehand and play it; say that it is a
 - **Does it stop all prompt injection?** No. It stops injected values reaching risky actions when those values are structured (addresses, emails, URLs, amounts). An agent that rewords an instruction in its own words is not caught by matching; the session-level rules and approvals are the fallback.
 - **How is this different from Google DeepMind's CaMeL?** CaMeL proves information-flow control works but needs the agent rebuilt around it. Tortoise Gate brings a narrower version of the idea to agents people already run, without changing them.
 - **What about agents that do not use MCP?** Not covered today; an SDK is on the roadmap.
+- **What about remote MCP servers (a URL instead of a command)?** Not covered yet. `protect` lists them as not covered instead of pretending.
+- **Does it slow the agent down?** About 1 ms per tool call at the median and 1.7 ms at p99 with the full policy, measured on a laptop (`docs/performance.md`). CI fails if the overhead grows past 2 ms at the median.
 - **Does the ledger prove the agent behaved?** No. It proves the record was not edited.
 
 ## Numbers to have ready
