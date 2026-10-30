@@ -197,8 +197,14 @@ export class ProvenanceEngine {
       const trimmed = value.trim();
       const visible = stripInvisible(trimmed);
       const collapsed = visible.replace(/\s+/g, '');
+      // Joining whitespace catches an address split into pieces ("0x5aAe b605 ..."). Only an EVM
+      // address is tried that way: joining a sentence can form a different, bogus email or URL
+      // ("x a@b.example y" -> "xa@b.exampley") and hide the real one from extraction below.
+      const whole =
+        collapsed === visible
+          ? normalizeWhole(deconfuse(visible).text)
+          : normalizeEvm(deconfuse(collapsed).text);
       const ascii = deconfuse(collapsed).text;
-      const whole = normalizeWhole(ascii);
       if (whole !== undefined) {
         out.push({
           argPath: path,

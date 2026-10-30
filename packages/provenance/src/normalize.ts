@@ -43,7 +43,12 @@ export function normalizeEvm(s: string): Normalized | undefined {
   };
 }
 
+/** A whole string that is one email address (same shape as extraction's pattern). */
+const EMAIL_WHOLE =
+  /^[\p{L}\p{N}._%+-]{1,64}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){0,8}\.\p{L}{2,63}$/u;
+
 export function normalizeEmail(s: string): Normalized | undefined {
+  if (!EMAIL_WHOLE.test(s)) return undefined;
   const at = s.lastIndexOf('@');
   if (at < 1 || at > 64 || s.length - at > 254 || /\s/.test(s)) return undefined;
   const local = s.slice(0, at);

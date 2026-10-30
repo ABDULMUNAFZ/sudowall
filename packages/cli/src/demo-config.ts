@@ -44,7 +44,8 @@ export interface DemoFiles {
 /** The money-moving template with Dana's address on the allowlist. */
 export function demoPolicy(templatePath: string): string {
   const empty = 'trusted-recipients:\n    kind: evm-address\n    values: []';
-  const text = readFileSync(templatePath, 'utf8');
+  // CRLF when Git on Windows checked the template out with native line endings.
+  const text = readFileSync(templatePath, 'utf8').replace(/\r\n/g, '\n');
   if (!text.includes(empty))
     throw new Error(`${templatePath} no longer has an empty trusted-recipients list`);
   const out = text

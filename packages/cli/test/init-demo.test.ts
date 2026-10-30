@@ -64,7 +64,7 @@ describe('init', () => {
   it('rejects an unknown template and lists the available ones', () => {
     const r = cli(['init', '--dir', tmp(), '--template', 'nope']);
     expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/unknown template "nope"; available: money-moving/);
+    expect(r.stderr).toMatch(/unknown template "nope"; available: dodo-payments, money-moving/);
   });
 });
 

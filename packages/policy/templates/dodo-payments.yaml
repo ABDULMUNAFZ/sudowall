@@ -1,0 +1,88 @@
+# SudoWall policy for the official Dodo Payments MCP server (npm `dodopayments-mcp`, or
+# `npx mcp-remote https://mcp.dodopayments.com/mcp`). Its `execute` tool runs TypeScript against
+# the Dodo Payments SDK, so this policy reads that code before it runs:
+#
+# - simple read-only code (list, retrieve) runs;
+# - anything else asks you first: refunds, payments, subscriptions, discounts, checkout links,
+#   customers, webhooks, and any code too clever to check (dynamic access, eval, fetch);
+# - code that would change something using an email, URL or amount copied from untrusted content
+#   (a support ticket, an email, a web page) is blocked.
+#
+# Matching is on the code text. It cannot prove that code is harmless, so anything that is not
+# plainly read-only asks. Also give the server a restricted API key and keep it in test mode
+# while you try it (DODO_PAYMENTS_ENVIRONMENT=test_mode).
+schema: sudowall/policy@1
+name: dodo-payments
+version: 1
+
+defaults:
+  sink: ask
+  other: allow
+
+rules:
+  - id: block-untrusted-value-in-dodo-write
+    description: Code that changes payments or customers uses a value copied from untrusted content
+    match: { tool: 'execute' }
+    when:
+      all:
+        - path: /code
+          provenance: { label: untrusted }
+        - not:
+            all:
+              - any:
+                  - { path: /code, glob: '*.list(*' }
+                  - { path: /code, glob: '*.retrieve(*' }
+              - not:
+                  any:
+                    - { path: /code, glob: '*.create(*' }
+                    - { path: /code, glob: '*.update(*' }
+                    - { path: /code, glob: '*.delete(*' }
+                    - { path: /code, glob: '*.charge(*' }
+                    - { path: /code, glob: '*.changePlan(*' }
+                    - { path: /code, glob: '*.cancel*' }
+                    - { path: /code, glob: '*.archive(*' }
+                    - { path: /code, glob: '*.unarchive(*' }
+                    - { path: /code, glob: '*.activate(*' }
+                    - { path: /code, glob: '*.deactivate(*' }
+                    - { path: /code, glob: '*.ingest(*' }
+                    - { path: /code, glob: '*[*' }
+                    - { path: /code, glob: '*eval*' }
+                    - { path: /code, glob: '*Function*' }
+                    - { path: /code, glob: '*Reflect*' }
+                    - { path: /code, glob: '*import(*' }
+                    - { path: /code, glob: '*require(*' }
+                    - { path: /code, glob: '*fetch(*' }
+    action: block
+    reason: 'The code would change payments or customers using an email, URL or amount copied from untrusted content.'
+
+  - id: ask-dodo-write
+    description: Code that can change payments, customers or settings, or that is too dynamic to check
+    match: { tool: 'execute' }
+    when:
+      not:
+        all:
+          - any:
+              - { path: /code, glob: '*.list(*' }
+              - { path: /code, glob: '*.retrieve(*' }
+          - not:
+              any:
+                - { path: /code, glob: '*.create(*' }
+                - { path: /code, glob: '*.update(*' }
+                - { path: /code, glob: '*.delete(*' }
+                - { path: /code, glob: '*.charge(*' }
+                - { path: /code, glob: '*.changePlan(*' }
+                - { path: /code, glob: '*.cancel*' }
+                - { path: /code, glob: '*.archive(*' }
+                - { path: /code, glob: '*.unarchive(*' }
+                - { path: /code, glob: '*.activate(*' }
+                - { path: /code, glob: '*.deactivate(*' }
+                - { path: /code, glob: '*.ingest(*' }
+                - { path: /code, glob: '*[*' }
+                - { path: /code, glob: '*eval*' }
+                - { path: /code, glob: '*Function*' }
+                - { path: /code, glob: '*Reflect*' }
+                - { path: /code, glob: '*import(*' }
+                - { path: /code, glob: '*require(*' }
+                - { path: /code, glob: '*fetch(*' }
+    action: ask
+    reason: 'This code can move money or change customers or settings. Check it before it runs.'

@@ -1,0 +1,5 @@
+# Same bytes on every platform: templates, demo emails and scripts are read as text by the CLI.
+* text=auto eol=lf
+*.jpg binary
+*.png binary
+*.tgz binary
