@@ -4,6 +4,7 @@ import { basename, dirname, resolve } from 'node:path';
 import { demoCommand } from './demo.js';
 import { graphCommand, incidentCommand } from './incident-cmd.js';
 import { initCommand } from './init-cmd.js';
+import { protectCommand } from './protect-cmd.js';
 import { ledgerCommand } from './ledger-cmd.js';
 import { uiCommand } from './ui-cmd.js';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,14 @@ Usage:
       the ledger is verified, then shown catching an edit. Installs the pinned Anvil if missing.
   tortoisegate init [--template <name>] [--dir <dir>] [--force]
       Write a starter config (observe mode) and a policy template to your config directory.
+  tortoisegate protect [--client <name>] [--project <dir>] [--config <file>] [--apply] [--offline]
+      Put the gate in front of the MCP servers configured in Claude Code, Claude Desktop and
+      Cursor. Without --apply it only shows what it would change; with --apply it backs each
+      file up first. Clients: claude-code, claude-desktop, cursor, all (default).
+  tortoisegate unprotect [--client <name>] [--project <dir>] [--apply]
+      Restore the original server entries.
+  tortoisegate status [--client <name>] [--project <dir>]
+      Show which MCP servers run through the gate.
   tortoisegate wrap [--config <file>] [--mode observe|enforce] -- <command> [args...]
       Run one stdio MCP server behind the gate. Put this in your MCP client's config in place
       of the server command. Speaks MCP on stdin/stdout; logs go to stderr.
@@ -64,6 +73,11 @@ Options:
   --keep              demo: keep the demo's temporary files
   --no-open           demo: do not open the approval UI in a browser
   --approval-timeout <s>  demo: seconds the paused payment waits for you (default 300)
+  --client <name>     protect, unprotect, status: claude-code, claude-desktop, cursor or all
+  --project <dir>     protect, unprotect, status: project folder for .mcp.json and .cursor/mcp.json
+                      (default: the current folder)
+  --apply             protect, unprotect: write the change (default: show it only)
+  --offline           protect: do not download the pinned package first (it must be cached)
   --format <fmt>      incident: text (default), markdown or json
   --tigergraph        incident: run the graph queries on TigerGraph instead of locally
 
@@ -179,6 +193,10 @@ export async function main(argv: string[]): Promise<number> {
       'no-open': { type: 'boolean' },
       'approval-timeout': { type: 'string' },
       format: { type: 'string' },
+      client: { type: 'string' },
+      project: { type: 'string' },
+      apply: { type: 'boolean' },
+      offline: { type: 'boolean' },
       tigergraph: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
@@ -206,6 +224,17 @@ export async function main(argv: string[]): Promise<number> {
       keyDir: values['key-dir'],
       publicKey: values['public-key'],
       out: values.out,
+    });
+  }
+
+  if (command === 'protect' || command === 'unprotect' || command === 'status') {
+    if (positionals.length > 1) throw new UsageError(`${command} takes no arguments`);
+    return protectCommand(command, {
+      client: values.client,
+      project: values.project,
+      config: values.config,
+      apply: values.apply === true,
+      offline: values.offline === true,
     });
   }
 

@@ -2,6 +2,17 @@
 
 All notable changes to Tortoise Gate. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.2.0 (2026-10-30)
+
+### Added
+
+- **`tortoisegate protect`**: finds the MCP servers configured in Claude Code (`~/.claude.json`, user and per-project scopes, and a project's `.mcp.json`), Claude Desktop and Cursor (`~/.cursor/mcp.json` and a project's `.cursor/mcp.json`) and puts the gate in front of every local server. It shows the plan without `--apply`; with `--apply` it downloads the pinned Tortoise Gate version first, backs each file up next to itself, refuses if a client rewrote the file meanwhile, and keeps every other field of each entry. Remote servers are listed as not covered. Credentials in command lines are masked in the output.
+- **`tortoisegate unprotect`** restores the original entries exactly, and **`tortoisegate status`** shows which servers run through the gate.
+
+### Fixed
+
+- A server launched with `npx` behind a gate that was itself launched with `npx` (`npx -y tortoisegate wrap -- npx -y some-server`, the common setup) failed to start with exit code 127: it inherited npx's per-run variables (`npm_config_package`, `npm_config_call`) and ran the wrong package. The gate now drops those variables, and only those, when it starts a server. Found by testing a protected server with Claude Code. This affected 0.1.0 and 0.1.1.
+
 ## 0.1.1 (2026-10-30)
 
 ### Fixed

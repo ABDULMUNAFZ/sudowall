@@ -58,3 +58,8 @@ Checkpoint notes per step (done, tests, time).
 
 - Done: `@abdulmunafz/tortoisegate` published to GitHub Packages by a release workflow (GITHUB_TOKEN); README badges; repo description corrected (it claimed a desktop app that does not exist yet); real test with Claude Code (claude-sonnet-5-5) through `tortoisegate@0.1.0` from npm, three runs, written up in `docs/real-world-test.md`; site split into Home, Get started and See it real, shared `site.css`, strict CSP without inline styles, real screenshots from the run.
 - Tests: real run: attacker and lookalike balances unchanged, Dana +0.005 ETH, `ledger verify` OK on 34 entries, `incident 24` correct; site checked at 360 px (no horizontal scroll) and desktop.
+
+### 0.2.0: `protect`, `unprotect`, `status`
+
+- Done: one command protects every local MCP server configured in Claude Code, Claude Desktop and Cursor (dry run by default, backups, concurrent-edit refusal, pinned version downloaded first, secrets masked in output); exact `unprotect`; `status`. Fixed npx variable leak that broke `npx`-launched servers behind an `npx`-launched gate. ADR 0021.
+- Tests: 367 green, including property tests that unwrap restores any entry exactly, a fake-home CLI test across all three clients, a failed-download test that changes nothing, and env tests. Real Claude Code run through a protected `npx` server: connected, three calls recorded, ledger verified.

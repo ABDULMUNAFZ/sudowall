@@ -83,18 +83,25 @@
               <pre><code>npx tortoisegate init</code></pre>
             </li>
             <li>
-              <h3>Wrap one of your MCP servers</h3>
+              <h3>Protect the agents you already use</h3>
               <p>
-                Put <code>tortoisegate wrap --</code> in front of the server command you already
-                use. With Claude Code:
+                One command finds the MCP servers configured in Claude Code, Claude Desktop and
+                Cursor. Without <code>--apply</code> it only shows what it would change. With it, it
+                backs each config file up, then routes every local server through the gate.
               </p>
-              <pre><code># before
-claude mcp add memory -- npx -y @modelcontextprotocol/server-memory
-# after
-claude mcp add memory -- npx -y tortoisegate wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>
+              <pre><code>npx tortoisegate protect
+npx tortoisegate protect --apply
+npx tortoisegate status
+npx tortoisegate unprotect --apply   # restores the original entries</code></pre>
               <p>
-                Tool names and results stay the same. For several servers behind one gate, list them
-                in a config and use <code>tortoisegate serve --config gateway.json</code>:
+                Restart the client afterwards so it starts the protected servers. Remote (URL)
+                servers are listed but not covered yet. To wrap one server by hand instead, put
+                <code>tortoisegate wrap --</code> in front of its command:
+              </p>
+              <pre><code>claude mcp add memory -- npx -y tortoisegate wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>
+              <p>
+                For several servers behind one gate, list them in a config and use
+                <code>tortoisegate serve --config gateway.json</code>:
               </p>
               <pre><code>{
   "schemaVersion": 1,

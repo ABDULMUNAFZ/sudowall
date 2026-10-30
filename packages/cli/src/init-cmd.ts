@@ -16,6 +16,25 @@ const out = (s = '') => process.stdout.write(`${s}\n`);
 /** Quotes for POSIX shells so printed commands survive paths with spaces. */
 const q = (s: string): string => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
+/** Writes the starter config (observe mode) and a policy template into `dir`. Overwrites. */
+export function writeStarterConfig(
+  dir: string,
+  template = 'money-moving',
+): { configPath: string; policyPath: string } {
+  const configPath = join(dir, 'config.json');
+  const policyPath = join(dir, 'policy.yaml');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  copyFileSync(join(templatesDir(), `${template}.yaml`), policyPath);
+  const config = {
+    schemaVersion: 1,
+    // observe records every decision but blocks nothing; switch to enforce once the policy fits.
+    mode: 'observe',
+    policy: { path: 'policy.yaml' },
+  };
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  return { configPath, policyPath };
+}
+
 /**
  * `tortoisegate init`: writes a starter config (observe mode) and a copy of a policy template.
  * Existing files are left alone unless --force is given.
@@ -35,21 +54,18 @@ export function initCommand(flags: InitFlags): number {
       `${existing.join(' and ')} already exist${existing.length === 1 ? 's' : ''}; use --force to overwrite`,
     );
   }
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  copyFileSync(join(templatesDir(), `${template}.yaml`), policyPath);
-  const config = {
-    schemaVersion: 1,
-    // observe records every decision but blocks nothing; switch to enforce once the policy fits.
-    mode: 'observe',
-    policy: { path: 'policy.yaml' },
-  };
-  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  writeStarterConfig(dir, template);
 
   out(`Wrote ${configPath} (observe mode: records decisions, blocks nothing yet)`);
   out(`Wrote ${policyPath} (the ${template} template; edit its lists for your agent)`);
   out('');
   out('Next steps:');
-  out('1. Put an MCP server behind the gate. For example, with Claude Code:');
+  out('1. Put your MCP servers (Claude Code, Claude Desktop, Cursor) behind the gate:');
+  out(
+    `   npx -y tortoisegate protect --config ${q(configPath)}          # shows what would change`,
+  );
+  out(`   npx -y tortoisegate protect --config ${q(configPath)} --apply  # backs up, then changes`);
+  out('   Or wrap one server by hand:');
   out(
     `   claude mcp add my-server -- npx -y tortoisegate wrap --config ${q(configPath)} -- <server command>`,
   );

@@ -54,6 +54,19 @@ The demo starts a private local test chain, puts Tortoise Gate in front of two r
 
 Without `--ci`, the paused payment waits for you to click Approve or Deny in the UI. The demo installs the pinned, checksum-verified Foundry release (Anvil) if it is missing; on Intel Macs Anvil also needs `brew install libusb`.
 
+## Protect the agents you already use
+
+One command finds the MCP servers configured in **Claude Code**, **Claude Desktop** and **Cursor** and puts the gate in front of each local server:
+
+```sh
+npx tortoisegate protect            # shows what it would change; changes nothing
+npx tortoisegate protect --apply    # backs each config up, then protects every local server
+npx tortoisegate status             # which servers run through the gate
+npx tortoisegate unprotect --apply  # restores the original entries exactly
+```
+
+Then restart the client and open `npx tortoisegate ui` to watch decisions. The gate starts in observe mode (records, blocks nothing); set `"mode": "enforce"` in the config it names when the decisions look right. Remote (URL) servers are listed but not covered yet. Credentials in command lines are masked in the output.
+
 ## How it works
 
 1. **Source tracking.** Every tool output is labelled trusted or untrusted. When a later call uses an address, email, URL or amount that appeared in untrusted content, or a lookalike of one, the call is flagged.
@@ -102,7 +115,7 @@ claude            # "Read the emails in my inbox with the tortoise-gate-demo too
 
 Not built yet: an independent verifier, desktop app, credential vault, SDK for agents that do not use MCP.
 
-## Put Tortoise Gate in front of an MCP server
+## Put Tortoise Gate in front of one MCP server by hand
 
 Start with a config in observe mode and a policy template:
 

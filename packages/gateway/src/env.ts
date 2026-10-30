@@ -15,8 +15,28 @@ export function resolveEnvValue(v: EnvValue, env: NodeJS.ProcessEnv): string {
 }
 
 /**
+ * Variables `npm exec` / `npx` sets for the one command it runs. When the gateway was itself
+ * started with npx (`npx -y tortoisegate wrap -- npx -y some-server`), an upstream that inherits
+ * them makes its own `npx` run the wrong package (`npm_config_package`) or a `-c` script
+ * (`npm_config_call`), and fails with "command not found". Normal npm settings such as a custom
+ * registry are not in this list and stay.
+ */
+export const NPM_EXEC_VARIABLES: readonly string[] = [
+  'npm_command',
+  'npm_config_package',
+  'npm_config_call',
+  'npm_config_local_prefix',
+  'npm_lifecycle_event',
+  'npm_lifecycle_script',
+  'npm_package_json',
+  'npm_execpath',
+  'npm_node_execpath',
+];
+
+/**
  * Builds a stdio upstream's environment: only the gateway variables named in `inheritEnv`
- * (or all of them for `"*"`), then the upstream's own `env` entries on top.
+ * (or all of them for `"*"`, minus npx's per-run variables), then the upstream's own `env`
+ * entries on top.
  */
 export function buildEnv(
   spec: Extract<Upstream, { transport: 'stdio' }>,
@@ -24,7 +44,9 @@ export function buildEnv(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (spec.inheritEnv === '*') {
-    for (const [k, v] of Object.entries(gatewayEnv)) if (v !== undefined) out[k] = v;
+    const drop = new Set(gatewayEnv['npm_command'] === 'exec' ? NPM_EXEC_VARIABLES : []);
+    for (const [k, v] of Object.entries(gatewayEnv))
+      if (v !== undefined && !drop.has(k)) out[k] = v;
   } else {
     for (const k of spec.inheritEnv) {
       const v = gatewayEnv[k];

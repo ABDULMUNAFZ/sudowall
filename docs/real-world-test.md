@@ -72,3 +72,11 @@ A capable model can catch an obvious trap by itself. You cannot rely on that eve
 - Testnet only, by design.
 
 Screenshots from this run are on the website: https://tortoise-gate.vercel.app/real-run.html
+
+## Follow-up: `tortoisegate protect` with Claude Code (0.2.0)
+
+A project folder with a `.mcp.json` listing the reference filesystem server, started with `npx` as most MCP servers are. `tortoisegate protect --apply` backed the file up and rewrote the entry to run through `npx -y tortoisegate@0.2.0 wrap`. Claude Code 2.1.312 then loaded that config.
+
+- **First attempt failed, and found a real bug.** The server exited with code 127. npx had exported `npm_config_package` for the gate, and the gate passed it on, so the server's own `npx` tried to run the wrong package. Every `npx`-launched server behind an `npx`-launched gate was affected, including the setup the 0.1.x docs recommended. Fixed in 0.2.0 (the gate drops npx's per-run variables) and covered by tests.
+- **A cold cache timed out.** With npm's cache cleared, downloading the gate and the server took longer than Claude Code's connect timeout. `protect --apply` now downloads the pinned gate version before changing anything.
+- **After the fixes:** Claude Code reported the server `connected` and called `read_text_file` and `list_allowed_directories` through the gate. The ledger recorded the session (`claude-code 2.1.312`) and all three calls, and `ledger verify` passed. `tortoisegate status` showed the server as protected.
