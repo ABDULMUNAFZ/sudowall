@@ -30,16 +30,7 @@ const NAV = [
 const routeFromHash = () => window.location.hash.replace(/^#\/?/, '');
 
 function Mark() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className="mark-icon">
-      <rect x="3" y="8" width="26" height="18" rx="2" className="wall" />
-      <path
-        d="M3 14h26M3 20h10M19 20h10M10 8v6M22 8v6M7 14v6M25 14v6M9 20v6M23 20v6"
-        className="joints"
-      />
-      <path d="M13 26v-6a3 3 0 0 1 6 0v6z" className="gate" />
-    </svg>
-  );
+  return <img src="brand/mark-white.png" alt="" className="mark-icon" width="34" height="34" />;
 }
 
 export function App() {
@@ -151,7 +142,13 @@ export function App() {
         >
           <Mark />
           <span>
-            SudoWall
+            <img
+              src="brand/wordmark-white.png"
+              alt="SudoWall"
+              className="wordmark"
+              width="118"
+              height="20"
+            />
             <small>Nothing moves until it&rsquo;s checked.</small>
           </span>
         </a>

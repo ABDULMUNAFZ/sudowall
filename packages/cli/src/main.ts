@@ -85,6 +85,7 @@ Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verif
 `;
 
 export { UsageError } from './errors.js';
+import { printBanner } from './banner.js';
 import { RuntimeError, UsageError } from './errors.js';
 
 function readConfigFile(path: string): unknown {
@@ -228,8 +229,16 @@ export async function main(argv: string[]): Promise<number> {
   }
   const command = positionals[0];
   if (values.help === true || command === undefined) {
+    if (values.help === true) printBanner(GATEWAY_VERSION);
     (values.help === true ? process.stdout : process.stderr).write(USAGE);
     return values.help === true ? EXIT.ok : EXIT.usage;
+  }
+  // Interactive commands show the mark; wrap and serve never print to stdout (it carries MCP).
+  if (
+    ['demo', 'protect', 'unprotect', 'status', 'ui', 'init'].includes(command) &&
+    values.ci !== true
+  ) {
+    printBanner(GATEWAY_VERSION);
   }
   const level = (values['log-level'] ?? 'info') as LogLevel;
   if (!['debug', 'info', 'warn', 'error'].includes(level))

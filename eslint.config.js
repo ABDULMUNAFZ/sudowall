@@ -7,6 +7,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      // Vendored, minified third-party code (GSAP), checked as shipped.
+      'apps/site/vendor/**',
       '**/coverage/**',
       '**/.turbo/**',
       'planning/**',

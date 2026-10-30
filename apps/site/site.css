@@ -1,10 +1,13 @@
 :root {
-  --bg: #eef1ea;
-  --panel: #fbfcf9;
-  --ink: #1f2a22;
-  --muted: #56635a;
-  --line: #d1d9cd;
-  --allow: #2f6b4f;
+  /* Brand palette (see home.css): warm grey canvas, white cards, black ink, lime accent. */
+  --bg: #ececea;
+  --panel: #ffffff;
+  --ink: #111111;
+  --muted: #5f5f5a;
+  --line: #d9d9d4;
+  --lime: #d9f250;
+  --orange: #f28a4b;
+  --allow: #3b6b00;
   --ask: #8a5f00;
   --block: #b3261e;
   --round:
@@ -410,5 +413,25 @@ figcaption {
   header.site nav {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+
+/* Brand header: mark + wordmark. */
+.mark img {
+  display: block;
+  height: 30px;
+  width: auto;
+}
+.mark img.wordmark {
+  height: 20px;
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  .mark img {
+    filter: invert(1);
   }
 }

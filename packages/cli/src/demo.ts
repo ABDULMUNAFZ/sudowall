@@ -99,7 +99,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
   process.once('SIGTERM', onSignal);
 
   try {
-    out("SudoWall demo: a firewall for AI agents. Nothing moves until it's checked.\n");
+    out('SudoWall demo: a firewall for AI agents, on a private local test chain.\n');
     const bin = await ensureAnvil(assets.installFoundry, out);
     anvil = await startAnvil(bin);
     await rpc(anvil.url, 'anvil_setBalance', [A.wallet, `0x${(100n * ETH).toString(16)}`]);

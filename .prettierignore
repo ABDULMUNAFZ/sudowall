@@ -6,3 +6,4 @@ test-results
 playwright-report
 release/
 .vercel/
+apps/site/vendor/

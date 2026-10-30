@@ -2,6 +2,15 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## 0.7.0 (2026-10-30)
+
+### Changed
+
+- **New brand.** The SudoWall mark and wordmark everywhere: the website, its favicon, the local app and the terminal.
+- **Website:** a full-width scroll story built with GSAP (self-hosted, no outside requests): the problem, how a tool call passes the four checks, a poisoned invoice being stopped, the app, integrations and a typing terminal. Phones get the same story without pinned scenes; reduced-motion users get a static page.
+- **Local app:** the same palette and black rail as the website.
+- **Terminal:** `demo`, `protect`, `unprotect`, `status`, `ui`, `init` and `--help` open with the mark and name, in colour when the terminal supports it (never in pipes, never for `wrap` or `serve`, plain with `NO_COLOR`).
+
 ## 0.6.0 (2026-10-30)
 
 ### Added
