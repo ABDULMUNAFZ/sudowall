@@ -66,7 +66,7 @@ Options:
   --log-level <lvl>   debug | info | warn | error (default: info)
   --db <file>         state database (default: <state dir>/ledger.db)
   --key-dir <dir>     installation key directory (default: <config dir>)
-  --template <name>   init: policy template to copy (default: money-moving)
+  --template <name>   init: policy template to copy: everyday (default), money-moving, dodo-payments
   --dir <dir>         init: where to write config.json and policy.yaml (default: <config dir>)
   --force             init: overwrite existing files
   --ci                demo: deny the paused payment automatically and exit when done

@@ -19,7 +19,7 @@ const q = (s: string): string => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace
 /** Writes the starter config (observe mode) and a policy template into `dir`. Overwrites. */
 export function writeStarterConfig(
   dir: string,
-  template = 'money-moving',
+  template = 'everyday',
 ): { configPath: string; policyPath: string } {
   const configPath = join(dir, 'config.json');
   const policyPath = join(dir, 'policy.yaml');
@@ -41,7 +41,7 @@ export function writeStarterConfig(
  */
 export function initCommand(flags: InitFlags): number {
   const names = templateNames();
-  const template = flags.template ?? 'money-moving';
+  const template = flags.template ?? 'everyday';
   if (!names.includes(template)) {
     throw new UsageError(`unknown template "${template}"; available: ${names.join(', ')}`);
   }

@@ -2,6 +2,20 @@
 
 Templates live in `packages/policy/templates/`. Copy one, fill in its lists, and point `policy.path` in the gateway config at the copy. Each template's behaviour below is checked by `packages/policy/test/template.test.ts`, which runs every row of the table against the real provenance engine. A row added here without a matching test scenario fails the test.
 
+## `everyday.yaml` (default)
+
+The default for `sudowall init` and `sudowall protect`, for any MCP setup: GitHub, Slack, email, browser, filesystem, shell. Rules match tool names, the convention MCP servers use. Checked by `packages/policy/test/everyday-template.test.ts`.
+
+| Situation                                                                                                                                                                                                                 | Verdict | Rules                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------- |
+| A `*send*`, `*reply*`, `*forward*`, `post_*`, `share*`, `*invite*`, `*upload*`, `*publish*` or `*webhook*` tool has an argument containing an email, URL or address copied from untrusted content (also inside free text) | block   | `block-*-to-untrusted`  |
+| The same tools with values that did not come from untrusted content                                                                                                                                                       | allow   | none                    |
+| `*delete*`, `*remove*`, `*drop*`, `*destroy*`, `*merge*`, `*push*`, `*deploy*`, `*revoke*`, `*transfer*`, `*refund*`, `pay*`, `*send_funds*`                                                                              | ask     | `ask-*`                 |
+| `*exec*`, `*command*`, `*shell*`, `*terminal*` after untrusted content entered the session                                                                                                                                | ask     | `ask-*-after-untrusted` |
+| Everything else (reads, searches, notes)                                                                                                                                                                                  | allow   | none                    |
+
+Limits: a tool named differently (for example `notify_user` that sends email) needs its own rule; fetching a URL found in untrusted content is allowed (following links is normal), so a leak through a GET query string is not caught by this template.
+
 ## `money-moving.yaml`
 
 For an agent that can send funds with an EVM `send_funds` tool (`{ to, amount }`, amount in ETH as a decimal string). Fill in `trusted-recipients` (addresses the agent may pay without asking, within the limit) and, optionally, `blocked-recipients`. The per-call limit is 0.01 ETH; change it in both `ask-above-limit` and `allow-trusted-within-limit`.

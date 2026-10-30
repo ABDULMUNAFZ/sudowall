@@ -1,0 +1,139 @@
+# SudoWall everyday policy: a sensible start for any MCP setup (GitHub, Slack, email, browser,
+# filesystem, shell). `sudowall protect` and `sudowall init` use it unless you choose another
+# template.
+#
+# - Sending data out to an email, URL or address that was copied from untrusted content (an
+#   issue, a web page, an email) is blocked: that is how a hidden instruction leaks your data.
+# - Actions that are hard to undo ask you first: delete, merge, push, deploy, payments.
+# - Shell and command tools ask you first once untrusted content has entered the session.
+# - Everything else runs, and every call is recorded in the ledger.
+#
+# Rules match tool names, the convention MCP servers use. Add your own servers' tool names
+# below, or start from `money-moving` (wallets) or `dodo-payments` (Dodo Payments).
+schema: sudowall/policy@1
+name: everyday
+version: 1
+
+defaults:
+  sink: ask
+  other: allow
+
+rules:
+  # Outbound: block when any argument carries a value copied from untrusted content.
+  - id: block-send-to-untrusted
+    match: { tool: '*send*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would send to an email, URL or address copied from untrusted content.'
+  - id: block-reply-to-untrusted
+    match: { tool: '*reply*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would reply to an email, URL or address copied from untrusted content.'
+  - id: block-forward-to-untrusted
+    match: { tool: '*forward*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would forward to an email, URL or address copied from untrusted content.'
+  - id: block-post-to-untrusted
+    match: { tool: 'post_*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would post to an email, URL or address copied from untrusted content.'
+  - id: block-share-with-untrusted
+    match: { tool: 'share*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would share with an email or URL copied from untrusted content.'
+  - id: block-invite-untrusted
+    match: { tool: '*invite*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would invite an email address copied from untrusted content.'
+  - id: block-upload-to-untrusted
+    match: { tool: '*upload*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would upload to a URL copied from untrusted content.'
+  - id: block-publish-to-untrusted
+    match: { tool: '*publish*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would publish to a URL copied from untrusted content.'
+  - id: block-webhook-to-untrusted
+    match: { tool: '*webhook*' }
+    when: { path: '', provenance: { label: untrusted } }
+    action: block
+    reason: 'It would point a webhook at a URL copied from untrusted content.'
+
+  # Hard to undo: ask first.
+  - id: ask-delete
+    match: { tool: '*delete*' }
+    action: ask
+    reason: 'Deleting is hard to undo.'
+  - id: ask-remove
+    match: { tool: '*remove*' }
+    action: ask
+    reason: 'Removing is hard to undo.'
+  - id: ask-drop
+    match: { tool: '*drop*' }
+    action: ask
+    reason: 'Dropping data is hard to undo.'
+  - id: ask-destroy
+    match: { tool: '*destroy*' }
+    action: ask
+    reason: 'Destroying is hard to undo.'
+  - id: ask-merge
+    match: { tool: '*merge*' }
+    action: ask
+    reason: 'Merging changes shared code.'
+  - id: ask-push
+    match: { tool: '*push*' }
+    action: ask
+    reason: 'Pushing publishes changes.'
+  - id: ask-deploy
+    match: { tool: '*deploy*' }
+    action: ask
+    reason: 'Deploying changes what users run.'
+  - id: ask-revoke
+    match: { tool: '*revoke*' }
+    action: ask
+    reason: 'Revoking access is hard to undo.'
+  - id: ask-transfer
+    match: { tool: '*transfer*' }
+    action: ask
+    reason: 'Transfers move money or ownership.'
+  - id: ask-refund
+    match: { tool: '*refund*' }
+    action: ask
+    reason: 'Refunds move money.'
+  - id: ask-pay
+    match: { tool: 'pay*' }
+    action: ask
+    reason: 'Payments move money.'
+  - id: ask-send-funds
+    match: { tool: '*send_funds*' }
+    action: ask
+    reason: 'Payments move money.'
+
+  # Commands: ask once untrusted content has entered the session.
+  - id: ask-shell-after-untrusted
+    match: { tool: '*exec*' }
+    when: { session_tainted: true }
+    action: ask
+    reason: 'The agent has read untrusted content; check commands before they run.'
+  - id: ask-command-after-untrusted
+    match: { tool: '*command*' }
+    when: { session_tainted: true }
+    action: ask
+    reason: 'The agent has read untrusted content; check commands before they run.'
+  - id: ask-shell-tool-after-untrusted
+    match: { tool: '*shell*' }
+    when: { session_tainted: true }
+    action: ask
+    reason: 'The agent has read untrusted content; check commands before they run.'
+  - id: ask-terminal-after-untrusted
+    match: { tool: '*terminal*' }
+    when: { session_tainted: true }
+    action: ask
+    reason: 'The agent has read untrusted content; check commands before they run.'

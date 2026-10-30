@@ -5,9 +5,11 @@ import { join, resolve } from 'node:path';
 import {
   GATEWAY_VERSION,
   defaultConfigDir,
+  defaultStateDir,
   spawnPlan,
   withoutNpxRunVariables,
 } from '@sudowall/gateway';
+import { activityAt, describeActivity } from './activity.js';
 import { RuntimeError, UsageError } from './errors.js';
 import { writeStarterConfig } from './init-cmd.js';
 import { CLIENTS, applyPlan, planAll, type Action, type ClientId } from './protect.js';
@@ -150,6 +152,12 @@ export function protectCommand(
       `${String(n('already'))} protected, ${String(n('wrap'))} not protected, ${String(n('remote'))} remote (not covered yet).`,
     );
     if (n('wrap') > 0) out('Run `sudowall protect` to see the change, then add --apply.');
+    const days = 7;
+    const activity = activityAt(
+      join(defaultStateDir(), 'ledger.db'),
+      new Date(Date.now() - days * 86_400_000),
+    );
+    if (activity !== undefined) for (const l of describeActivity(activity, days, q(config))) out(l);
     return 0;
   }
 
