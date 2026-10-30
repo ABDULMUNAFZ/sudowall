@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { GATEWAY_VERSION, defaultConfigDir } from '@tortoisegate/gateway';
-import { UsageError } from './errors.js';
+import { GATEWAY_VERSION, defaultConfigDir, withoutNpxRunVariables } from '@tortoisegate/gateway';
+import { RuntimeError, UsageError } from './errors.js';
 import { writeStarterConfig } from './init-cmd.js';
 import { CLIENTS, applyPlan, planAll, type Action, type ClientId } from './protect.js';
 
@@ -17,21 +17,47 @@ export interface ProtectFlags {
 }
 
 /**
+ * The line of npm's error output that says what went wrong: the first `npm error` line that is
+ * not the bare error code or the pointer to the debug log, else the last line.
+ */
+function npmReason(stderr: string): string | undefined {
+  const lines = stderr
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '');
+  const useful = lines.find(
+    (l) => /^npm (error|ERR!)/.test(l) && !/ code \S+$|complete log of this run/.test(l),
+  );
+  return useful ?? lines.at(-1);
+}
+
+/**
  * Downloads the exact package version the protected entries will run, so the first start after
  * `protect` does not spend the client's connect timeout on a download. Throws when it cannot,
  * because writing the configs then would leave every protected server unable to start.
+ *
+ * Runs from an empty folder without npx's per-run variables: inside a project that already has
+ * tortoisegate, npx would use that copy and fill no cache, and when `protect` itself was started
+ * by npx, the inherited `npm_config_package` would make this npx run the wrong package.
  */
 function prefetch(version: string): void {
-  const r = spawnSync('npx', ['-y', `tortoisegate@${version}`, '--version'], {
-    encoding: 'utf8',
-    timeout: 180_000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const empty = mkdtempSync(join(tmpdir(), 'tortoisegate-prefetch-'));
+  let r;
+  try {
+    r = spawnSync('npx', ['-y', `tortoisegate@${version}`, '--version'], {
+      cwd: empty,
+      env: withoutNpxRunVariables(process.env),
+      encoding: 'utf8',
+      timeout: 180_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
   if (r.status !== 0 || r.stdout.trim() !== version) {
-    const why =
-      r.error?.message ?? (r.stderr.trim().split('\n').pop() || `exit ${String(r.status)}`);
-    throw new UsageError(
-      `could not download tortoisegate@${version} (${why}); nothing was changed. Check your connection and run the command again, or use --offline if this version is already installed.`,
+    const why = r.error?.message ?? npmReason(r.stderr) ?? `exit ${String(r.status)}`;
+    throw new RuntimeError(
+      `could not download tortoisegate@${version} (${why}); nothing was changed. Run the command again, or use --offline if this version is already in the npx cache.`,
     );
   }
 }

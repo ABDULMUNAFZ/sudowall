@@ -85,7 +85,7 @@ Exit codes: 0 ok, 1 runtime error, 2 usage error, 3 config error, 4 ledger verif
 `;
 
 export { UsageError } from './errors.js';
-import { UsageError } from './errors.js';
+import { RuntimeError, UsageError } from './errors.js';
 
 function readConfigFile(path: string): unknown {
   let text: string;
@@ -362,6 +362,10 @@ function fail(e: unknown): number {
   if (e instanceof TortoiseGateError || e instanceof MissingEnvError) {
     process.stderr.write(`tortoisegate: ${e.message}\n`);
     return EXIT.config;
+  }
+  if (e instanceof RuntimeError) {
+    process.stderr.write(`tortoisegate: ${e.message}\n`);
+    return EXIT.runtime;
   }
   process.stderr.write(`tortoisegate: ${(e as Error).stack ?? String(e)}\n`);
   return EXIT.runtime;

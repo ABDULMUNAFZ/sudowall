@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -301,9 +302,20 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
     const { home, project, files, originals } = fakeHome();
     const bin = join(home, 'fake-bin');
     mkdirSync(bin);
-    writeFileSync(join(bin, 'npx'), '#!/bin/sh\necho "npm error 404 Not Found" >&2\nexit 1\n', {
-      mode: 0o755,
-    });
+    // What npm 11 prints for a version that is not on the registry.
+    writeFileSync(
+      join(bin, 'npx'),
+      [
+        '#!/bin/sh',
+        'echo "npm error code ETARGET" >&2',
+        'echo "npm error notarget No matching version found for tortoisegate@9.9.9." >&2',
+        'echo "npm error notarget In most cases you or one of your dependencies are requesting" >&2',
+        'echo "npm error A complete log of this run can be found in: /home/u/.npm/_logs/x.log" >&2',
+        'exit 1',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
     const r = spawnSync(process.execPath, [CLI, 'protect', '--apply', '--project', project], {
       encoding: 'utf8',
       env: {
@@ -314,12 +326,59 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
       },
       timeout: 20_000,
     });
-    expect(r.status).toBe(2);
+    expect(r.status).toBe(1);
     expect(r.stderr).toMatch(
-      /could not download tortoisegate@\S+ \(npm error 404 Not Found\); nothing was changed/,
+      /could not download tortoisegate@\S+ \(npm error notarget No matching version found for tortoisegate@9\.9\.9\.\); nothing was changed/,
     );
+    // A failed download is not a usage mistake: no usage text, no stack trace.
+    expect(r.stderr).not.toContain('Usage:');
+    expect(r.stderr).not.toMatch(/\n\s+at /);
     for (const [k, f] of Object.entries(files)) expect(readFileSync(f, 'utf8')).toBe(originals[k]);
     expect(existsSync(join(home, '.config', 'tortoisegate', 'config.json'))).toBe(false);
+  });
+
+  it('downloads into the npx cache even when started by npx inside a project', () => {
+    if (process.platform === 'win32') return;
+    // `npx -y tortoisegate protect --apply` runs us with npx's per-run variables set, often from a
+    // folder whose package.json already has tortoisegate. The download must ignore both: the
+    // variables make the inner npx run the wrong package, and a local copy is not the cache the
+    // client's npx will use.
+    const { home, project, files } = fakeHome();
+    writeFileSync(join(project, 'package.json'), '{"name":"my-app"}\n');
+    const bin = join(home, 'fake-bin');
+    const seen = join(home, 'npx-saw.txt');
+    mkdirSync(bin);
+    const version = (
+      JSON.parse(
+        readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+      ) as { version: string }
+    ).version;
+    writeFileSync(
+      join(bin, 'npx'),
+      `#!/bin/sh\nprintf '%s\\n%s\\n%s\\n' "$(pwd -P)" "\${npm_config_package-unset}" "$*" > '${seen}'\necho ${version}\n`,
+      { mode: 0o755 },
+    );
+    const r = spawnSync(process.execPath, [CLI, 'protect', '--apply', '--project', project], {
+      cwd: project,
+      encoding: 'utf8',
+      env: {
+        PATH: `${bin}:${process.env['PATH'] ?? ''}`,
+        HOME: home,
+        XDG_CONFIG_HOME: join(home, '.config'),
+        XDG_STATE_HOME: join(home, '.state'),
+        npm_command: 'exec',
+        npm_config_package: 'tortoisegate@latest',
+        npm_config_registry: 'https://registry.example.com/',
+      },
+      timeout: 20_000,
+    });
+    expect(r.status, r.stderr).toBe(0);
+    const [cwd, pkg, args] = readFileSync(seen, 'utf8').split('\n');
+    expect(cwd).not.toBe(realpathSync(project));
+    expect(existsSync(cwd ?? '')).toBe(false); // the empty folder is removed afterwards
+    expect(pkg).toBe('unset');
+    expect(args).toBe(`-y tortoisegate@${version} --version`);
+    expect(readFileSync(files.cursor, 'utf8')).toContain(`tortoisegate@${version}`);
   });
 
   it('rejects an unknown client', () => {

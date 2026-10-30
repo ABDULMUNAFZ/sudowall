@@ -34,6 +34,17 @@ export const NPM_EXEC_VARIABLES: readonly string[] = [
 ];
 
 /**
+ * A copy of `env` without npx's per-run variables when npx started this process, for any child
+ * process that may run `npx` itself. Otherwise an unchanged copy.
+ */
+export function withoutNpxRunVariables(env: NodeJS.ProcessEnv): Record<string, string> {
+  const drop = new Set(env['npm_command'] === 'exec' ? NPM_EXEC_VARIABLES : []);
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined && !drop.has(k)) out[k] = v;
+  return out;
+}
+
+/**
  * Builds a stdio upstream's environment: only the gateway variables named in `inheritEnv`
  * (or all of them for `"*"`, minus npx's per-run variables), then the upstream's own `env`
  * entries on top.
@@ -42,11 +53,9 @@ export function buildEnv(
   spec: Extract<Upstream, { transport: 'stdio' }>,
   gatewayEnv: NodeJS.ProcessEnv,
 ): Record<string, string> {
-  const out: Record<string, string> = {};
+  let out: Record<string, string> = {};
   if (spec.inheritEnv === '*') {
-    const drop = new Set(gatewayEnv['npm_command'] === 'exec' ? NPM_EXEC_VARIABLES : []);
-    for (const [k, v] of Object.entries(gatewayEnv))
-      if (v !== undefined && !drop.has(k)) out[k] = v;
+    out = withoutNpxRunVariables(gatewayEnv);
   } else {
     for (const k of spec.inheritEnv) {
       const v = gatewayEnv[k];

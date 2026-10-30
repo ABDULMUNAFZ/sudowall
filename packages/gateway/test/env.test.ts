@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseConfig } from '@tortoisegate/core';
-import { NPM_EXEC_VARIABLES, buildEnv } from '../src/env.js';
+import { NPM_EXEC_VARIABLES, buildEnv, withoutNpxRunVariables } from '../src/env.js';
 
 const upstream = (extra: Record<string, unknown>) => {
   const u = parseConfig({
@@ -58,5 +58,16 @@ describe('upstream environment', () => {
 
   it('passes only the named variables without "*"', () => {
     expect(buildEnv(upstream({ inheritEnv: ['HOME'] }), NPX_ENV)).toEqual({ HOME: '/home/u' });
+  });
+});
+
+describe('withoutNpxRunVariables', () => {
+  it('removes them only when npx started this process, and copies the rest', () => {
+    const env = withoutNpxRunVariables(NPX_ENV);
+    for (const k of NPM_EXEC_VARIABLES) expect(env).not.toHaveProperty(k);
+    expect(env['npm_config_registry']).toBe('https://registry.example.com/');
+    expect(NPX_ENV.npm_config_package).toBe('tortoisegate@0.2.0'); // input untouched
+    const plain = { PATH: '/usr/bin', npm_config_package: 'x' };
+    expect(withoutNpxRunVariables(plain)).toEqual(plain);
   });
 });
