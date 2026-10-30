@@ -143,6 +143,22 @@ const GENERIC_DIRS = new Set(['dist', 'build', 'lib', 'src', 'bin', 'out']);
  * `node /x/server-everything/dist/index.js stdio` -> `server-everything`.
  */
 export function upstreamIdFor(command: string, args: readonly string[]): string {
+  // A remote server behind the mcp-remote bridge is named after its host: mcp.deepwiki.com -> deepwiki.
+  const words0 = [command, ...args];
+  const bridge = words0.findIndex((w) => /^mcp-remote(@[^/]*)?$/.test(w));
+  const url =
+    bridge === -1 ? undefined : words0.slice(bridge + 1).find((w) => /^https?:\/\//.test(w));
+  if (url !== undefined) {
+    try {
+      const labels = new URL(url).hostname
+        .split('.')
+        .filter((l) => !['mcp', 'www', 'api'].includes(l));
+      const host = (labels.length > 1 ? labels.slice(0, -1) : labels).join('-').toLowerCase();
+      if (/^[a-z0-9][a-z0-9-]{0,62}$/.test(host)) return host;
+    } catch {
+      // not a URL after all; fall through
+    }
+  }
   // Flags: -x and --x, and cmd.exe's /c, /d, /s (`cmd /c npx -y pkg` on Windows).
   const words = [command, ...args].filter((a) => !a.startsWith('-') && !/^\/[a-z]$/i.test(a));
   const name =
@@ -200,6 +216,8 @@ export async function main(argv: string[]): Promise<number> {
       apply: { type: 'boolean' },
       offline: { type: 'boolean' },
       tigergraph: { type: 'boolean' },
+      // Written by `protect` for remote servers so `unprotect` can restore them; wrap ignores it.
+      'remote-entry': { type: 'string' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
     },

@@ -127,20 +127,79 @@ export function isWrapped(entry: Json): boolean {
   return i !== -1 && args[i + 1] === 'wrap' && args.indexOf('--', i) !== -1;
 }
 
-/** A remote server (url) cannot be wrapped yet. */
+/** A remote server: the client connects to a URL (Streamable HTTP or SSE). */
 export function isRemote(entry: Json): boolean {
   return typeof entry['url'] === 'string';
 }
 
+/**
+ * The pinned bridge a remote server runs through once protected: a local stdio process that
+ * speaks Streamable HTTP or SSE to the server and handles OAuth sign-in in the browser.
+ */
+export const MCP_REMOTE = 'mcp-remote@0.15.2';
+/** Wrap flag carrying what `unprotect` needs to rebuild a remote entry (never header values). */
+const REMOTE_FLAG = '--remote-entry=';
+
+interface RemoteInfo {
+  url: string;
+  type?: unknown;
+  transport?: unknown;
+  /** Header name -> environment variable that holds its value. */
+  headers?: Record<string, string>;
+  hadEnv: boolean;
+}
+
+function runner(o: WrapOptions, flags: string[], command: string, args: string[]) {
+  const run = ['-y', `sudowall@${o.version}`, 'wrap', '--config', o.config, ...flags, '--'];
+  // Clients on native Windows cannot start npx (npx.cmd) directly; Claude Code's docs use cmd /c.
+  return (o.platform ?? process.platform) === 'win32'
+    ? { command: 'cmd', args: ['/c', 'npx', ...run, command, ...args] }
+    : { command: 'npx', args: [...run, command, ...args] };
+}
+
+/**
+ * Remote entry -> a local entry running `sudowall wrap -- npx -y mcp-remote <url>`. Header
+ * values move into the entry's `env` and are passed as `${VAR}`, so they never appear in a
+ * command line; the rest is recorded in `--remote-entry` for `unprotect`.
+ */
+function wrapRemote(entry: Json, o: WrapOptions): Json {
+  const { url, type, transport, headers, env: oldEnv, ...rest } = entry;
+  if (typeof url !== 'string') throw new Error('remote entry has no url');
+  const env: Record<string, unknown> = isObj(oldEnv) ? { ...oldEnv } : {};
+  const headerArgs: string[] = [];
+  const headerVars: Record<string, string> = {};
+  if (isObj(headers)) {
+    Object.entries(headers).forEach(([name, value], i) => {
+      const v = `SUDOWALL_HEADER_${String(i + 1)}`;
+      env[v] = String(value);
+      headerVars[name] = v;
+      headerArgs.push('--header', `${name}:\${${v}}`);
+    });
+  }
+  const sse = type === 'sse' || transport === 'sse';
+  const info: RemoteInfo = {
+    url,
+    ...(type === undefined ? {} : { type }),
+    ...(transport === undefined ? {} : { transport }),
+    ...(Object.keys(headerVars).length === 0 ? {} : { headers: headerVars }),
+    hadEnv: isObj(oldEnv),
+  };
+  const flag = `${REMOTE_FLAG}${Buffer.from(JSON.stringify(info)).toString('base64url')}`;
+  const bridge = [MCP_REMOTE, url, ...headerArgs, ...(sse ? ['--transport', 'sse-first'] : [])];
+  return {
+    ...rest,
+    ...(type === undefined ? {} : { type: 'stdio' }),
+    ...runner(o, [flag], 'npx', ['-y', ...bridge]),
+    ...(Object.keys(env).length === 0 ? {} : { env }),
+  };
+}
+
 export function wrapEntry(entry: Json, o: WrapOptions): Json {
+  if (isRemote(entry)) return wrapRemote(entry, o);
   const command = entry['command'];
   if (typeof command !== 'string' || command === '') throw new Error('stdio entry has no command');
   const args = Array.isArray(entry['args']) ? (entry['args'] as unknown[]).map(String) : [];
-  const run = ['-y', `sudowall@${o.version}`, 'wrap', '--config', o.config, '--', command, ...args];
-  // Clients on native Windows cannot start npx (npx.cmd) directly; Claude Code's docs use cmd /c.
-  return (o.platform ?? process.platform) === 'win32'
-    ? { ...entry, command: 'cmd', args: ['/c', 'npx', ...run] }
-    : { ...entry, command: 'npx', args: run };
+  return { ...entry, ...runner(o, [], command, args) };
 }
 
 /** Restores the entry `wrapEntry` produced, exactly. */
@@ -148,6 +207,10 @@ export function unwrapEntry(entry: Json): Json {
   const args = entry['args'] as unknown[];
   const i = args.findIndex((a) => typeof a === 'string' && RUNNER.test(a));
   const dash = args.indexOf('--', i);
+  const flag = args
+    .slice(i, dash)
+    .find((a): a is string => typeof a === 'string' && a.startsWith(REMOTE_FLAG));
+  if (flag !== undefined) return unwrapRemote(entry, flag);
   const [command, ...rest] = args.slice(dash + 1).map(String);
   if (command === undefined) throw new Error('wrapped entry has no command after --');
   const out: Json = { ...entry, command };
@@ -156,7 +219,33 @@ export function unwrapEntry(entry: Json): Json {
   return out;
 }
 
-export type Action = 'wrap' | 'unwrap' | 'already' | 'not-wrapped' | 'remote' | 'invalid';
+function unwrapRemote(entry: Json, flag: string): Json {
+  const info = JSON.parse(
+    Buffer.from(flag.slice(REMOTE_FLAG.length), 'base64url').toString('utf8'),
+  ) as RemoteInfo;
+  // Everything except what wrapRemote added (command, args, type, env) is the user's own.
+  const rest = Object.fromEntries(
+    Object.entries(entry).filter(([k]) => !['command', 'args', 'type', 'env'].includes(k)),
+  );
+  const env = isObj(entry['env']) ? entry['env'] : {};
+  const headerVars = new Set(Object.values(info.headers ?? {}));
+  const left = Object.fromEntries(Object.entries(env).filter(([k]) => !headerVars.has(k)));
+  const headers: Record<string, string> = {};
+  for (const [name, v] of Object.entries(info.headers ?? {})) {
+    const value = env[v];
+    headers[name] = typeof value === 'string' ? value : '';
+  }
+  return {
+    ...rest,
+    ...(info.type === undefined ? {} : { type: info.type }),
+    url: info.url,
+    ...(info.transport === undefined ? {} : { transport: info.transport }),
+    ...(info.headers === undefined ? {} : { headers }),
+    ...(info.hadEnv ? { env: left } : {}),
+  };
+}
+
+export type Action = 'wrap' | 'unwrap' | 'already' | 'not-wrapped' | 'invalid';
 
 export interface ServerPlan {
   group: ServerGroup;
@@ -203,9 +292,20 @@ export function redactArgs(parts: readonly string[]): string[] {
   });
 }
 
+/**
+ * A remote URL for display: secret-looking query values and long random path segments (some
+ * services, viaSocket for one, put the credential in the path) are masked.
+ */
+export function redactUrl(url: string): string {
+  return url
+    .replace(/([?&][^=]*(key|token|secret|auth)[^=]*=)[^&]+/gi, '$1***')
+    .replace(/\/([A-Za-z0-9_-]{20,})(?=[/?#]|$)/g, (m, seg: string) =>
+      /\d/.test(seg) && /[A-Za-z]/.test(seg) ? '/***' : m,
+    );
+}
+
 const describe = (e: Json): string => {
-  if (isRemote(e))
-    return String(e['url']).replace(/([?&][^=]*(key|token|secret)[^=]*=)[^&]+/gi, '$1***');
+  if (isRemote(e)) return `${redactUrl(String(e['url']))} (remote)`;
   const args = Array.isArray(e['args']) ? (e['args'] as unknown[]).map(String) : [];
   const command = typeof e['command'] === 'string' ? e['command'] : '?';
   return redactArgs([command, ...args]).join(' ');
@@ -238,20 +338,14 @@ export function planFile(
         servers.push({ group, name, action: 'invalid', detail: 'entry is not an object' });
         continue;
       }
-      if (isRemote(entry)) {
-        servers.push({
-          group,
-          name,
-          action: 'remote',
-          detail: `${String(entry['url'])} (remote servers are not covered yet)`,
-        });
-        continue;
-      }
       const wrapped = isWrapped(entry);
       if (mode === 'protect') {
         if (wrapped) {
           servers.push({ group, name, action: 'already', detail: describe(unwrapEntry(entry)) });
-        } else if (typeof entry['command'] !== 'string' || entry['command'] === '') {
+        } else if (
+          !isRemote(entry) &&
+          (typeof entry['command'] !== 'string' || entry['command'] === '')
+        ) {
           servers.push({ group, name, action: 'invalid', detail: 'no command' });
         } else {
           entries[name] = wrapEntry(entry, o);

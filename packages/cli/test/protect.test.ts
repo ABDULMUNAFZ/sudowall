@@ -19,6 +19,7 @@ import {
   isWrapped,
   planFile,
   redactArgs,
+  redactUrl,
   unwrapEntry,
   wrapEntry,
 } from '../src/protect.js';
@@ -115,7 +116,7 @@ describe('planning a config file', () => {
   const desktop = (servers: Record<string, unknown>) =>
     `${JSON.stringify({ mcpServers: servers, preferences: { theme: 'dark' } }, null, 2)}\n`;
 
-  it('wraps stdio servers, reports remote ones, and leaves the rest of the file alone', () => {
+  it('wraps local and remote servers and leaves the rest of the file alone', () => {
     const text = desktop({
       files: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'] },
       notion: { type: 'http', url: 'https://mcp.notion.com/mcp' },
@@ -123,7 +124,7 @@ describe('planning a config file', () => {
     const p = planFile('claude-desktop', '/c.json', 'app', text, 'protect', O);
     expect(p.servers.map((s) => [s.name, s.action])).toEqual([
       ['files', 'wrap'],
-      ['notion', 'remote'],
+      ['notion', 'wrap'],
     ]);
     const next = JSON.parse(p.next ?? '{}') as {
       mcpServers: Record<string, { command: string; args: string[]; url?: string }>;
@@ -131,8 +132,71 @@ describe('planning a config file', () => {
     };
     expect(next.preferences).toEqual({ theme: 'dark' });
     expect(next.mcpServers['files']?.args.slice(0, 3)).toEqual(['-y', 'sudowall@9.9.9', 'wrap']);
-    expect(next.mcpServers['notion']).toEqual({ type: 'http', url: 'https://mcp.notion.com/mcp' });
+    expect(next.mcpServers['notion']?.url).toBeUndefined();
+    expect(next.mcpServers['notion']?.args).toContain('mcp-remote@0.15.2');
     expect(p.next?.endsWith('}\n')).toBe(true);
+  });
+
+  it('runs remote servers through the pinned mcp-remote bridge and restores them exactly', () => {
+    const cases: Record<string, unknown>[] = [
+      // Cursor: just a URL.
+      { url: 'https://mcp.deepwiki.com/mcp' },
+      // Claude Code: typed, with a credential header.
+      {
+        type: 'http',
+        url: 'https://api.example.com/mcp',
+        headers: { Authorization: 'Bearer s3cr3t-token' },
+      },
+      // viaSocket's documented form: SSE, credential in the path.
+      { url: 'https://mcp.viasocket.com/mcp/a1B2c3D4e5F6g7H8i9J0k1L2', transport: 'sse' },
+      // Other fields and an env survive.
+      { type: 'sse', url: 'https://x.example/sse', env: { KEEP: '1' }, disabled: false },
+    ];
+    for (const entry of cases) {
+      const w = wrapEntry(entry, O);
+      expect(w['url']).toBeUndefined();
+      expect(w['command']).toBe('npx');
+      const args = w['args'] as string[];
+      expect(args.slice(0, 3)).toEqual(['-y', 'sudowall@9.9.9', 'wrap']);
+      expect(args.slice(args.indexOf('--') + 1, args.indexOf('--') + 5)).toEqual([
+        'npx',
+        '-y',
+        'mcp-remote@0.15.2',
+        entry['url'],
+      ]);
+      if (entry['type'] !== undefined) expect(w['type']).toBe('stdio');
+      expect(isWrapped(w)).toBe(true);
+      expect(unwrapEntry(w)).toEqual(entry);
+    }
+  });
+
+  it('keeps header credentials out of command lines', () => {
+    const w = wrapEntry(
+      {
+        type: 'http',
+        url: 'https://api.example.com/mcp',
+        headers: { Authorization: 'Bearer s3cr3t-token' },
+      },
+      O,
+    );
+    expect(JSON.stringify(w['args'])).not.toContain('s3cr3t');
+    expect(w['args']).toContain('Authorization:${SUDOWALL_HEADER_1}');
+    expect(w['env']).toEqual({ SUDOWALL_HEADER_1: 'Bearer s3cr3t-token' });
+  });
+
+  it('asks mcp-remote for SSE first when the entry says sse', () => {
+    const w = wrapEntry({ url: 'https://mcp.viasocket.com/mcp/x', transport: 'sse' }, O);
+    expect((w['args'] as string[]).slice(-2)).toEqual(['--transport', 'sse-first']);
+  });
+
+  it('masks credentials in remote URLs it prints', () => {
+    expect(redactUrl('https://mcp.viasocket.com/mcp/a1B2c3D4e5F6g7H8i9J0k1L2')).toBe(
+      'https://mcp.viasocket.com/mcp/***',
+    );
+    expect(redactUrl('https://x.example/mcp?api_key=abc&x=1')).toBe(
+      'https://x.example/mcp?api_key=***&x=1',
+    );
+    expect(redactUrl('https://mcp.notion.com/mcp')).toBe('https://mcp.notion.com/mcp');
   });
 
   it('is idempotent: protecting a protected file changes nothing', () => {
@@ -292,7 +356,9 @@ describe('sudowall protect / status / unprotect (CLI, fake home)', () => {
     expect(dry.stdout).toMatch(/memory\s+will protect/);
     expect(dry.stdout).toMatch(/files\s+will protect .*\[project\]/);
     expect(dry.stdout).toMatch(/aws\s+will protect\s+uvx aws-mcp --api-key \*\*\*/);
-    expect(dry.stdout).toMatch(/notion\s+not covered/);
+    expect(dry.stdout).toMatch(
+      /notion\s+will protect\s+https:\/\/mcp\.notion\.com\/mcp \(remote\)/,
+    );
     expect(dry.stdout).toContain('Dry run: nothing was changed');
     expect(dry.stdout).not.toContain('secret-value-123');
     for (const [k, f] of Object.entries(files)) expect(readFileSync(f, 'utf8')).toBe(originals[k]);
@@ -312,7 +378,7 @@ describe('sudowall protect / status / unprotect (CLI, fake home)', () => {
     expect(existsSync(join(home, '.config', 'sudowall', 'config.json'))).toBe(true);
 
     const status = run(home, project, ['status']);
-    expect(status.stdout).toMatch(/3 protected, 0 not protected, 1 remote/);
+    expect(status.stdout).toMatch(/4 protected, 0 not protected\./);
     expect(run(home, project, ['protect', '--apply', '--offline']).stdout).toContain(
       'Nothing to change.',
     );

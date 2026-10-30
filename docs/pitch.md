@@ -32,7 +32,7 @@ If the network is slow, record this run beforehand and play it; say that it is a
 - **Does it stop all prompt injection?** No. It stops injected values reaching risky actions when those values are structured (addresses, emails, URLs, amounts). An agent that rewords an instruction in its own words is not caught by matching; the session-level rules and approvals are the fallback.
 - **How is this different from Google DeepMind's CaMeL?** CaMeL proves information-flow control works but needs the agent rebuilt around it. SudoWall brings a narrower version of the idea to agents people already run, without changing them.
 - **What about agents that do not use MCP?** Not covered today; an SDK is on the roadmap.
-- **What about remote MCP servers (a URL instead of a command)?** Not covered yet. `protect` lists them as not covered instead of pretending.
+- **What about remote MCP servers (a URL instead of a command)?** Covered since 0.5.0: `protect` runs them through the gate and a pinned `mcp-remote` bridge (HTTP, SSE, OAuth). Tested against the public DeepWiki server.
 - **Does it slow the agent down?** About 1 ms per tool call at the median and 1.7 ms at p99 with the full policy, measured on a laptop (`docs/performance.md`). CI fails if the overhead grows past 2 ms at the median.
 - **Does the ledger prove the agent behaved?** No. It proves the record was not edited.
 

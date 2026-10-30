@@ -65,7 +65,7 @@ npx sudowall status             # which servers run through the gate
 npx sudowall unprotect --apply  # restores the original entries exactly
 ```
 
-Then restart the client and open `npx sudowall ui` to watch decisions. The gate starts in observe mode (records, blocks nothing); set `"mode": "enforce"` in the config it names when the decisions look right. Remote (URL) servers are listed but not covered yet. Credentials in command lines are masked in the output. Works on macOS, Linux and Windows.
+Then restart the client and open `npx sudowall ui` to watch decisions. The gate starts in observe mode (records, blocks nothing; `status` shows what it would have blocked); set `"mode": "enforce"` in the config it names when the decisions look right. Remote (URL) servers such as viaSocket, Notion and Linear are covered through a pinned bridge ([guide](docs/integrations/remote-servers.md)). The default policy blocks data leaving to addresses planted in untrusted content and asks before actions that are hard to undo ([templates](docs/policy-templates.md)). Credentials are masked in the output. Works on macOS, Linux and Windows.
 
 ### Payments agents: Dodo Payments
 

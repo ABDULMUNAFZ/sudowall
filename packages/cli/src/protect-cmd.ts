@@ -83,7 +83,6 @@ const LABEL: Record<Action, string> = {
   unwrap: 'will unprotect',
   already: 'protected',
   'not-wrapped': 'not protected',
-  remote: 'not covered',
   invalid: 'skipped',
 };
 
@@ -148,9 +147,7 @@ export function protectCommand(
 
   const n = (a: Action) => counts[a] ?? 0;
   if (mode === 'status') {
-    out(
-      `${String(n('already'))} protected, ${String(n('wrap'))} not protected, ${String(n('remote'))} remote (not covered yet).`,
-    );
+    out(`${String(n('already'))} protected, ${String(n('wrap'))} not protected.`);
     if (n('wrap') > 0) out('Run `sudowall protect` to see the change, then add --apply.');
     const days = 7;
     const activity = activityAt(
@@ -164,7 +161,7 @@ export function protectCommand(
   const changing = plans.filter((p) => p.next !== undefined);
   if (mode === 'protect') {
     out(
-      `${String(n('wrap'))} to protect, ${String(n('already'))} already protected, ${String(n('remote'))} remote (not covered yet), ${String(n('invalid'))} skipped.`,
+      `${String(n('wrap'))} to protect, ${String(n('already'))} already protected, ${String(n('invalid'))} skipped.`,
     );
   } else {
     out(`${String(n('unwrap'))} to unprotect, ${String(n('not-wrapped'))} not protected.`);

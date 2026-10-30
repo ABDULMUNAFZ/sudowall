@@ -101,7 +101,8 @@ npx sudowall status
 npx sudowall unprotect --apply   # restores the original entries</code></pre>
               <p>
                 Restart the client afterwards so it starts the protected servers. Remote (URL)
-                servers are listed but not covered yet. To wrap one server by hand instead, put
+                servers such as viaSocket, Notion and Linear are protected too, through a pinned
+                bridge. To wrap one server by hand instead, put
                 <code>sudowall wrap --</code> in front of its command:
               </p>
               <pre><code>claude mcp add memory -- npx -y sudowall wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>

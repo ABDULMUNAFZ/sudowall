@@ -2,6 +2,14 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## 0.5.0 (2026-10-30)
+
+### Added
+
+- **Everyday policy, now the default** for `init` and `protect`: sending data out (`send`, `reply`, `forward`, `post`, `share`, `invite`, `upload`, `publish`, `webhook` tools) to an email, URL or address copied from untrusted content is blocked; delete, merge, push, deploy, revoke, transfers, refunds and payments ask first; shell and command tools ask once untrusted content entered the session. Before, users without payment tools got a record but no protection.
+- **Remote servers in `protect`** (viaSocket, Notion, Linear, DeepWiki, ...): they run through the gate and the pinned `mcp-remote` bridge (Streamable HTTP, SSE, OAuth). Header credentials stay in `env`, and `unprotect` restores the URL entry exactly. Guide: [docs/integrations/remote-servers.md](docs/integrations/remote-servers.md).
+- `sudowall status` summarises the last 7 days: tool calls, and what observe mode would have blocked or asked (or what enforce mode did).
+
 ## 0.4.0 (2026-10-30)
 
 ### Added
