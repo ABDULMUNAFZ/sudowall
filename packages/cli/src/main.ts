@@ -109,6 +109,7 @@ function readConfigFile(path: string): unknown {
 
 /** Launchers whose first argument names the real server. */
 const LAUNCHERS = new Set([
+  'cmd',
   'node',
   'nodejs',
   'npx',
@@ -142,7 +143,8 @@ const GENERIC_DIRS = new Set(['dist', 'build', 'lib', 'src', 'bin', 'out']);
  * `node /x/server-everything/dist/index.js stdio` -> `server-everything`.
  */
 export function upstreamIdFor(command: string, args: readonly string[]): string {
-  const words = [command, ...args].filter((a) => !a.startsWith('-'));
+  // Flags: -x and --x, and cmd.exe's /c, /d, /s (`cmd /c npx -y pkg` on Windows).
+  const words = [command, ...args].filter((a) => !a.startsWith('-') && !/^\/[a-z]$/i.test(a));
   const name =
     words.find(
       (w) =>

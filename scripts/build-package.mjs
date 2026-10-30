@@ -54,6 +54,8 @@ const ownCodeOnly = {
   name: 'own-code-only',
   setup(b) {
     b.onResolve({ filter: /^[^./]/ }, (args) => {
+      // Entry points and absolute Windows paths (D:\\...) are files, not package names.
+      if (args.kind === 'entry-point' || /^[A-Za-z]:[\\/]/.test(args.path)) return undefined;
       if (args.path.startsWith('node:')) return { path: args.path, external: true };
       const name = packageName(args.path);
       if (name.startsWith('@sudowall/') || name === 'sudowall') return undefined;
