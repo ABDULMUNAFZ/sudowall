@@ -2,6 +2,18 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## 0.4.0 (2026-10-30)
+
+### Added
+
+- **Windows.** The package installs on Windows (it declared macOS and Linux only before). The gateway starts `npx` and other `.cmd` servers through `cmd.exe` with every argument quoted and every metacharacter escaped; `protect` writes `cmd /c npx ...`, the form Claude Code documents for native Windows; `demo` installs the pinned Foundry build for Windows (SHA-256 checked). CI runs the package smoke test on Windows.
+- **Dodo Payments.** A `dodo-payments` policy template (`sudowall init --template dodo-payments`) for the official Dodo Payments MCP server: plain reads run, anything that can move money or change customers asks, and a change that uses an email, URL or amount copied from untrusted content is blocked. Guide: [docs/integrations/dodo-payments.md](docs/integrations/dodo-payments.md).
+
+### Fixed
+
+- An email address inside a sentence or inside code never matched the content it came from, so `provenance` rules missed it. The engine joined whitespace and accepted any text around one `@` as an email. Emails now need a real email shape, and only wallet addresses are tried with whitespace joined.
+- On Windows, `cmd /c npx -y <package>` servers are named after the package, not `c`.
+
 ## 0.3.0 (2026-10-30)
 
 Tortoise Gate is now **SudoWall**. Same product, new name.

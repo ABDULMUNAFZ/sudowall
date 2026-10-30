@@ -1,6 +1,6 @@
 {
   "name": "sudowall",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "SudoWall: open-source firewall for AI agents. Nothing moves until it's checked.",
   "license": "Apache-2.0",

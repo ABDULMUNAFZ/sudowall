@@ -65,7 +65,11 @@ npx sudowall status             # which servers run through the gate
 npx sudowall unprotect --apply  # restores the original entries exactly
 ```
 
-Then restart the client and open `npx sudowall ui` to watch decisions. The gate starts in observe mode (records, blocks nothing); set `"mode": "enforce"` in the config it names when the decisions look right. Remote (URL) servers are listed but not covered yet. Credentials in command lines are masked in the output.
+Then restart the client and open `npx sudowall ui` to watch decisions. The gate starts in observe mode (records, blocks nothing); set `"mode": "enforce"` in the config it names when the decisions look right. Remote (URL) servers are listed but not covered yet. Credentials in command lines are masked in the output. Works on macOS, Linux and Windows.
+
+### Payments agents: Dodo Payments
+
+`npx sudowall init --template dodo-payments` writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: reads run, refunds and other changes ask you first, and a change using an email or URL copied from a support ticket or email is blocked. Setup and a tested run: [docs/integrations/dodo-payments.md](docs/integrations/dodo-payments.md).
 
 ## How it works
 
