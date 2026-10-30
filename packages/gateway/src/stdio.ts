@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnPlan } from './win-spawn.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Channel, CloseReason } from './channel.js';
 import { LineFramer } from './framing.js';
@@ -101,11 +102,14 @@ export class StdioUpstreamChannel extends FramedChannel {
     private readonly shutdownGraceMs: number,
   ) {
     super(maxBytes);
-    this.child = spawn(spec.command, spec.args, {
+    // On Windows, `npx` and other .cmd launchers need cmd.exe (see win-spawn.ts).
+    const plan = spawnPlan(spec.command, spec.args, spec.env);
+    this.child = spawn(plan.command, plan.args, {
       env: spec.env,
       cwd: spec.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      windowsVerbatimArguments: plan.windowsVerbatimArguments,
     });
     this.exited = new Promise((resolve) => {
       this.child.once('exit', (code, signal) => {

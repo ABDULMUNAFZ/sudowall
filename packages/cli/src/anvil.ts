@@ -1,7 +1,16 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { once } from 'node:events';
+import {
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /** Local Anvil chain id; the demo payments server refuses every other chain except Base Sepolia. */
@@ -9,9 +18,67 @@ export const ANVIL_CHAIN_ID = 31337;
 
 export class AnvilError extends Error {}
 
+const foundryDir = () => process.env['FOUNDRY_DIR'] ?? join(homedir(), '.foundry');
+
 function candidates(): string[] {
-  const dir = process.env['FOUNDRY_DIR'] ?? join(homedir(), '.foundry');
-  return [join(dir, 'bin', 'anvil'), 'anvil'];
+  const exe = process.platform === 'win32' ? 'anvil.exe' : 'anvil';
+  return [join(foundryDir(), 'bin', exe), 'anvil'];
+}
+
+/** The pinned Foundry release for Windows, same version as scripts/install-foundry.sh. */
+const WINDOWS_FOUNDRY = {
+  version: 'v1.8.6',
+  file: 'foundry_v1.8.6_win32_amd64.zip',
+  sha256: '924d6395786af438e7cb315f6835185f99d727ed6127dbbc4e6a62eb14edcfff',
+};
+
+/**
+ * Installs anvil.exe from the pinned Foundry release into <FOUNDRY_DIR>\bin. The zip is checked
+ * against the pinned SHA-256 before it is unpacked, with Windows' own tar.exe (bsdtar reads zip).
+ */
+async function installFoundryWindows(say: (s: string) => void): Promise<void> {
+  if (process.arch !== 'x64') {
+    throw new AnvilError('Foundry publishes Windows builds for x64 only; install anvil yourself');
+  }
+  const { version, file, sha256 } = WINDOWS_FOUNDRY;
+  const tmp = mkdtempSync(join(tmpdir(), 'sudowall-foundry-'));
+  try {
+    const zip = join(tmp, file);
+    say(`downloading Foundry ${version} for Windows (about 120 MB; one time only)`);
+    const res = await fetch(
+      `https://github.com/foundry-rs/foundry/releases/download/${version}/${file}`,
+    );
+    if (!res.ok || res.body === null) {
+      throw new AnvilError(`downloading Foundry failed: HTTP ${String(res.status)}`);
+    }
+    const hash = createHash('sha256');
+    const out = createWriteStream(zip);
+    for await (const chunk of res.body as AsyncIterable<Uint8Array>) {
+      hash.update(chunk);
+      if (!out.write(chunk)) await once(out, 'drain');
+    }
+    out.end();
+    await once(out, 'finish');
+    if (hash.digest('hex') !== sha256) {
+      throw new AnvilError(
+        'the Foundry download did not match its pinned SHA-256; nothing was installed',
+      );
+    }
+    const systemTar = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'tar.exe');
+    const r = spawnSync(
+      existsSync(systemTar) ? systemTar : 'tar',
+      ['-xf', zip, '-C', tmp, 'anvil.exe'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    if (r.status !== 0) throw new AnvilError(`unpacking Foundry failed: ${r.stderr.trim()}`);
+    mkdirSync(join(foundryDir(), 'bin'), { recursive: true });
+    copyFileSync(join(tmp, 'anvil.exe'), join(foundryDir(), 'bin', 'anvil.exe'));
+    say(`installed anvil ${version} (sha256 verified) into ${join(foundryDir(), 'bin')}`);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -30,18 +97,20 @@ function runs(bin: string): boolean {
 }
 
 /** Finds a working anvil binary, installing the pinned Foundry release if there is none. */
-export function ensureAnvil(installScript: string, say: (s: string) => void): string {
+export async function ensureAnvil(
+  installScript: string,
+  say: (s: string) => void,
+): Promise<string> {
   for (const c of candidates()) {
     if ((c === 'anvil' || existsSync(c)) && runs(c)) return c;
   }
-  if (process.platform === 'win32') {
-    throw new AnvilError(
-      'the demo needs Anvil (Foundry), and installing it automatically is not supported on Windows; install Foundry and put anvil on PATH',
-    );
-  }
   say('Anvil (Foundry) not found; installing the pinned, checksum-verified release...');
-  const r = spawnSync('bash', [installScript], { stdio: ['ignore', 'inherit', 'inherit'] });
-  if (r.status !== 0) throw new AnvilError('installing Foundry failed (see the output above)');
+  if (process.platform === 'win32') {
+    await installFoundryWindows(say);
+  } else {
+    const r = spawnSync('bash', [installScript], { stdio: ['ignore', 'inherit', 'inherit'] });
+    if (r.status !== 0) throw new AnvilError('installing Foundry failed (see the output above)');
+  }
   for (const c of candidates()) {
     if ((c === 'anvil' || existsSync(c)) && runs(c)) return c;
   }

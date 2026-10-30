@@ -112,6 +112,8 @@ export interface WrapOptions {
   version: string;
   /** Absolute path of the SudoWall config the wrapped servers use. */
   config: string;
+  /** Platform the client runs on; on Windows `npx` is started as `cmd /c npx`. */
+  platform?: NodeJS.Platform;
 }
 
 /** The package argument of a wrapped entry; `tortoisegate` is the product's former name. */
@@ -134,11 +136,11 @@ export function wrapEntry(entry: Json, o: WrapOptions): Json {
   const command = entry['command'];
   if (typeof command !== 'string' || command === '') throw new Error('stdio entry has no command');
   const args = Array.isArray(entry['args']) ? (entry['args'] as unknown[]).map(String) : [];
-  return {
-    ...entry,
-    command: 'npx',
-    args: ['-y', `sudowall@${o.version}`, 'wrap', '--config', o.config, '--', command, ...args],
-  };
+  const run = ['-y', `sudowall@${o.version}`, 'wrap', '--config', o.config, '--', command, ...args];
+  // Clients on native Windows cannot start npx (npx.cmd) directly; Claude Code's docs use cmd /c.
+  return (o.platform ?? process.platform) === 'win32'
+    ? { ...entry, command: 'cmd', args: ['/c', 'npx', ...run] }
+    : { ...entry, command: 'npx', args: run };
 }
 
 /** Restores the entry `wrapEntry` produced, exactly. */

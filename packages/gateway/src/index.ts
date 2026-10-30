@@ -16,3 +16,4 @@ export * from './store.js';
 export * from './policy-pipeline.js';
 export * from './approvals.js';
 export * from './ui-server.js';
+export * from './win-spawn.js';

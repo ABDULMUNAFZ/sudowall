@@ -2,7 +2,12 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { GATEWAY_VERSION, defaultConfigDir, withoutNpxRunVariables } from '@sudowall/gateway';
+import {
+  GATEWAY_VERSION,
+  defaultConfigDir,
+  spawnPlan,
+  withoutNpxRunVariables,
+} from '@sudowall/gateway';
 import { RuntimeError, UsageError } from './errors.js';
 import { writeStarterConfig } from './init-cmd.js';
 import { CLIENTS, applyPlan, planAll, type Action, type ClientId } from './protect.js';
@@ -44,9 +49,12 @@ function prefetch(version: string): void {
   const empty = mkdtempSync(join(tmpdir(), 'sudowall-prefetch-'));
   let r;
   try {
-    r = spawnSync('npx', ['-y', `sudowall@${version}`, '--version'], {
+    const env = withoutNpxRunVariables(process.env);
+    const plan = spawnPlan('npx', ['-y', `sudowall@${version}`, '--version'], env);
+    r = spawnSync(plan.command, plan.args, {
       cwd: empty,
-      env: withoutNpxRunVariables(process.env),
+      env,
+      windowsVerbatimArguments: plan.windowsVerbatimArguments,
       encoding: 'utf8',
       timeout: 180_000,
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -27,6 +27,7 @@ const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const O = {
   version: '9.9.9',
   config: '/home/u/Library/Application Support/sudowall/config.json',
+  platform: 'linux' as const,
 };
 const tmp = () => mkdtempSync(join(tmpdir(), 'tg protect '));
 
@@ -60,6 +61,18 @@ describe('wrapping one server entry', () => {
     expect(isWrapped(w)).toBe(true);
     expect(isWrapped(entry)).toBe(false);
     expect(unwrapEntry(w)).toEqual(entry);
+  });
+
+  it('wraps as cmd /c npx on Windows, and restores the entry exactly', () => {
+    const entry = { command: 'npx', args: ['-y', '@modelcontextprotocol/server-memory'], env: {} };
+    const w = wrapEntry(entry, { ...O, platform: 'win32' });
+    expect(w['command']).toBe('cmd');
+    expect((w['args'] as string[]).slice(0, 4)).toEqual(['/c', 'npx', '-y', 'sudowall@9.9.9']);
+    expect(isWrapped(w)).toBe(true);
+    expect(unwrapEntry(w)).toEqual(entry);
+    // An entry that already used cmd /c (as Claude Code documents for Windows) round-trips too.
+    const cmdEntry = { command: 'cmd', args: ['/c', 'npx', '-y', 'some-server'] };
+    expect(unwrapEntry(wrapEntry(cmdEntry, { ...O, platform: 'win32' }))).toEqual(cmdEntry);
   });
 
   it('recognises and restores entries wrapped before the rename (tortoisegate@...)', () => {

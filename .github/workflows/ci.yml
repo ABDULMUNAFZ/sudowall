@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,11 +123,14 @@ jobs:
       - name: libusb for Foundry's Anvil (macOS)
         if: runner.os == 'macOS'
         run: brew install libusb
+      # On Windows the demo installs the pinned Foundry build itself, which this job tests.
       - name: Install Foundry (pinned, checksum verified)
+        if: runner.os != 'Windows'
         run: |
           bash scripts/install-foundry.sh
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
       # Builds release/sudowall, packs it, installs the tarball into an empty directory whose
-      # path has spaces, and runs --version, init, wrap and demo --ci from there.
+      # path has spaces, and runs --version, init, wrap (also of an npx-launched server), protect
+      # on a fake home, and demo --ci from there.
       - run: pnpm run package
       - run: pnpm run smoke:package
