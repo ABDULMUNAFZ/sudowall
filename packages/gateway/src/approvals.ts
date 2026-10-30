@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { Config, JsonValue, ToolCallEvent } from '@tortoisegate/core';
-import { migrateComponent, type StateDb } from '@tortoisegate/ledger';
+import type { Config, JsonValue, ToolCallEvent } from '@sudowall/core';
+import { migrateComponent, type StateDb } from '@sudowall/ledger';
 import type { Logger } from './log.js';
 
 const MIGRATIONS = [
@@ -188,7 +188,7 @@ export interface ApprovalChannel {
 
 /**
  * Approvals through the shared state database: the waiting gateway polls its row, the local UI
- * (`tortoisegate ui`, another process) decides. Pending approvals survive a UI restart.
+ * (`sudowall ui`, another process) decides. Pending approvals survive a UI restart.
  */
 export class DbApprovalChannel implements ApprovalChannel {
   constructor(
@@ -250,9 +250,9 @@ function notify(call: ToolCallEvent, log: Logger): void {
     const child = spawn(
       'notify-send',
       [
-        '--app-name=Tortoise Gate',
+        '--app-name=SudoWall',
         'Approval needed',
-        `${call.server.id}/${call.tool} is waiting for your decision in the Tortoise Gate UI.`,
+        `${call.server.id}/${call.tool} is waiting for your decision in the SudoWall UI.`,
       ],
       { stdio: 'ignore', detached: false },
     );

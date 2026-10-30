@@ -26,7 +26,7 @@ import {
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const O = {
   version: '9.9.9',
-  config: '/home/u/Library/Application Support/tortoisegate/config.json',
+  config: '/home/u/Library/Application Support/sudowall/config.json',
 };
 const tmp = () => mkdtempSync(join(tmpdir(), 'tg protect '));
 
@@ -45,7 +45,7 @@ describe('wrapping one server entry', () => {
       command: 'npx',
       args: [
         '-y',
-        'tortoisegate@9.9.9',
+        'sudowall@9.9.9',
         'wrap',
         '--config',
         O.config,
@@ -62,10 +62,29 @@ describe('wrapping one server entry', () => {
     expect(unwrapEntry(w)).toEqual(entry);
   });
 
+  it('recognises and restores entries wrapped before the rename (tortoisegate@...)', () => {
+    const old = {
+      command: 'npx',
+      args: [
+        '-y',
+        'tortoisegate@0.2.0',
+        'wrap',
+        '--config',
+        O.config,
+        '--',
+        'uvx',
+        'mcp-server-git',
+      ],
+      env: { A: '1' },
+    };
+    expect(isWrapped(old)).toBe(true);
+    expect(unwrapEntry(old)).toEqual({ command: 'uvx', args: ['mcp-server-git'], env: { A: '1' } });
+  });
+
   it('restores entries exactly, for any command, args and extra fields', () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1 }).filter((s) => !/^tortoisegate(@\S+)?$/.test(s)),
+        fc.string({ minLength: 1 }).filter((s) => !/^(sudowall|tortoisegate)(@\S+)?$/.test(s)),
         fc.option(fc.array(fc.string()), { nil: undefined }),
         fc.dictionary(fc.constantFrom('env', 'type', 'timeout', 'cwd'), fc.jsonValue()),
         (command, args, extra) => {
@@ -98,11 +117,7 @@ describe('planning a config file', () => {
       preferences: unknown;
     };
     expect(next.preferences).toEqual({ theme: 'dark' });
-    expect(next.mcpServers['files']?.args.slice(0, 3)).toEqual([
-      '-y',
-      'tortoisegate@9.9.9',
-      'wrap',
-    ]);
+    expect(next.mcpServers['files']?.args.slice(0, 3)).toEqual(['-y', 'sudowall@9.9.9', 'wrap']);
     expect(next.mcpServers['notion']).toEqual({ type: 'http', url: 'https://mcp.notion.com/mcp' });
     expect(p.next?.endsWith('}\n')).toBe(true);
   });
@@ -187,7 +202,7 @@ describe('applying a plan', () => {
     writeFileSync(file, text, { mode: 0o600 });
     const plan = planFile('cursor', file, 'global', text, 'protect', O);
     const backup = applyPlan(plan, new Date('2026-10-30T07:00:00.000Z'));
-    expect(backup).toBe(`${file}.tortoisegate-backup-2026-10-30T07-00-00-000Z`);
+    expect(backup).toBe(`${file}.sudowall-backup-2026-10-30T07-00-00-000Z`);
     expect(readFileSync(backup ?? '', 'utf8')).toBe(text);
     expect(readFileSync(file, 'utf8')).toBe(plan.next);
     expect(statSync(file).mode & 0o777).toBe(0o600);
@@ -198,7 +213,7 @@ describe('applying a plan', () => {
   });
 });
 
-describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
+describe('sudowall protect / status / unprotect (CLI, fake home)', () => {
   function fakeHome() {
     const home = tmp();
     const project = join(home, 'my app');
@@ -280,10 +295,8 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
     expect(cc.numStartups).toBe(1);
     expect(cc.mcpServers.memory.args).toContain('wrap');
     expect(cc.mcpServers.memory.env).toEqual({});
-    expect(readdirSync(home).some((f) => f.startsWith('.claude.json.tortoisegate-backup-'))).toBe(
-      true,
-    );
-    expect(existsSync(join(home, '.config', 'tortoisegate', 'config.json'))).toBe(true);
+    expect(readdirSync(home).some((f) => f.startsWith('.claude.json.sudowall-backup-'))).toBe(true);
+    expect(existsSync(join(home, '.config', 'sudowall', 'config.json'))).toBe(true);
 
     const status = run(home, project, ['status']);
     expect(status.stdout).toMatch(/3 protected, 0 not protected, 1 remote/);
@@ -308,7 +321,7 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
       [
         '#!/bin/sh',
         'echo "npm error code ETARGET" >&2',
-        'echo "npm error notarget No matching version found for tortoisegate@9.9.9." >&2',
+        'echo "npm error notarget No matching version found for sudowall@9.9.9." >&2',
         'echo "npm error notarget In most cases you or one of your dependencies are requesting" >&2',
         'echo "npm error A complete log of this run can be found in: /home/u/.npm/_logs/x.log" >&2',
         'exit 1',
@@ -328,19 +341,19 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
     });
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(
-      /could not download tortoisegate@\S+ \(npm error notarget No matching version found for tortoisegate@9\.9\.9\.\); nothing was changed/,
+      /could not download sudowall@\S+ \(npm error notarget No matching version found for sudowall@9\.9\.9\.\); nothing was changed/,
     );
     // A failed download is not a usage mistake: no usage text, no stack trace.
     expect(r.stderr).not.toContain('Usage:');
     expect(r.stderr).not.toMatch(/\n\s+at /);
     for (const [k, f] of Object.entries(files)) expect(readFileSync(f, 'utf8')).toBe(originals[k]);
-    expect(existsSync(join(home, '.config', 'tortoisegate', 'config.json'))).toBe(false);
+    expect(existsSync(join(home, '.config', 'sudowall', 'config.json'))).toBe(false);
   });
 
   it('downloads into the npx cache even when started by npx inside a project', () => {
     if (process.platform === 'win32') return;
-    // `npx -y tortoisegate protect --apply` runs us with npx's per-run variables set, often from a
-    // folder whose package.json already has tortoisegate. The download must ignore both: the
+    // `npx -y sudowall protect --apply` runs us with npx's per-run variables set, often from a
+    // folder whose package.json already has sudowall. The download must ignore both: the
     // variables make the inner npx run the wrong package, and a local copy is not the cache the
     // client's npx will use.
     const { home, project, files } = fakeHome();
@@ -367,7 +380,7 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
         XDG_CONFIG_HOME: join(home, '.config'),
         XDG_STATE_HOME: join(home, '.state'),
         npm_command: 'exec',
-        npm_config_package: 'tortoisegate@latest',
+        npm_config_package: 'sudowall@latest',
         npm_config_registry: 'https://registry.example.com/',
       },
       timeout: 20_000,
@@ -377,8 +390,8 @@ describe('tortoisegate protect / status / unprotect (CLI, fake home)', () => {
     expect(cwd).not.toBe(realpathSync(project));
     expect(existsSync(cwd ?? '')).toBe(false); // the empty folder is removed afterwards
     expect(pkg).toBe('unset');
-    expect(args).toBe(`-y tortoisegate@${version} --version`);
-    expect(readFileSync(files.cursor, 'utf8')).toContain(`tortoisegate@${version}`);
+    expect(args).toBe(`-y sudowall@${version} --version`);
+    expect(readFileSync(files.cursor, 'utf8')).toContain(`sudowall@${version}`);
   });
 
   it('rejects an unknown client', () => {

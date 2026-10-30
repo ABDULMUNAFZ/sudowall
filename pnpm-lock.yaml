@@ -251,20 +251,20 @@ importers:
 
   examples/scripted-agent:
     dependencies:
-      '@tortoisegate/example-evm-mcp':
+      '@sudowall/example-evm-mcp':
         specifier: workspace:*
         version: link:../evm-mcp
-      tortoisegate:
+      sudowall:
         specifier: workspace:*
         version: link:../../packages/cli
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 2.4.0
         version: 2.4.0
-      '@tortoisegate/gateway':
+      '@sudowall/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../../packages/ledger
       '@types/better-sqlite3':
@@ -285,22 +285,22 @@ importers:
       '@modelcontextprotocol/server-filesystem':
         specifier: 2.1.0
         version: 2.1.0
-      '@tortoisegate/core':
+      '@sudowall/core':
         specifier: workspace:*
         version: link:../core
-      '@tortoisegate/gateway':
+      '@sudowall/gateway':
         specifier: workspace:*
         version: link:../gateway
-      '@tortoisegate/graph':
+      '@sudowall/graph':
         specifier: workspace:*
         version: link:../graph
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../ledger
-      '@tortoisegate/policy':
+      '@sudowall/policy':
         specifier: workspace:*
         version: link:../policy
-      '@tortoisegate/web-ui':
+      '@sudowall/web-ui':
         specifier: workspace:*
         version: link:../../apps/web-ui
     devDependencies:
@@ -328,19 +328,19 @@ importers:
 
   packages/gateway:
     dependencies:
-      '@tortoisegate/core':
+      '@sudowall/core':
         specifier: workspace:*
         version: link:../core
-      '@tortoisegate/graph':
+      '@sudowall/graph':
         specifier: workspace:*
         version: link:../graph
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../ledger
-      '@tortoisegate/policy':
+      '@sudowall/policy':
         specifier: workspace:*
         version: link:../policy
-      '@tortoisegate/provenance':
+      '@sudowall/provenance':
         specifier: workspace:*
         version: link:../provenance
       zod:
@@ -371,7 +371,7 @@ importers:
 
   packages/graph:
     dependencies:
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../ledger
       better-sqlite3:
@@ -384,7 +384,7 @@ importers:
 
   packages/ledger:
     dependencies:
-      '@tortoisegate/core':
+      '@sudowall/core':
         specifier: workspace:*
         version: link:../core
       better-sqlite3:
@@ -400,13 +400,13 @@ importers:
 
   packages/policy:
     dependencies:
-      '@tortoisegate/core':
+      '@sudowall/core':
         specifier: workspace:*
         version: link:../core
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../ledger
-      '@tortoisegate/provenance':
+      '@sudowall/provenance':
         specifier: workspace:*
         version: link:../provenance
       yaml:
@@ -428,10 +428,10 @@ importers:
       '@noble/hashes':
         specifier: 1.8.0
         version: 1.8.0
-      '@tortoisegate/core':
+      '@sudowall/core':
         specifier: workspace:*
         version: link:../core
-      '@tortoisegate/ledger':
+      '@sudowall/ledger':
         specifier: workspace:*
         version: link:../ledger
       zod:

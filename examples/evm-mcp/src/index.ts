@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Example MCP server that moves testnet ETH: `get_balance` and `send_funds`. It refuses every
 // chain except a local Anvil chain (31337) and Base Sepolia (84532). It is the "dangerous tool"
-// Tortoise Gate protects in the demo; it has no protection of its own beyond input validation.
+// SudoWall protects in the demo; it has no protection of its own beyond input validation.
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
@@ -18,7 +18,7 @@ const short = (e: unknown) => ((e as Error).message.split('\n')[0] ?? 'error').s
 async function main(): Promise<void> {
   const wallet = new Wallet(walletConfig());
   const chainId = await wallet.checkChain();
-  const server = new McpServer({ name: 'tortoisegate-evm-mcp', version: '0.0.0' });
+  const server = new McpServer({ name: 'sudowall-evm-mcp', version: '0.0.0' });
 
   server.registerTool(
     'get_balance',
@@ -68,11 +68,11 @@ async function main(): Promise<void> {
 
   await server.connect(new StdioServerTransport());
   process.stderr.write(
-    `tortoisegate-evm-mcp: ${wallet.cfg.mode}, chain ${String(chainId)}, wallet ${wallet.address}\n`,
+    `sudowall-evm-mcp: ${wallet.cfg.mode}, chain ${String(chainId)}, wallet ${wallet.address}\n`,
   );
 }
 
 main().catch((e: unknown) => {
-  process.stderr.write(`tortoisegate-evm-mcp: ${short(e)}\n`);
+  process.stderr.write(`sudowall-evm-mcp: ${short(e)}\n`);
   process.exit(1);
 });

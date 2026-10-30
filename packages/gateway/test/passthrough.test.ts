@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ToolCallEvent, ToolResultEvent } from '@tortoisegate/core';
+import type { ToolCallEvent, ToolResultEvent } from '@sudowall/core';
 import { DECISION_META_KEY } from '../src/session.js';
 import {
   CALL,
@@ -129,7 +129,7 @@ describe('byte fidelity (passthrough)', () => {
 });
 
 describe('enforce: static deny list', () => {
-  it('answers a denied call with isError + TG_BLOCKED, never reaches the upstream, and records a block', async () => {
+  it('answers a denied call with isError + SW_BLOCKED, never reaches the upstream, and records a block', async () => {
     const rec = join(tempDir(), 'rec.log');
     h = startSession({
       mode: 'enforce',
@@ -145,9 +145,9 @@ describe('enforce: static deny list', () => {
       _meta: Record<string, { code: string; ruleIds: string[]; eventId: string }>;
     };
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toMatch(/^Blocked by Tortoise Gate: /);
+    expect(result.content[0]?.text).toMatch(/^Blocked by SudoWall: /);
     const meta = result._meta[DECISION_META_KEY];
-    expect(meta?.code).toBe('TG_BLOCKED');
+    expect(meta?.code).toBe('SW_BLOCKED');
     expect(meta?.ruleIds).toEqual(['deny-list-0']);
     expect(readLines(rec).some((l) => l.includes('tools/call'))).toBe(false);
     const ev = calls(h)[0];
@@ -174,7 +174,7 @@ describe('enforce: static deny list', () => {
     expect(results(h)[0]?.outcome).toBe('ok');
   });
 
-  it('blocks with TG_LEDGER_UNAVAILABLE in enforce mode when the event cannot be recorded', async () => {
+  it('blocks with SW_LEDGER_UNAVAILABLE in enforce mode when the event cannot be recorded', async () => {
     h = startSession({ mode: 'enforce', upstreams: [rawUpstream('raw')] });
     await handshake(h.client);
     h.sink.failWith = new Error('disk full');
@@ -182,7 +182,7 @@ describe('enforce: static deny list', () => {
     const res = await h.client.response('4');
     expect(res['result']).toMatchObject({
       isError: true,
-      _meta: { [DECISION_META_KEY]: { code: 'TG_LEDGER_UNAVAILABLE' } },
+      _meta: { [DECISION_META_KEY]: { code: 'SW_LEDGER_UNAVAILABLE' } },
     });
   });
 

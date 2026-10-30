@@ -122,7 +122,7 @@ export const LedgerConfigSchema = z
   })
   .prefault({});
 
-/** Local web UI (`tortoisegate ui`). */
+/** Local web UI (`sudowall ui`). */
 export const UiConfigSchema = z
   .strictObject({
     /** Local web UI port on 127.0.0.1; 0 picks a free port. The host is not configurable. */

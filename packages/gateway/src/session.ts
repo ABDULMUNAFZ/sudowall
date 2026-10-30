@@ -14,7 +14,7 @@ import {
   type ToolCallEvent,
   type ToolResultEvent,
   type Transport,
-} from '@tortoisegate/core';
+} from '@sudowall/core';
 import type { Channel, CloseReason, Related } from './channel.js';
 import { RpcCode, classify, errorResponse, resultResponse, type Message } from './jsonrpc.js';
 import type { Logger } from './log.js';
@@ -42,14 +42,14 @@ const UNSUPPORTED_SERVER_CAPS = ['tasks'];
 /** 2026-07-28 form of task support (`capabilities.extensions`); removed on both sides. */
 const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
 /** `_meta` key carrying the machine-readable gateway decision on results the gateway produced. */
-export const DECISION_META_KEY = 'tortoisegate/decision';
+export const DECISION_META_KEY = 'sudowall/decision';
 
 export type GateCode =
-  | 'TG_BLOCKED'
-  | 'TG_APPROVAL_DENIED'
-  | 'TG_APPROVAL_TIMEOUT'
-  | 'TG_APPROVAL_UNAVAILABLE'
-  | 'TG_LEDGER_UNAVAILABLE';
+  | 'SW_BLOCKED'
+  | 'SW_APPROVAL_DENIED'
+  | 'SW_APPROVAL_TIMEOUT'
+  | 'SW_APPROVAL_UNAVAILABLE'
+  | 'SW_LEDGER_UNAVAILABLE';
 
 interface Pending {
   method: string;
@@ -384,7 +384,7 @@ export class Session {
           this.replyError(
             m,
             RpcCode.MethodNotFound,
-            `method ${m.method} is not supported by Tortoise Gate`,
+            `method ${m.method} is not supported by SudoWall`,
           );
       }
     } catch (e) {
@@ -406,7 +406,7 @@ export class Session {
     this.replyResult(m, {
       protocolVersion: this.clientProtocol,
       capabilities: this.mergedCapabilities(),
-      serverInfo: { name: 'tortoise-gate', version: GATEWAY_VERSION },
+      serverInfo: { name: 'sudowall', version: GATEWAY_VERSION },
     });
   }
 
@@ -445,7 +445,7 @@ export class Session {
       out['cacheScope'] = 'private';
     }
     out['_meta'] = {
-      'io.modelcontextprotocol/serverInfo': { name: 'tortoise-gate', version: GATEWAY_VERSION },
+      'io.modelcontextprotocol/serverInfo': { name: 'sudowall', version: GATEWAY_VERSION },
     };
     return out;
   }
@@ -466,7 +466,7 @@ export class Session {
           {
             protocolVersion: LEGACY_PROTOCOL,
             capabilities: {},
-            clientInfo: { name: 'tortoise-gate', version: GATEWAY_VERSION },
+            clientInfo: { name: 'sudowall', version: GATEWAY_VERSION },
           },
           timeout,
         );
@@ -763,7 +763,7 @@ export class Session {
     if (up.era === 'modern') {
       next[ENV_VERSION] = MODERN_PROTOCOL;
       next[ENV_CAPS] = {};
-      next[ENV_INFO] = { name: 'tortoise-gate', version: GATEWAY_VERSION };
+      next[ENV_INFO] = { name: 'sudowall', version: GATEWAY_VERSION };
     }
     const hadEnvelope = Object.keys(meta).some((k) => k.startsWith('io.modelcontextprotocol/'));
     if (!hadEnvelope && up.era !== 'modern') return [];
@@ -863,14 +863,14 @@ export class Session {
       this.blockCall(
         p,
         m,
-        'TG_LEDGER_UNAVAILABLE',
+        'SW_LEDGER_UNAVAILABLE',
         'The action could not be recorded, so it was not run.',
         [],
       );
       return;
     }
     if (decision.effective === 'block') {
-      this.blockCall(p, m, 'TG_BLOCKED', decision.reason, decision.matchedRules);
+      this.blockCall(p, m, 'SW_BLOCKED', decision.reason, decision.matchedRules);
       return;
     }
     if (decision.effective === 'ask') {
@@ -879,7 +879,7 @@ export class Session {
         this.blockCall(
           p,
           m,
-          'TG_APPROVAL_UNAVAILABLE',
+          'SW_APPROVAL_UNAVAILABLE',
           `${decision.reason} Approval is required but no approval channel is available.`,
           decision.matchedRules,
         );
@@ -900,7 +900,7 @@ export class Session {
         this.blockCall(
           p,
           m,
-          'TG_APPROVAL_UNAVAILABLE',
+          'SW_APPROVAL_UNAVAILABLE',
           `${decision.reason} Approval is required but the approval store failed.`,
           decision.matchedRules,
         );
@@ -916,7 +916,7 @@ export class Session {
         this.blockCall(
           p,
           m,
-          'TG_LEDGER_UNAVAILABLE',
+          'SW_LEDGER_UNAVAILABLE',
           'The approval could not be recorded, so the action was not run.',
           [],
         );
@@ -927,7 +927,7 @@ export class Session {
           this.blockCall(
             p,
             m,
-            'TG_APPROVAL_TIMEOUT',
+            'SW_APPROVAL_TIMEOUT',
             `${decision.reason} No one approved this action within ${String(this.cfg.approvals.timeoutSeconds)} s.`,
             decision.matchedRules,
             'timeout',
@@ -936,7 +936,7 @@ export class Session {
           this.blockCall(
             p,
             m,
-            'TG_APPROVAL_DENIED',
+            'SW_APPROVAL_DENIED',
             `${decision.reason} The user denied this action.`,
             decision.matchedRules,
             'denied',
@@ -1005,7 +1005,7 @@ export class Session {
   ): void {
     this.finish(p);
     const result: Record<string, unknown> = {
-      content: [{ type: 'text', text: `Blocked by Tortoise Gate: ${reason}` }],
+      content: [{ type: 'text', text: `Blocked by SudoWall: ${reason}` }],
       isError: true,
       _meta: {
         [DECISION_META_KEY]: {
@@ -1055,7 +1055,7 @@ export class Session {
             text = errorResponse(
               p.clientIdText,
               RpcCode.MethodNotFound,
-              'Tortoise Gate does not support input_required (multi round-trip) results yet',
+              'SudoWall does not support input_required (multi round-trip) results yet',
             );
             outcome = 'protocol-error';
             error = { code: RpcCode.MethodNotFound, message: 'input_required not supported' };
@@ -1105,7 +1105,7 @@ export class Session {
       errorResponse(
         m.idKey,
         RpcCode.MethodNotFound,
-        `Tortoise Gate does not support server-initiated ${m.method}`,
+        `SudoWall does not support server-initiated ${m.method}`,
       ),
     );
   }

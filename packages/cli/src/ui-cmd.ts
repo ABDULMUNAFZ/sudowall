@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { LedgerConfigSchema, TortoiseGateError, UiConfigSchema } from '@tortoisegate/core';
-import { startUiServer, storePaths, type Logger } from '@tortoisegate/gateway';
+import { LedgerConfigSchema, SudoWallError, UiConfigSchema } from '@sudowall/core';
+import { startUiServer, storePaths, type Logger } from '@sudowall/gateway';
 import { webUiDir } from './assets.js';
 import { UsageError } from './errors.js';
 
@@ -16,18 +16,18 @@ function readConfigObject(path: string): Record<string, unknown> {
   try {
     v = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e) {
-    throw new TortoiseGateError(
+    throw new SudoWallError(
       'INVALID_CONFIG',
       `cannot read config file ${path}: ${(e as Error).message}`,
     );
   }
   if (v === null || typeof v !== 'object' || Array.isArray(v)) {
-    throw new TortoiseGateError('INVALID_CONFIG', 'config must be a JSON object');
+    throw new SudoWallError('INVALID_CONFIG', 'config must be a JSON object');
   }
   return v as Record<string, unknown>;
 }
 
-/** `tortoisegate ui`: serves the local UI until SIGINT or SIGTERM. */
+/** `sudowall ui`: serves the local UI until SIGINT or SIGTERM. */
 export async function uiCommand(flags: UiFlags, log: Logger): Promise<void> {
   // Only the `ledger` and `ui` sections of a gateway config apply (wrap configs have no upstreams).
   const file: Record<string, unknown> =
@@ -49,7 +49,7 @@ export async function uiCommand(flags: UiFlags, log: Logger): Promise<void> {
     log,
   });
   // The URL is the credential for this run: print it on stdout only, never into logs.
-  process.stdout.write(`Tortoise Gate UI: ${ui.url}\n`);
+  process.stdout.write(`SudoWall UI: ${ui.url}\n`);
   log.info('ui started', { port: ui.port });
   await new Promise<void>((resolve) => {
     const stop = () => {

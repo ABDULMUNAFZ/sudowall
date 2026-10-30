@@ -41,25 +41,25 @@ describe('testnet guard', () => {
 describe('configuration', () => {
   it('uses local Anvil by default and refuses a non-local Anvil URL', () => {
     expect(walletConfig({}).mode).toBe('anvil');
-    expect(() => walletConfig({ TG_EVM_ANVIL_URL: 'http://rpc.example:8545' })).toThrow(
+    expect(() => walletConfig({ SW_EVM_ANVIL_URL: 'http://rpc.example:8545' })).toThrow(
       /local Anvil/,
     );
   });
 
   it('uses Base Sepolia only when both variables are set, and never prints the key', () => {
     const key = `0x${randomBytes(32).toString('hex')}`;
-    expect(() => walletConfig({ TG_EVM_RPC_URL: 'https://sepolia.base.org' })).toThrow(/both/);
-    expect(() => walletConfig({ TG_EVM_PRIVATE_KEY: key })).toThrow(/both/);
+    expect(() => walletConfig({ SW_EVM_RPC_URL: 'https://sepolia.base.org' })).toThrow(/both/);
+    expect(() => walletConfig({ SW_EVM_PRIVATE_KEY: key })).toThrow(/both/);
     const cfg = walletConfig({
-      TG_EVM_RPC_URL: 'https://sepolia.base.org',
-      TG_EVM_PRIVATE_KEY: key,
+      SW_EVM_RPC_URL: 'https://sepolia.base.org',
+      SW_EVM_PRIVATE_KEY: key,
     });
     expect(cfg.mode).toBe('base-sepolia');
     expect(cfg.chain.id).toBe(84532);
     expect(JSON.stringify(cfg.account)).not.toContain(key.slice(2));
     let msg = '';
     try {
-      walletConfig({ TG_EVM_RPC_URL: 'x', TG_EVM_PRIVATE_KEY: key.slice(0, 40) });
+      walletConfig({ SW_EVM_RPC_URL: 'x', SW_EVM_PRIVATE_KEY: key.slice(0, 40) });
     } catch (e) {
       msg = (e as Error).message;
     }
@@ -108,7 +108,7 @@ describe('against a real Anvil chain', () => {
       new StdioClientTransport({
         command: process.execPath,
         args: [SERVER],
-        env: { PATH: process.env['PATH'] ?? '', TG_EVM_ANVIL_URL: url },
+        env: { PATH: process.env['PATH'] ?? '', SW_EVM_ANVIL_URL: url },
         stderr: 'ignore',
       }),
     );
@@ -151,7 +151,7 @@ describe('against a real Anvil chain', () => {
   it('refuses to start against a chain that reports a mainnet chain id', async () => {
     anvil = await startAnvil(1);
     const r = spawnSync(process.execPath, [SERVER], {
-      env: { PATH: process.env['PATH'] ?? '', TG_EVM_ANVIL_URL: anvil.url },
+      env: { PATH: process.env['PATH'] ?? '', SW_EVM_ANVIL_URL: anvil.url },
       encoding: 'utf8',
       input: '',
       timeout: 20_000,

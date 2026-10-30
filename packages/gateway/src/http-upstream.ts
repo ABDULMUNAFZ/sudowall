@@ -1,4 +1,4 @@
-import { rawGet } from '@tortoisegate/core';
+import { rawGet } from '@sudowall/core';
 import type { Channel, CloseReason } from './channel.js';
 import { RpcCode, classify, errorResponse } from './jsonrpc.js';
 import type { Logger } from './log.js';

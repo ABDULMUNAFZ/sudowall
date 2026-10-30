@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseLossless, type Event, type JsonObject } from '@tortoisegate/core';
+import { parseLossless, type Event, type JsonObject } from '@sudowall/core';
 import { Ledger, loadOrCreateKeys, type LedgerOptions } from '../src/index.js';
 
 export function tempDir(prefix = 'tg-ledger-'): string {

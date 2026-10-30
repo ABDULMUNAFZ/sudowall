@@ -4,7 +4,7 @@ import {
   DecisionSchema,
   EventSchema,
   MAX_JSON_DEPTH,
-  TortoiseGateError,
+  SudoWallError,
   isJsonValue,
   parseEvent,
 } from '../src/index.js';
@@ -88,12 +88,12 @@ describe('event schema', () => {
     );
   });
 
-  it('reports invalid events with TortoiseGateError INVALID_EVENT', () => {
-    expect(() => parseEvent({ schemaVersion: 1, type: 'tool.call' })).toThrow(TortoiseGateError);
+  it('reports invalid events with SudoWallError INVALID_EVENT', () => {
+    expect(() => parseEvent({ schemaVersion: 1, type: 'tool.call' })).toThrow(SudoWallError);
     try {
       parseEvent({ schemaVersion: 1, type: 'tool.call' });
     } catch (e) {
-      expect((e as TortoiseGateError).code).toBe('INVALID_EVENT');
+      expect((e as SudoWallError).code).toBe('INVALID_EVENT');
     }
   });
 });

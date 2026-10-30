@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { rawGet, type Config, type Upstream } from '@tortoisegate/core';
+import { rawGet, type Config, type Upstream } from '@sudowall/core';
 import type { Channel, CloseReason } from './channel.js';
 import { buildEnv, resolveEnvValue } from './env.js';
 import { HttpUpstreamChannel } from './http-upstream.js';
@@ -285,9 +285,9 @@ export function modernMeta(params: Record<string, unknown>): Record<string, unkn
       ...meta,
       'io.modelcontextprotocol/protocolVersion': MODERN_PROTOCOL,
       'io.modelcontextprotocol/clientCapabilities': {},
-      'io.modelcontextprotocol/clientInfo': { name: 'tortoise-gate', version: GATEWAY_VERSION },
+      'io.modelcontextprotocol/clientInfo': { name: 'sudowall', version: GATEWAY_VERSION },
     },
   };
 }
 
-export const GATEWAY_VERSION = '0.2.0';
+export const GATEWAY_VERSION = '0.3.0';

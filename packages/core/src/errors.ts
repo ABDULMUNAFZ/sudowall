@@ -6,13 +6,13 @@ export const ERROR_CODES = [
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
-/** Base error for every failure Tortoise Gate reports. Messages must never contain secret values. */
-export class TortoiseGateError extends Error {
+/** Base error for every failure SudoWall reports. Messages must never contain secret values. */
+export class SudoWallError extends Error {
   readonly code: ErrorCode;
 
   constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = 'TortoiseGateError';
+    this.name = 'SudoWallError';
     this.code = code;
   }
 }

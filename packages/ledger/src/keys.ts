@@ -52,7 +52,10 @@ export function publicKeyFromRaw(raw: Uint8Array): KeyObject {
   });
 }
 
-/** Derives a 32-byte purpose-specific key from the installation secret. */
+/**
+ * Derives a 32-byte purpose-specific key from the installation secret. The `tortoisegate/` prefix
+ * is the product's former name and is fixed: changing it would change every derived key.
+ */
 export function deriveKey(secret: Buffer, purpose: string): Buffer {
   return Buffer.from(hkdfSync('sha256', secret, Buffer.alloc(0), `tortoisegate/${purpose}`, 32));
 }

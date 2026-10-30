@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/scripted-agent",
+  "name": "@sudowall/scripted-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Demo setup and a deterministic scripted agent (no LLM) for Tortoise Gate end-to-end tests.",
+  "description": "Demo setup and a deterministic scripted agent (no LLM) for SudoWall end-to-end tests.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -14,13 +14,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tortoisegate/example-evm-mcp": "workspace:*",
-    "tortoisegate": "workspace:*"
+    "@sudowall/example-evm-mcp": "workspace:*",
+    "sudowall": "workspace:*"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.4.0",
-    "@tortoisegate/gateway": "workspace:*",
-    "@tortoisegate/ledger": "workspace:*",
+    "@sudowall/gateway": "workspace:*",
+    "@sudowall/ledger": "workspace:*",
     "@types/better-sqlite3": "9.6.0",
     "better-sqlite3": "13.0.3",
     "viem": "2.57.7"

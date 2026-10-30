@@ -1,6 +1,6 @@
 # Ledger specification: `tg-ledger/1`
 
-This document is the normative spec for the Tortoise Gate ledger. A third party should be able to write an independent verifier from it alone. "MUST", "SHOULD" and "MAY" are used as in RFC 2119.
+This document is the normative spec for the SudoWall ledger. A third party should be able to write an independent verifier from it alone. "MUST", "SHOULD" and "MAY" are used as in RFC 2119.
 
 ## 1. What it guarantees, and what it does not
 

@@ -1,6 +1,6 @@
-# People who tried Tortoise Gate
+# People who tried SudoWall
 
-A plain log of real people who used Tortoise Gate. There is no telemetry, so this file and the [feedback form](https://github.com/ABDULMUNAFZ/tortoise-gate/issues/new?template=tried-it.yml) are the only record.
+A plain log of real people who used SudoWall. There is no telemetry, so this file and the [feedback form](https://github.com/ABDULMUNAFZ/sudowall/issues/new?template=tried-it.yml) are the only record.
 
 Rules:
 

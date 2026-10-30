@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { parseLossless, tgjson, type JsonObject } from '@tortoisegate/core';
+import { parseLossless, tgjson, type JsonObject } from '@sudowall/core';
 import { Redactor, isSecretKey, prepareForStorage, redactString } from '../src/index.js';
 import { toolCall } from './helpers.js';
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Installs the packed `tortoisegate` tarball (or a given package spec) into an empty directory
+// Installs the packed `sudowall` tarball (or a given package spec) into an empty directory
 // whose path contains spaces, the way a stranger would, and checks that it works:
 // --version, init, wrap in front of a real MCP server, and the demo in --ci mode.
 //
-//   node scripts/smoke-package.mjs                 # packs release/tortoisegate first
-//   node scripts/smoke-package.mjs tortoisegate@0.1.0   # tests the published package instead
+//   node scripts/smoke-package.mjs                 # packs release/sudowall first
+//   node scripts/smoke-package.mjs sudowall@0.1.0   # tests the published package instead
 //
 // Needs network access for npm install, and Anvil (or permission to install it) for the demo.
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -31,9 +31,9 @@ const env = { ...process.env, XDG_CONFIG_HOME: home, XDG_STATE_HOME: home };
 try {
   let spec = process.argv[2];
   if (spec === undefined) {
-    const pkgDir = join(ROOT, 'release', 'tortoisegate');
+    const pkgDir = join(ROOT, 'release', 'sudowall');
     if (!existsSync(join(pkgDir, 'package.json'))) {
-      throw new Error('release/tortoisegate is missing; run node scripts/build-package.mjs first');
+      throw new Error('release/sudowall is missing; run node scripts/build-package.mjs first');
     }
     execFileSync(npm, ['pack', '--pack-destination', work], { cwd: pkgDir, stdio: 'ignore' });
     const tgz = readdirSync(work).find((f) => f.endsWith('.tgz'));
@@ -47,16 +47,16 @@ try {
     stdio: 'inherit',
     env,
   });
-  const bin = join(app, 'node_modules', '.bin', 'tortoisegate');
+  const bin = join(app, 'node_modules', '.bin', 'sudowall');
   const run = (args) => spawnSync(bin, args, { cwd: app, env, encoding: 'utf8', timeout: 300_000 });
 
-  const v = spawnSync(npm, ['exec', '--no', '--', 'tortoisegate', '--version'], {
+  const v = spawnSync(npm, ['exec', '--no', '--', 'sudowall', '--version'], {
     cwd: app,
     env,
     encoding: 'utf8',
   });
   check(
-    'npm exec tortoisegate --version',
+    'npm exec sudowall --version',
     v.status === 0 && /^\d+\.\d+\.\d+\n$/.test(v.stdout),
     v.stderr,
   );

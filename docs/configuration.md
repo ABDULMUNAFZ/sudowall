@@ -1,8 +1,8 @@
 # Configuration
 
-Tortoise Gate reads one JSON file (`--config <file>`). The schema is `ConfigSchema` in `packages/core/src/config.ts` (zod). Unknown keys are rejected, so a typo is an error, never a silently ignored setting.
+SudoWall reads one JSON file (`--config <file>`). The schema is `ConfigSchema` in `packages/core/src/config.ts` (zod). Unknown keys are rejected, so a typo is an error, never a silently ignored setting.
 
-`tortoisegate wrap [--config <file>] -- <command> [args...]` builds `upstreams` and `listen` from the command line. The file may set everything else. `tortoisegate serve --config <file>` takes everything from the file.
+`sudowall wrap [--config <file>] -- <command> [args...]` builds `upstreams` and `listen` from the command line. The file may set everything else. `sudowall serve --config <file>` takes everything from the file.
 
 ## Example
 
@@ -70,10 +70,10 @@ Secrets never go in the file. Use `{ "fromEnv": "NAME" }`; the value is read fro
 | `policy.path`                             | none                       | Policy YAML file ([policy DSL](policy-dsl.md), [templates](policy-templates.md)). Relative paths resolve against the config file's folder. A missing or invalid policy refuses start (exit 3). Without a policy, only the deny list applies                            |
 | `failure.onPolicyErrorNonSink`            | `block`                    | Verdict when the policy cannot be evaluated for a call that touches no sink. Sink calls always block on error ([ADR 0016](adr/0016-policy-engine-v1.md))                                                                                                               |
 | `approvals.timeoutSeconds`                | 120                        | How long a paused (`ask`) call waits for a decision in the local UI (5–3600). Keep it below your MCP client's tool-call timeout (Claude Code: `MCP_TOOL_TIMEOUT`, default 1e8 ms) and below `limits.requestTimeoutMs` ([ADR 0017](adr/0017-approvals-and-local-ui.md)) |
-| `approvals.onTimeout`                     | `deny`                     | `deny` answers `TG_APPROVAL_TIMEOUT`. `allow` runs calls nobody approved: avoid it                                                                                                                                                                                     |
+| `approvals.onTimeout`                     | `deny`                     | `deny` answers `SW_APPROVAL_TIMEOUT`. `allow` runs calls nobody approved: avoid it                                                                                                                                                                                     |
 | `approvals.pollIntervalMs`                | 250                        | How often the waiting gateway checks for a decision (50–5000)                                                                                                                                                                                                          |
 | `approvals.notify`                        | `true`                     | Linux desktop notification (`notify-send`) per new approval: server and tool name only                                                                                                                                                                                 |
-| `ui.port`                                 | 0                          | Port of `tortoisegate ui` on 127.0.0.1; 0 picks a free port ([UI](ui.md))                                                                                                                                                                                              |
+| `ui.port`                                 | 0                          | Port of `sudowall ui` on 127.0.0.1; 0 picks a free port ([UI](ui.md))                                                                                                                                                                                                  |
 | `redaction.ruleVersion`                   | 1                          | Version of your own rules, 0–999. Events record `1000 × built-in version + this`                                                                                                                                                                                       |
 | `redaction.rules[]`                       | `[]`                       | `{ "server": glob, "tool": glob, "target": "arguments"\|"result"\|"both", "path": JSON Pointer, "method": "removed"\|"hmac-sha256" }`. Applied before the built-in rules (`ledger-spec.md` §8)                                                                         |
 
@@ -91,14 +91,14 @@ Streamable HTTP: `{ "id", "transport": "streamable-http", "url", "headers": {} }
 
 ## State directory
 
-`$XDG_STATE_HOME/tortoisegate` (default `~/.local/state/tortoisegate`) on Linux, `~/Library/Application Support/tortoisegate` on macOS, `%LOCALAPPDATA%\tortoisegate` on Windows. It holds `ledger.db` (mode 0600, directory 0700) and `names.json` (stable tool names).
+`$XDG_STATE_HOME/sudowall` (default `~/.local/state/sudowall`) on Linux, `~/Library/Application Support/sudowall` on macOS, `%LOCALAPPDATA%\sudowall` on Windows. It holds `ledger.db` (mode 0600, directory 0700) and `names.json` (stable tool names).
 
 ## Config directory
 
-`$XDG_CONFIG_HOME/tortoisegate` (default `~/.config/tortoisegate`) on Linux, the same directory as the state on macOS, `%APPDATA%\tortoisegate` on Windows. It holds the installation keys (`ledger-signing-key.pem`, `hmac-secret.key`, both 0600). The gateway refuses key files that other users can read.
+`$XDG_CONFIG_HOME/sudowall` (default `~/.config/sudowall`) on Linux, the same directory as the state on macOS, `%APPDATA%\sudowall` on Windows. It holds the installation keys (`ledger-signing-key.pem`, `hmac-secret.key`, both 0600). The gateway refuses key files that other users can read.
 
 Arguments and results are redacted before they are stored anywhere (`ledger-spec.md` §8). Nothing is sent off the machine.
 
 ## Exit codes
 
-`0` clean exit, `1` runtime error, `2` usage error, `3` config error, `4` ledger verification failed (`tortoisegate ledger verify`).
+`0` clean exit, `1` runtime error, `2` usage error, `3` config error, `4` ledger verification failed (`sudowall ledger verify`).

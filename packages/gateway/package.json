@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/gateway",
+  "name": "@sudowall/gateway",
   "version": "0.0.0",
   "private": true,
-  "description": "Tortoise Gate MCP proxy and decision pipeline.",
+  "description": "SudoWall MCP proxy and decision pipeline.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -33,11 +33,11 @@
     "@modelcontextprotocol/server-memory": "2.0.1"
   },
   "dependencies": {
-    "@tortoisegate/core": "workspace:*",
-    "@tortoisegate/graph": "workspace:*",
-    "@tortoisegate/ledger": "workspace:*",
-    "@tortoisegate/policy": "workspace:*",
-    "@tortoisegate/provenance": "workspace:*",
+    "@sudowall/core": "workspace:*",
+    "@sudowall/graph": "workspace:*",
+    "@sudowall/ledger": "workspace:*",
+    "@sudowall/policy": "workspace:*",
+    "@sudowall/provenance": "workspace:*",
     "zod": "4.6.7"
   }
 }

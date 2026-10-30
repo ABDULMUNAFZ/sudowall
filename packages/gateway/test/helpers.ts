@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseConfig, type ConfigInput, type Event } from '@tortoisegate/core';
+import { parseConfig, type ConfigInput, type Event } from '@sudowall/core';
 import type { Channel, CloseReason, Related } from '../src/channel.js';
 import { silentLogger } from '../src/log.js';
 import { MemoryNameStore, type NameStore } from '../src/namespacing.js';

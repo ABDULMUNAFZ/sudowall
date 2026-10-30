@@ -14,7 +14,7 @@ coverage/
 *.db
 *.db-wal
 *.db-shm
-.tortoisegate/
+.sudowall/
 
 # private planning notes (not part of the open-source repo)
 planning/

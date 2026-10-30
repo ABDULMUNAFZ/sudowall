@@ -1,7 +1,7 @@
 import { createPrivateKey } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultConfigDir, defaultStateDir } from '@tortoisegate/gateway';
+import { defaultConfigDir, defaultStateDir } from '@sudowall/gateway';
 import {
   IncidentNotFound,
   TigerGraph,
@@ -14,14 +14,14 @@ import {
   sha256ValueId,
   tigerGraphConfigFromEnv,
   type ValueIdFn,
-} from '@tortoisegate/graph';
+} from '@sudowall/graph';
 import {
   HMAC_SECRET_FILE,
   SIGNING_KEY_FILE,
   deriveKey,
   openStateDb,
   rawPublicKey,
-} from '@tortoisegate/ledger';
+} from '@sudowall/ledger';
 import { UsageError } from './errors.js';
 
 export interface IncidentFlags {
@@ -42,6 +42,7 @@ function valueIdFor(keyDir: string): ValueIdFn {
   const path = join(keyDir, HMAC_SECRET_FILE);
   if (!existsSync(path)) return sha256ValueId;
   const secret = Buffer.from(readFileSync(path, 'utf8').trim(), 'hex');
+  // Fixed label (the product's former name): changing it would change every value id.
   return hmacValueId(deriveKey(secret, 'tortoisegate graph value ids v1'));
 }
 
@@ -60,13 +61,13 @@ function tigerGraph(): TigerGraph {
   const config = tigerGraphConfigFromEnv();
   if (config === undefined) {
     throw new UsageError(
-      'TigerGraph is not configured: set TG_TIGERGRAPH_HOST and TG_TIGERGRAPH_TOKEN (or TG_TIGERGRAPH_USERNAME and TG_TIGERGRAPH_PASSWORD)',
+      'TigerGraph is not configured: set SW_TIGERGRAPH_HOST and SW_TIGERGRAPH_TOKEN (or SW_TIGERGRAPH_USERNAME and SW_TIGERGRAPH_PASSWORD)',
     );
   }
   return new TigerGraph(config);
 }
 
-/** `tortoisegate incident <event id | seq>`: why a decision was made and where its values came from. */
+/** `sudowall incident <event id | seq>`: why a decision was made and where its values came from. */
 export async function incidentCommand(args: string[], flags: IncidentFlags): Promise<number> {
   const [ref, extra] = args;
   if (ref === undefined || extra !== undefined) {
@@ -106,12 +107,12 @@ export async function incidentCommand(args: string[], flags: IncidentFlags): Pro
   }
 }
 
-/** `tortoisegate graph sync`: pushes the data-flow graph to TigerGraph (opt-in). */
+/** `sudowall graph sync`: pushes the data-flow graph to TigerGraph (opt-in). */
 export async function graphCommand(
   args: string[],
   flags: { db: string | undefined; keyDir: string | undefined },
 ): Promise<number> {
-  if (args[0] !== 'sync' || args.length > 1) throw new UsageError('usage: tortoisegate graph sync');
+  if (args[0] !== 'sync' || args.length > 1) throw new UsageError('usage: sudowall graph sync');
   const p = paths(flags);
   const tg = tigerGraph();
   const db = openStateDb(p.db, { readonly: true });

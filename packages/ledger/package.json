@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/ledger",
+  "name": "@sudowall/ledger",
   "version": "0.0.0",
   "private": true,
-  "description": "Tortoise Gate event store, hash chain, signed checkpoints and verifier.",
+  "description": "SudoWall event store, hash chain, signed checkpoints and verifier.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -24,7 +24,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tortoisegate/core": "workspace:*",
+    "@sudowall/core": "workspace:*",
     "better-sqlite3": "13.0.3",
     "zod": "4.6.7"
   },

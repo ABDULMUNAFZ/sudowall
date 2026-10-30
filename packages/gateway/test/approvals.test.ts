@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { canonicalSha256, parseConfig, type Event } from '@tortoisegate/core';
-import { openStateDb, type StateDb } from '@tortoisegate/ledger';
+import { canonicalSha256, parseConfig, type Event } from '@sudowall/core';
+import { openStateDb, type StateDb } from '@sudowall/ledger';
 import { ApprovalStore, DbApprovalChannel, type ApprovalChannel } from '../src/approvals.js';
 import { silentLogger } from '../src/log.js';
 import type { DecisionPipeline } from '../src/pipeline.js';
@@ -131,7 +131,7 @@ describe('approvals', () => {
     expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('ok');
   });
 
-  it('a denied call never reaches the upstream and returns TG_APPROVAL_DENIED', async () => {
+  it('a denied call never reaches the upstream and returns SW_APPROVAL_DENIED', async () => {
     const { h, store, rec } = setup();
     await handshake(h.client);
     h.client.push(CALL(6, 'echo', '{"to":"0xabc"}'));
@@ -142,7 +142,7 @@ describe('approvals', () => {
     const res = resultOf(await h.client.response('6'));
     expect(res.isError).toBe(true);
     expect(res._meta?.[DECISION_META_KEY]).toMatchObject({
-      code: 'TG_APPROVAL_DENIED',
+      code: 'SW_APPROVAL_DENIED',
       ruleIds: ['ask-echo'],
     });
     expect(res.content[0]?.text).toContain('The user denied this action.');
@@ -202,7 +202,7 @@ describe('approvals', () => {
     ).toBe('arguments-mismatch');
     store.resolve(second?.id ?? '', 'denied', second?.argumentsSha256 ?? '', 'web-ui', Date.now());
     expect(resultOf(await h.client.response('8'))._meta?.[DECISION_META_KEY]?.code).toBe(
-      'TG_APPROVAL_DENIED',
+      'SW_APPROVAL_DENIED',
     );
     expect(forwarded(rec)).toHaveLength(1);
   });
@@ -215,7 +215,7 @@ describe('approvals', () => {
     expect((a?.expiresAt ?? 0) - (a?.createdAt ?? 0)).toBe(120_000);
     clock.skewMs = 121_000;
     const res = resultOf(await h.client.response('9'));
-    expect(res._meta?.[DECISION_META_KEY]?.code).toBe('TG_APPROVAL_TIMEOUT');
+    expect(res._meta?.[DECISION_META_KEY]?.code).toBe('SW_APPROVAL_TIMEOUT');
     expect(res.content[0]?.text).toContain('within 120 s');
     expect(forwarded(rec)).toEqual([]);
     expect(store.get(a?.id ?? '')).toMatchObject({ status: 'timed-out', channel: 'timeout' });
@@ -300,7 +300,7 @@ describe('approvals', () => {
     expect(ofType(h.events, 'approval.resolved')).toEqual([]);
   });
 
-  it('fails closed with TG_APPROVAL_UNAVAILABLE when the approval store fails', async () => {
+  it('fails closed with SW_APPROVAL_UNAVAILABLE when the approval store fails', async () => {
     const broken: ApprovalChannel = {
       request: () => Promise.reject(new Error('disk full')),
     };
@@ -308,7 +308,7 @@ describe('approvals', () => {
     await handshake(h.client);
     h.client.push(CALL(13, 'echo', '{}'));
     const res = resultOf(await h.client.response('13'));
-    expect(res._meta?.[DECISION_META_KEY]?.code).toBe('TG_APPROVAL_UNAVAILABLE');
+    expect(res._meta?.[DECISION_META_KEY]?.code).toBe('SW_APPROVAL_UNAVAILABLE');
     expect(forwarded(rec)).toEqual([]);
   });
 });

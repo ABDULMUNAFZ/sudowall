@@ -10,8 +10,8 @@ import {
   silentLogger,
   startUiServer,
   type RunningUi,
-} from '@tortoisegate/gateway';
-import { openStateDb } from '@tortoisegate/ledger';
+} from '@sudowall/gateway';
+import { openStateDb } from '@sudowall/ledger';
 import { ensureAnvil, rpc, balanceWei, startAnvil, type RunningAnvil } from './anvil.js';
 import { cliEntry, demoAssets, webUiDir } from './assets.js';
 import { DEMO_ADDRESSES as A, DEMO_EMAILS, writeDemoConfig } from './demo-config.js';
@@ -47,7 +47,7 @@ const fmtEth = (wei: bigint) => {
   return frac === '' ? `${whole} ETH` : `${whole}.${frac} ETH`;
 };
 const textOf = (r: ToolResult) => r.content.find((c) => c.type === 'text')?.text ?? '';
-const decisionOf = (r: ToolResult) => r._meta?.['tortoisegate/decision'] as Decision | undefined;
+const decisionOf = (r: ToolResult) => r._meta?.['sudowall/decision'] as Decision | undefined;
 
 function openBrowser(url: string): void {
   const [cmd, args] =
@@ -66,7 +66,7 @@ function openBrowser(url: string): void {
 }
 
 /**
- * `tortoisegate demo`: a self-contained walkthrough. A scripted agent (fixed tool calls, no LLM)
+ * `sudowall demo`: a self-contained walkthrough. A scripted agent (fixed tool calls, no LLM)
  * reads two poisoned emails through the gate and tries three testnet payments on a private local
  * chain; a human decides the paused one in the approval UI; the ledger is verified and then shown
  * to catch an edit. Every process it starts is stopped on exit or Ctrl-C.
@@ -77,7 +77,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     throw new Error(`demo payments server is not built: ${assets.evmServer} (run pnpm build)`);
   }
   const approvalTimeout = flags.approvalTimeoutSeconds ?? (flags.ci ? 60 : 300);
-  const stateDir = mkdtempSync(join(tmpdir(), 'tortoisegate-demo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'sudowall-demo-'));
   let anvil: RunningAnvil | undefined;
   let ui: RunningUi | undefined;
   let client: Client | undefined;
@@ -98,7 +98,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
   process.once('SIGTERM', onSignal);
 
   try {
-    out("Tortoise Gate demo: a firewall for AI agents. Nothing moves until it's checked.\n");
+    out("SudoWall demo: a firewall for AI agents. Nothing moves until it's checked.\n");
     const bin = ensureAnvil(assets.installFoundry, out);
     anvil = await startAnvil(bin);
     await rpc(anvil.url, 'anvil_setBalance', [A.wallet, `0x${(100n * ETH).toString(16)}`]);
@@ -119,7 +119,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     transport.stderr?.on('data', (d: Buffer) => {
       gatewayErr += d.toString();
     });
-    client = new Client({ name: 'tortoisegate-demo-agent', version: GATEWAY_VERSION });
+    client = new Client({ name: 'sudowall-demo-agent', version: GATEWAY_VERSION });
     try {
       await client.connect(transport);
     } catch (e) {
@@ -127,7 +127,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
         cause: e,
       });
     }
-    out('Started Tortoise Gate in enforce mode with the money-moving policy, in front of:');
+    out('Started SudoWall in enforce mode with the money-moving policy, in front of:');
     out('  files  the reference filesystem MCP server on the demo inbox (its output is untrusted)');
     out('  evm    a payments MCP server (get_balance, send_funds) on the local chain\n');
 
@@ -197,8 +197,8 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       // Denied, approved, or nobody answered in time (the gate then denies by default): all are
       // the gate working. Anything else, such as the payment running without a pause, is not.
       ok:
-        d1?.code === 'TG_APPROVAL_DENIED' ||
-        d1?.code === 'TG_APPROVAL_TIMEOUT' ||
+        d1?.code === 'SW_APPROVAL_DENIED' ||
+        d1?.code === 'SW_APPROVAL_TIMEOUT' ||
         r1.isError !== true,
     });
 
@@ -216,7 +216,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       step: 'pay a lookalike of a trusted address',
       expected: 'blocked',
       got: d2?.code ?? 'allowed',
-      ok: d2?.code === 'TG_BLOCKED',
+      ok: d2?.code === 'SW_BLOCKED',
     });
 
     // 3. Legitimate payment.
@@ -233,7 +233,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     // 4. The record.
     await client.close();
     client = undefined;
-    out('4. Every step is in a signed, hash-chained ledger. tortoisegate ledger verify:');
+    out('4. Every step is in a signed, hash-chained ledger. sudowall ledger verify:');
     const flagsFor = (db: string) => ({
       db,
       keyDir: files.keyDir,
@@ -274,7 +274,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
 }
 
 function firstSentence(s: string): string {
-  const t = s.replace(/^Blocked by Tortoise Gate: /, '');
+  const t = s.replace(/^Blocked by SudoWall: /, '');
   const i = t.indexOf('. ');
   return i === -1 ? t : t.slice(0, i + 1);
 }

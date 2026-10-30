@@ -1,4 +1,4 @@
-title = "tortoise-gate gitleaks config"
+title = "sudowall gitleaks config"
 
 [extend]
 useDefault = true

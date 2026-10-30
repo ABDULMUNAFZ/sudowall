@@ -6,7 +6,7 @@ import {
   type ToolCallEvent,
   type ToolResultEvent,
   type Source,
-} from '@tortoisegate/core';
+} from '@sudowall/core';
 import {
   amountHints,
   evaluatePolicy,
@@ -16,8 +16,8 @@ import {
   sinksFor,
   type CompiledPolicy,
   type PolicyStateStore,
-} from '@tortoisegate/policy';
-import type { ProvenanceEngine, Reference } from '@tortoisegate/provenance';
+} from '@sudowall/policy';
+import type { ProvenanceEngine, Reference } from '@sudowall/provenance';
 import {
   observeResult,
   type DecisionPipeline,

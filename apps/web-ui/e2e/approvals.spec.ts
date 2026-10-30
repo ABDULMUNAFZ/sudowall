@@ -17,7 +17,7 @@ const ATTACKER = '0xde709f2102306220921060314715629080e2fb77';
 const OTHER = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359';
 
 // `echo` stands in for a payment tool; its message is the recipient.
-const POLICY = `schema: tortoise-gate/policy@1
+const POLICY = `schema: sudowall/policy@1
 name: e2e
 version: 1
 lists:
@@ -82,7 +82,7 @@ async function setup(): Promise<Env> {
     let out = '';
     ui.stdout.on('data', (c: Buffer) => {
       out += c.toString();
-      const m = /Tortoise Gate UI: (\S+)/.exec(out);
+      const m = /SudoWall UI: (\S+)/.exec(out);
       if (m?.[1] !== undefined) resolve(m[1]);
     });
     ui.on('exit', (code) => {
@@ -171,7 +171,7 @@ test('a paused payment is denied in the UI and never runs', async ({ page }) => 
   await card.getByRole('button', { name: 'Deny' }).click();
   const result = await pending;
   expect(result.isError).toBe(true);
-  expect(result._meta?.['tortoisegate/decision']?.code).toBe('TG_APPROVAL_DENIED');
+  expect(result._meta?.['sudowall/decision']?.code).toBe('SW_APPROVAL_DENIED');
   await expect(page.getByTestId('feed')).toContainText('denied');
   // Explain the paused call: the panel shows the rule and the verified ledger entries.
   await page

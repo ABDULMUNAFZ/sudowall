@@ -1,6 +1,6 @@
 # Demo inbox
 
-Two emails for the Tortoise Gate demo (`docs/demo.md`). Both are fabricated for testing; the domains use the reserved `.example` TLD.
+Two emails for the SudoWall demo (`docs/demo.md`). Both are fabricated for testing; the domains use the reserved `.example` TLD.
 
 - `2026-10-28-acme-invoice.eml`: a normal invoice with a hidden instruction (white 1px text) telling an AI assistant to pay 0.005 ETH to an attacker address.
 - `2026-10-29-payout-details.eml`: an email from a lookalike domain giving a lookalike of Dana's real address (same first 4 and last 4 hex digits; address poisoning).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig } from '@tortoisegate/core';
+import { parseConfig } from '@sudowall/core';
 import { NPM_EXEC_VARIABLES, buildEnv, withoutNpxRunVariables } from '../src/env.js';
 
 const upstream = (extra: Record<string, unknown>) => {
@@ -11,16 +11,16 @@ const upstream = (extra: Record<string, unknown>) => {
   return u;
 };
 
-/** What `npx -y tortoisegate@x wrap -- ...` puts in the gateway's environment (npm 11). */
+/** What `npx -y sudowall@x wrap -- ...` puts in the gateway's environment (npm 11). */
 const NPX_ENV = {
   PATH: '/usr/bin',
   HOME: '/home/u',
   npm_command: 'exec',
-  npm_config_package: 'tortoisegate@0.2.0',
+  npm_config_package: 'sudowall@0.2.0',
   npm_config_call: '',
   npm_config_local_prefix: '/home/u/project',
   npm_lifecycle_event: 'npx',
-  npm_lifecycle_script: 'tortoisegate',
+  npm_lifecycle_script: 'sudowall',
   npm_package_json: '/home/u/project/package.json',
   npm_execpath: '/usr/lib/node_modules/npm/bin/npm-cli.js',
   npm_node_execpath: '/usr/bin/node',
@@ -66,7 +66,7 @@ describe('withoutNpxRunVariables', () => {
     const env = withoutNpxRunVariables(NPX_ENV);
     for (const k of NPM_EXEC_VARIABLES) expect(env).not.toHaveProperty(k);
     expect(env['npm_config_registry']).toBe('https://registry.example.com/');
-    expect(NPX_ENV.npm_config_package).toBe('tortoisegate@0.2.0'); // input untouched
+    expect(NPX_ENV.npm_config_package).toBe('sudowall@0.2.0'); // input untouched
     const plain = { PATH: '/usr/bin', npm_config_package: 'x' };
     expect(withoutNpxRunVariables(plain)).toEqual(plain);
   });

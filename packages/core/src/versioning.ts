@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ConfigSchema, type Config } from './config.js';
-import { TortoiseGateError, type ErrorCode } from './errors.js';
+import { SudoWallError, type ErrorCode } from './errors.js';
 import { EventSchema, type Event } from './events.js';
 import { SCHEMA_VERSION } from './primitives.js';
 
@@ -27,7 +27,7 @@ export function migrate(
 ): Record<string, unknown> {
   const head = VersionedSchema.safeParse(raw);
   if (!head.success) {
-    throw new TortoiseGateError(
+    throw new SudoWallError(
       'UNSUPPORTED_SCHEMA_VERSION',
       'document has no valid "schemaVersion" (expected a positive integer)',
     );
@@ -35,15 +35,15 @@ export function migrate(
   let doc: Record<string, unknown> = head.data;
   let version = head.data.schemaVersion;
   if (version > targetVersion) {
-    throw new TortoiseGateError(
+    throw new SudoWallError(
       'UNSUPPORTED_SCHEMA_VERSION',
-      `schemaVersion ${version} is newer than this build supports (${targetVersion}); upgrade Tortoise Gate`,
+      `schemaVersion ${version} is newer than this build supports (${targetVersion}); upgrade SudoWall`,
     );
   }
   while (version < targetVersion) {
     const step = migrations.get(version);
     if (step === undefined) {
-      throw new TortoiseGateError(
+      throw new SudoWallError(
         'UNSUPPORTED_SCHEMA_VERSION',
         `no migration from schemaVersion ${version}`,
       );
@@ -51,7 +51,7 @@ export function migrate(
     try {
       doc = { ...step(doc), schemaVersion: version + 1 };
     } catch (cause) {
-      throw new TortoiseGateError(
+      throw new SudoWallError(
         'MIGRATION_FAILED',
         `migration from schemaVersion ${version} failed`,
         { cause },
@@ -71,7 +71,7 @@ function parseWith<T>(
 ): T {
   const result = schema.safeParse(migrate(raw, migrations));
   if (!result.success) {
-    throw new TortoiseGateError(code, `invalid ${what}:\n${z.prettifyError(result.error)}`);
+    throw new SudoWallError(code, `invalid ${what}:\n${z.prettifyError(result.error)}`);
   }
   return result.data;
 }

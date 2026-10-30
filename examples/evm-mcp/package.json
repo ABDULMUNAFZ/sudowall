@@ -1,5 +1,5 @@
 {
-  "name": "@tortoisegate/example-evm-mcp",
+  "name": "@sudowall/example-evm-mcp",
   "version": "0.0.0",
   "private": true,
   "description": "Example MCP server with get_balance and send_funds on a local Anvil chain or Base Sepolia. Testnets only.",
@@ -9,7 +9,7 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "tortoisegate-evm-mcp": "./dist/index.js"
+    "sudowall-evm-mcp": "./dist/index.js"
   },
   "exports": {
     ".": {

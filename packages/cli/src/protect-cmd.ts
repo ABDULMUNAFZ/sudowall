@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { GATEWAY_VERSION, defaultConfigDir, withoutNpxRunVariables } from '@tortoisegate/gateway';
+import { GATEWAY_VERSION, defaultConfigDir, withoutNpxRunVariables } from '@sudowall/gateway';
 import { RuntimeError, UsageError } from './errors.js';
 import { writeStarterConfig } from './init-cmd.js';
 import { CLIENTS, applyPlan, planAll, type Action, type ClientId } from './protect.js';
@@ -37,14 +37,14 @@ function npmReason(stderr: string): string | undefined {
  * because writing the configs then would leave every protected server unable to start.
  *
  * Runs from an empty folder without npx's per-run variables: inside a project that already has
- * tortoisegate, npx would use that copy and fill no cache, and when `protect` itself was started
+ * sudowall, npx would use that copy and fill no cache, and when `protect` itself was started
  * by npx, the inherited `npm_config_package` would make this npx run the wrong package.
  */
 function prefetch(version: string): void {
-  const empty = mkdtempSync(join(tmpdir(), 'tortoisegate-prefetch-'));
+  const empty = mkdtempSync(join(tmpdir(), 'sudowall-prefetch-'));
   let r;
   try {
-    r = spawnSync('npx', ['-y', `tortoisegate@${version}`, '--version'], {
+    r = spawnSync('npx', ['-y', `sudowall@${version}`, '--version'], {
       cwd: empty,
       env: withoutNpxRunVariables(process.env),
       encoding: 'utf8',
@@ -57,7 +57,7 @@ function prefetch(version: string): void {
   if (r.status !== 0 || r.stdout.trim() !== version) {
     const why = r.error?.message ?? npmReason(r.stderr) ?? `exit ${String(r.status)}`;
     throw new RuntimeError(
-      `could not download tortoisegate@${version} (${why}); nothing was changed. Run the command again, or use --offline if this version is already in the npx cache.`,
+      `could not download sudowall@${version} (${why}); nothing was changed. Run the command again, or use --offline if this version is already in the npx cache.`,
     );
   }
 }
@@ -97,7 +97,7 @@ function clientsFrom(flag: string | undefined): ClientId[] {
 }
 
 /**
- * `tortoisegate protect | unprotect | status`. Without --apply nothing is written: the command
+ * `sudowall protect | unprotect | status`. Without --apply nothing is written: the command
  * shows what it would change. With --apply each changed file is backed up next to itself first.
  */
 export function protectCommand(
@@ -141,7 +141,7 @@ export function protectCommand(
     out(
       `${String(n('already'))} protected, ${String(n('wrap'))} not protected, ${String(n('remote'))} remote (not covered yet).`,
     );
-    if (n('wrap') > 0) out('Run `tortoisegate protect` to see the change, then add --apply.');
+    if (n('wrap') > 0) out('Run `sudowall protect` to see the change, then add --apply.');
     return 0;
   }
 
@@ -165,9 +165,7 @@ export function protectCommand(
   }
 
   if (mode === 'protect' && flags.offline !== true) {
-    out(
-      `Downloading tortoisegate@${GATEWAY_VERSION} so protected servers start without waiting...`,
-    );
+    out(`Downloading sudowall@${GATEWAY_VERSION} so protected servers start without waiting...`);
     prefetch(GATEWAY_VERSION);
   }
   if (mode === 'protect' && !existsSync(config)) {
@@ -184,11 +182,11 @@ export function protectCommand(
   );
   if (mode === 'protect') {
     out('Then watch decisions and answer approvals:');
-    out(`  npx -y tortoisegate ui --config ${q(config)}`);
+    out(`  npx -y sudowall ui --config ${q(config)}`);
     out(
       `The gate starts in observe mode. To block and pause, set "mode": "enforce" in ${q(config)}.`,
     );
-    out('Undo at any time: npx -y tortoisegate unprotect --apply');
+    out('Undo at any time: npx -y sudowall unprotect --apply');
   }
   return 0;
 }

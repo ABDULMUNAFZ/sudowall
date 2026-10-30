@@ -1,6 +1,26 @@
 # Changelog
 
-All notable changes to Tortoise Gate. Versions follow [semantic versioning](https://semver.org/).
+All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
+
+## 0.3.0 (2026-10-30)
+
+Tortoise Gate is now **SudoWall**. Same product, new name.
+
+### Changed (breaking)
+
+- The npm package and the command are now `sudowall` (were `tortoisegate`): `npx sudowall demo`, `npx sudowall protect`.
+- Config and state live in a `sudowall` directory. When only the old `tortoisegate` directory exists, it is used in place, so existing keys, ledgers, approvals and configs keep working without a move.
+- Error codes and environment variables use the `SW_` prefix (was `TG_`): `SW_BLOCKED`, `SW_APPROVAL_DENIED`, `SW_APPROVAL_TIMEOUT`, `SW_APPROVAL_UNAVAILABLE`, `SW_LEDGER_UNAVAILABLE`, `SW_EVM_RPC_URL`, `SW_EVM_PRIVATE_KEY`, `SW_EVM_ANVIL_URL` and `SW_TIGERGRAPH_*`. The `_meta` key on blocked results is `sudowall/decision` (was `tortoisegate/decision`).
+- The default TigerGraph graph is `SudoWall` (was `TortoiseGate`). Set `SW_TIGERGRAPH_GRAPH=TortoiseGate` to keep using a graph you already synced.
+- The gateway introduces itself to MCP clients and servers as `sudowall`.
+
+### Still compatible
+
+- Policy files with `schema: tortoise-gate/policy@1` still load. New files use `sudowall/policy@1`.
+- `status` and `unprotect` recognise servers that `tortoisegate protect` wrapped.
+- Ledgers written before the rename verify unchanged. Key-derivation labels are fixed and keep the old name.
+
+0.2.0 was released on GitHub only, as `tortoisegate`; it was never on npm.
 
 ## 0.2.0 (2026-10-30)
 

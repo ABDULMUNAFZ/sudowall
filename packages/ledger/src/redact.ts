@@ -6,7 +6,7 @@ import {
   type Event,
   type JsonValue,
   type ToolResultEvent,
-} from '@tortoisegate/core';
+} from '@sudowall/core';
 
 /**
  * Built-in redaction rules, applied before anything is hashed or stored (ledger-spec §8).

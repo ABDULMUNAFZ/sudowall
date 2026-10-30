@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/policy",
+  "name": "@sudowall/policy",
   "version": "0.0.0",
   "private": true,
-  "description": "Tortoise Gate policy DSL, evaluator, templates and explanations.",
+  "description": "SudoWall policy DSL, evaluator, templates and explanations.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -25,9 +25,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tortoisegate/core": "workspace:*",
-    "@tortoisegate/ledger": "workspace:*",
-    "@tortoisegate/provenance": "workspace:*",
+    "@sudowall/core": "workspace:*",
+    "@sudowall/ledger": "workspace:*",
+    "@sudowall/provenance": "workspace:*",
     "yaml": "2.9.1",
     "zod": "4.6.7"
   },

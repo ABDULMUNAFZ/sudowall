@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { tgjson } from '@tortoisegate/core';
+import { tgjson } from '@sudowall/core';
 
 export const SPEC = 'tg-ledger/1';
 export const ZERO_HASH = '0'.repeat(64);

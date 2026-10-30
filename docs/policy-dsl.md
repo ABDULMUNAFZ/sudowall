@@ -1,4 +1,4 @@
-# Policy DSL (`tortoise-gate/policy@1`)
+# Policy DSL (`sudowall/policy@1`)
 
 A policy is one YAML file. It decides `allow`, `ask` or `block` for each tool call, using the call's metadata, its argument values, the provenance report and persistent policy state.
 
@@ -17,7 +17,7 @@ YAML is parsed strictly: YAML 1.2 core schema, unique keys, no merge keys, no al
 ## 2. Top-level structure
 
 ```yaml
-schema: tortoise-gate/policy@1 # required, exact
+schema: sudowall/policy@1 # required, exact
 name: money-moving # required
 version: 3 # required integer >= 1; bump on every change
 defaults:
@@ -135,7 +135,7 @@ Evidence is reported only for conditions that are not under a `not`.
 The shipped template is `packages/policy/templates/money-moving.yaml` (`policy-templates.md`). The example below shows the full DSL, including deferred features (`unit: { path }`, `window_total_gt`), so it does not load today.
 
 ```yaml
-schema: tortoise-gate/policy@1
+schema: sudowall/policy@1
 name: money-moving
 version: 1
 defaults: { sink: ask, other: allow }

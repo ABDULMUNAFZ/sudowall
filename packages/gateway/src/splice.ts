@@ -1,4 +1,4 @@
-import { parseLossless, rawGet, type RawNode } from '@tortoisegate/core';
+import { parseLossless, rawGet, type RawNode } from '@sudowall/core';
 
 export interface Edit {
   start: number;

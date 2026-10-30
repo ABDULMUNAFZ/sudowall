@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openStateDb } from '@tortoisegate/ledger';
-import { ProvenanceEngine, evmChecksum } from '@tortoisegate/provenance';
+import { openStateDb } from '@sudowall/ledger';
+import { ProvenanceEngine, evmChecksum } from '@sudowall/provenance';
 import { describe, expect, it } from 'vitest';
 import {
   amountHints,

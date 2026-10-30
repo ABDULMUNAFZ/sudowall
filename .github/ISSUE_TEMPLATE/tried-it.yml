@@ -1,18 +1,18 @@
-name: I tried Tortoise Gate
+name: I tried SudoWall
 description: Tell us how it went. Every answer helps, short ones too.
 title: 'Tried it: '
 labels: ['feedback']
 body:
   - type: markdown
     attributes:
-      value: Thanks for trying Tortoise Gate. Please do not paste secrets, keys or private data.
+      value: Thanks for trying SudoWall. Please do not paste secrets, keys or private data.
   - type: dropdown
     id: what
     attributes:
       label: What did you run?
       options:
-        - npx tortoisegate demo
-        - tortoisegate wrap in front of my own MCP server
+        - npx sudowall demo
+        - sudowall wrap in front of my own MCP server
         - Both
         - Something else
     validations:

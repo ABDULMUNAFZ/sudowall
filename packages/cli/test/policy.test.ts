@@ -7,9 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { existsSync } from 'node:fs';
-import { ApprovalStore } from '@tortoisegate/gateway';
-import { openStateDb } from '@tortoisegate/ledger';
-import { parsePolicyYaml } from '@tortoisegate/policy';
+import { ApprovalStore } from '@sudowall/gateway';
+import { openStateDb } from '@sudowall/ledger';
+import { parsePolicyYaml } from '@sudowall/policy';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const pkg = (name: string) =>
@@ -23,7 +23,7 @@ const LOOKALIKE = `0x5aae${'1'.repeat(32)}eaed`;
 
 // The echo tool stands in for a payment tool here: its message is the "recipient". The real
 // money-moving template runs against a real EVM server in the end-to-end test.
-const POLICY = `schema: tortoise-gate/policy@1
+const POLICY = `schema: sudowall/policy@1
 name: cli-test
 version: 1
 lists:
@@ -66,7 +66,7 @@ rules:
 `;
 
 function events(home: string): Record<string, unknown>[] {
-  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  const db = openStateDb(join(home, 'sudowall', 'ledger.db'), { readonly: true });
   try {
     return (
       db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {
@@ -96,7 +96,7 @@ function setup() {
 
 /** Denies every pending approval, as a person would in the UI, until stopped. */
 function denyApprovals(home: string): () => void {
-  const path = join(home, 'tortoisegate', 'ledger.db');
+  const path = join(home, 'sudowall', 'ledger.db');
   const timer = setInterval(() => {
     if (!existsSync(path)) return;
     const db = openStateDb(path);
@@ -145,7 +145,7 @@ async function call(
 }
 
 const everything = [pkg('server-everything'), 'stdio'];
-const decisionOf = (r: Awaited<ReturnType<typeof call>>) => r._meta?.['tortoisegate/decision'];
+const decisionOf = (r: Awaited<ReturnType<typeof call>>) => r._meta?.['sudowall/decision'];
 
 describe('policy enforcement through the gateway', () => {
   it('asks for an injected recipient, blocks a lookalike, allows an allowlisted one', async () => {
@@ -158,7 +158,7 @@ describe('policy enforcement through the gateway', () => {
     expect(injected.isError).toBe(true);
     // The helper denies it in the approval store, as the user would in the UI.
     expect(decisionOf(injected)).toMatchObject({
-      code: 'TG_APPROVAL_DENIED',
+      code: 'SW_APPROVAL_DENIED',
       ruleIds: ['ask-untrusted', 'ask-first-seen'],
     });
     expect(injected.content[0]?.text).toContain(
@@ -166,7 +166,7 @@ describe('policy enforcement through the gateway', () => {
     );
 
     const lookalike = await call(home, cfg, everything, 'echo', { message: LOOKALIKE });
-    expect(decisionOf(lookalike)).toMatchObject({ code: 'TG_BLOCKED' });
+    expect(decisionOf(lookalike)).toMatchObject({ code: 'SW_BLOCKED' });
     expect(decisionOf(lookalike)?.ruleIds).toContain('block-lookalike');
     expect(lookalike.content[0]?.text).toContain('resembles a value from list `trusted`');
 
@@ -219,7 +219,7 @@ describe('policy enforcement through the gateway', () => {
     const friend = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359';
     const first = await call(home, cfg, everything, 'echo', { message: friend });
     expect(decisionOf(first)).toMatchObject({
-      code: 'TG_APPROVAL_DENIED',
+      code: 'SW_APPROVAL_DENIED',
       ruleIds: ['ask-first-seen'],
     });
     // Denied, so not executed and still first seen.

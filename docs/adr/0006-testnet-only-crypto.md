@@ -8,7 +8,7 @@ The demo needs a real `send_funds` tool. A bug in the gate or the demo server mu
 
 ## Decision
 
-Money-moving code (the `examples/evm-testnet-mcp` server) runs only on Base Sepolia (chain ID 84532). Mainnet chain IDs are refused in code, with a test. The testnet key comes from an environment variable and is never logged. Tortoise Gate never holds keys for user wallets.
+Money-moving code (the `examples/evm-testnet-mcp` server) runs only on Base Sepolia (chain ID 84532). Mainnet chain IDs are refused in code, with a test. The testnet key comes from an environment variable and is never logged. SudoWall never holds keys for user wallets.
 
 ## Consequences
 

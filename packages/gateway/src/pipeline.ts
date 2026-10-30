@@ -10,8 +10,8 @@ import {
   type Source,
   type ToolCallEvent,
   type ToolResultEvent,
-} from '@tortoisegate/core';
-import type { ProvenanceEngine } from '@tortoisegate/provenance';
+} from '@sudowall/core';
+import type { ProvenanceEngine } from '@sudowall/provenance';
 
 export { globMatch };
 

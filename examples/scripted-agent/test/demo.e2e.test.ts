@@ -1,5 +1,5 @@
 // End-to-end demo with a SCRIPTED AGENT: a fixed, deterministic sequence of MCP tool calls
-// (no LLM). It drives the real `tortoisegate serve` gateway over stdio, with the real reference
+// (no LLM). It drives the real `sudowall serve` gateway over stdio, with the real reference
 // filesystem server on demo/inbox and the real EVM payments server on a fresh local Anvil chain.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, realpathSync } from 'node:fs';
@@ -9,8 +9,8 @@ import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { ApprovalStore, type ApprovalRow } from '@tortoisegate/gateway';
-import { openStateDb } from '@tortoisegate/ledger';
+import { ApprovalStore, type ApprovalRow } from '@sudowall/gateway';
+import { openStateDb } from '@sudowall/ledger';
 import { createPublicClient, formatEther, http, type Hash } from 'viem';
 import { foundry } from 'viem/chains';
 import { createServer } from 'node:net';
@@ -77,7 +77,7 @@ async function startAnvil(): Promise<{ url: string; proc: ChildProcess }> {
   throw new Error('anvil did not start');
 }
 
-const decisionOf = (r: ToolResult) => r._meta?.['tortoisegate/decision'];
+const decisionOf = (r: ToolResult) => r._meta?.['sudowall/decision'];
 
 function verify(files: DemoFiles): { code: number; stdout: string } {
   try {
@@ -172,7 +172,7 @@ describe('demo: scripted agent (deterministic tool calls, no LLM) through the ga
     }
     const result = await pending;
     expect(result.isError).toBe(true);
-    expect(decisionOf(result)?.code).toBe('TG_APPROVAL_DENIED');
+    expect(decisionOf(result)?.code).toBe('SW_APPROVAL_DENIED');
     expect(await balance(ADDRESSES.attacker)).toBe(before);
   });
 
@@ -182,7 +182,7 @@ describe('demo: scripted agent (deterministic tool calls, no LLM) through the ga
     const before = await balance(ADDRESSES.lookalike);
     const result = await call('send_funds', { to: ADDRESSES.lookalike, amount: '0.005' });
     expect(result.isError).toBe(true);
-    expect(decisionOf(result)?.code).toBe('TG_BLOCKED');
+    expect(decisionOf(result)?.code).toBe('SW_BLOCKED');
     expect(decisionOf(result)?.ruleIds).toContain('block-lookalike-recipient');
     expect(await balance(ADDRESSES.lookalike)).toBe(before);
   });

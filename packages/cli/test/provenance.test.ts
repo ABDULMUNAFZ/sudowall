@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { openStateDb } from '@tortoisegate/ledger';
+import { openStateDb } from '@sudowall/ledger';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const pkg = (name: string) =>
@@ -15,7 +15,7 @@ const pkg = (name: string) =>
 const ATTACKER = '0xde709f2102306220921060314715629080e2fb77';
 
 function events(home: string): Record<string, unknown>[] {
-  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  const db = openStateDb(join(home, 'sudowall', 'ledger.db'), { readonly: true });
   try {
     return (
       db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {

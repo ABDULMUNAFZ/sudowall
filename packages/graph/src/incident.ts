@@ -1,4 +1,4 @@
-import { verifyDatabase, type StateDb } from '@tortoisegate/ledger';
+import { verifyDatabase, type StateDb } from '@sudowall/ledger';
 import { LocalGraph, type GraphBackend, type Subgraph } from './local.js';
 import { deltaFor, type Edge, type ValueIdFn, type Vertex } from './model.js';
 

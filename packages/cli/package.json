@@ -1,8 +1,8 @@
 {
-  "name": "tortoisegate",
-  "version": "0.2.0",
+  "name": "sudowall",
+  "version": "0.3.0",
   "private": true,
-  "description": "Tortoise Gate: open-source firewall for AI agents. Nothing moves until it's checked.",
+  "description": "SudoWall: open-source firewall for AI agents. Nothing moves until it's checked.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -32,15 +32,15 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/server-filesystem": "2.1.0",
-    "@tortoisegate/core": "workspace:*",
-    "@tortoisegate/gateway": "workspace:*",
-    "@tortoisegate/graph": "workspace:*",
-    "@tortoisegate/ledger": "workspace:*",
-    "@tortoisegate/policy": "workspace:*",
-    "@tortoisegate/web-ui": "workspace:*"
+    "@sudowall/core": "workspace:*",
+    "@sudowall/gateway": "workspace:*",
+    "@sudowall/graph": "workspace:*",
+    "@sudowall/ledger": "workspace:*",
+    "@sudowall/policy": "workspace:*",
+    "@sudowall/web-ui": "workspace:*"
   },
   "bin": {
-    "tortoisegate": "./dist/main.js"
+    "sudowall": "./dist/main.js"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

@@ -1,5 +1,5 @@
 import { verify as edVerify } from 'node:crypto';
-import { EventSchema, parseLossless, tgjson } from '@tortoisegate/core';
+import { EventSchema, parseLossless, tgjson } from '@sudowall/core';
 import { z } from 'zod';
 import type { StateDb } from './db.js';
 import {

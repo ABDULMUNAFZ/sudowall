@@ -4,7 +4,7 @@ import {
   type DecisionAction,
   type JsonObject,
   type ProvenanceReport,
-} from '@tortoisegate/core';
+} from '@sudowall/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { compilePolicy, evaluatePolicy, normalizeKind, type CallInput } from '../src/index.js';

@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/core",
+  "name": "@sudowall/core",
   "version": "0.0.0",
   "private": true,
-  "description": "Tortoise Gate shared types, event schema, errors and config.",
+  "description": "SudoWall shared types, event schema, errors and config.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

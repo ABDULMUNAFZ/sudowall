@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Latency added by Tortoise Gate per tool call.
+// Latency added by SudoWall per tool call.
 //
 // Runs the same sequential tools/call loop against the reference `everything` server in one
-// process: directly, then through `tortoisegate wrap` (observe, enforce with the deny list, and
+// process: directly, then through `sudowall wrap` (observe, enforce with the deny list, and
 // enforce with a money-moving style policy that treats `echo` as a payment sink). The gate is on
 // the overhead relative to the direct run on the same machine, so it holds on fast and slow
 // runners alike.
@@ -37,7 +37,7 @@ const EVERYTHING = fileURLToPath(
 );
 
 const TRUSTED = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
-const POLICY = `schema: tortoise-gate/policy@1
+const POLICY = `schema: sudowall/policy@1
 name: bench
 version: 1
 lists:

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// End-to-end: a real gateway process holds an `ask` call while a real `tortoisegate ui` process
+// End-to-end: a real gateway process holds an `ask` call while a real `sudowall ui` process
 // serves this app; the test approves or denies in the browser. Needs `pnpm build` first.
 export default defineConfig({
   testDir: './e2e',

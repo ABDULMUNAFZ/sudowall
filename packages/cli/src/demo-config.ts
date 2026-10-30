@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parsePolicyYaml } from '@tortoisegate/policy';
+import { parsePolicyYaml } from '@sudowall/policy';
 import type { DemoAssets } from './assets.js';
 
 export { demoAssets, type DemoAssets } from './assets.js';
@@ -28,7 +28,7 @@ export interface DemoOptions {
   stateDir: string;
   /** Local Anvil RPC URL; ignored with `baseSepolia`. */
   anvilUrl: string;
-  /** Use Base Sepolia: the evm server reads TG_EVM_RPC_URL and TG_EVM_PRIVATE_KEY from the env. */
+  /** Use Base Sepolia: the evm server reads SW_EVM_RPC_URL and SW_EVM_PRIVATE_KEY from the env. */
   baseSepolia?: boolean;
   approvalTimeoutSeconds?: number;
   assets: DemoAssets;
@@ -70,10 +70,10 @@ export function writeDemoConfig(o: DemoOptions): DemoFiles {
   writeFileSync(policyPath, demoPolicy(o.assets.template));
   const evmEnv = o.baseSepolia
     ? {
-        TG_EVM_RPC_URL: { fromEnv: 'TG_EVM_RPC_URL' },
-        TG_EVM_PRIVATE_KEY: { fromEnv: 'TG_EVM_PRIVATE_KEY' },
+        SW_EVM_RPC_URL: { fromEnv: 'SW_EVM_RPC_URL' },
+        SW_EVM_PRIVATE_KEY: { fromEnv: 'SW_EVM_PRIVATE_KEY' },
       }
-    : { TG_EVM_ANVIL_URL: o.anvilUrl };
+    : { SW_EVM_ANVIL_URL: o.anvilUrl };
   const config = {
     schemaVersion: 1,
     mode: 'enforce',

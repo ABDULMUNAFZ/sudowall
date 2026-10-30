@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultConfigDir } from '@tortoisegate/gateway';
+import { defaultConfigDir } from '@sudowall/gateway';
 import { templateNames, templatesDir } from './assets.js';
 import { UsageError } from './errors.js';
 
@@ -36,7 +36,7 @@ export function writeStarterConfig(
 }
 
 /**
- * `tortoisegate init`: writes a starter config (observe mode) and a copy of a policy template.
+ * `sudowall init`: writes a starter config (observe mode) and a copy of a policy template.
  * Existing files are left alone unless --force is given.
  */
 export function initCommand(flags: InitFlags): number {
@@ -61,17 +61,15 @@ export function initCommand(flags: InitFlags): number {
   out('');
   out('Next steps:');
   out('1. Put your MCP servers (Claude Code, Claude Desktop, Cursor) behind the gate:');
-  out(
-    `   npx -y tortoisegate protect --config ${q(configPath)}          # shows what would change`,
-  );
-  out(`   npx -y tortoisegate protect --config ${q(configPath)} --apply  # backs up, then changes`);
+  out(`   npx -y sudowall protect --config ${q(configPath)}          # shows what would change`);
+  out(`   npx -y sudowall protect --config ${q(configPath)} --apply  # backs up, then changes`);
   out('   Or wrap one server by hand:');
   out(
-    `   claude mcp add my-server -- npx -y tortoisegate wrap --config ${q(configPath)} -- <server command>`,
+    `   claude mcp add my-server -- npx -y sudowall wrap --config ${q(configPath)} -- <server command>`,
   );
   out('2. Watch decisions and answer approvals in the local UI:');
-  out(`   npx -y tortoisegate ui --config ${q(configPath)}`);
+  out(`   npx -y sudowall ui --config ${q(configPath)}`);
   out(`3. When the decisions look right, set "mode": "enforce" in ${q(configPath)}.`);
-  out('4. Check the record at any time: npx -y tortoisegate ledger verify');
+  out('4. Check the record at any time: npx -y sudowall ledger verify');
   return 0;
 }

@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
-// Served by `tortoisegate ui` on 127.0.0.1 under a strict CSP: one script and one stylesheet from
+// Served by `sudowall ui` on 127.0.0.1 under a strict CSP: one script and one stylesheet from
 // the same origin, no inline code, no external requests.
 export default defineConfig({
   base: './',

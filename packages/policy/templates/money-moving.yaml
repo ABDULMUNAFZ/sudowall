@@ -1,4 +1,4 @@
-# Tortoise Gate policy template: an agent that can move money (EVM `send_funds`).
+# SudoWall policy template: an agent that can move money (EVM `send_funds`).
 # Documented in docs/policy-templates.md. Copy it, then fill in the lists.
 #
 # Verdict per case (most restrictive matching rule wins):
@@ -9,7 +9,7 @@
 #   amount above the per-call limit (0.01 ETH) ............ ask
 #   allowlisted recipient within the limit ................ allow
 #   any other send_funds call (no rule matched) ........... ask (defaults.sink)
-schema: tortoise-gate/policy@1
+schema: sudowall/policy@1
 name: money-moving
 version: 1
 defaults:

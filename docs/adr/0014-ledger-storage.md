@@ -14,11 +14,11 @@ Step A implements `ledger-spec.md`. Three choices were open:
 
 1. **Default durability is `process-crash`:** SQLite WAL with `synchronous = NORMAL`. A committed entry survives the gateway being killed (`kill -9`, tested). An OS crash or power failure can lose the most recent entries; the database is never corrupted. `ledger.durability: "power-loss"` selects `synchronous = FULL` for users who accept the latency. This amends ADR 0003.
 2. **One state database per user**, `<stateDir>/ledger.db`, shared by every gateway process. Each append is an IMMEDIATE transaction that reads the last entry and inserts the next, so SQLite's write lock serialises the chain (4 concurrent processes are tested). Checkpoints are written inside the same transaction when due. Each component (ledger, provenance, approvals, policy state) versions its own tables in `tg_schema`. SQL triggers refuse UPDATE and DELETE on ledger tables.
-3. **Installation keys** live in the config directory (`$XDG_CONFIG_HOME/tortoisegate`), not next to the database: `ledger-signing-key.pem` (Ed25519, PKCS#8) and `hmac-secret.key` (32 bytes), both `0600`. Files are created atomically (temp file + hard link), so racing processes agree on one key. Files readable by other users are refused. The redaction HMAC key and the provenance-index key are derived from the secret with HKDF-SHA256.
+3. **Installation keys** live in the config directory (`$XDG_CONFIG_HOME/sudowall`), not next to the database: `ledger-signing-key.pem` (Ed25519, PKCS#8) and `hmac-secret.key` (32 bytes), both `0600`. Files are created atomically (temp file + hard link), so racing processes agree on one key. Files readable by other users are refused. The redaction HMAC key and the provenance-index key are derived from the secret with HKDF-SHA256.
 4. **Recorded `ruleVersion` = 1000 × built-in version + user `ruleVersion`** (user value 0–999). Built-in rules are version 1, so the default is 1001.
 5. **`tool.result` gains a `redaction` field**, like `tool.call`. Paths are relative to `result`, or to `error` for a protocol error.
 6. **The ledger is the default event sink.** `events.jsonl` is written only when configured, and it receives the same redacted events.
-7. If the ledger cannot be opened or written, every write fails. Enforce mode blocks the call with `TG_LEDGER_UNAVAILABLE`; observe mode allows it and logs `EVENT SINK FAILED` (Phase 1 decision).
+7. If the ledger cannot be opened or written, every write fails. Enforce mode blocks the call with `SW_LEDGER_UNAVAILABLE`; observe mode allows it and logs `EVENT SINK FAILED` (Phase 1 decision).
 
 ## Consequences
 

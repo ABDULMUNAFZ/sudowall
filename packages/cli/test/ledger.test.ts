@@ -65,7 +65,7 @@ describe('ledger commands', () => {
     );
     expect(ok.code).toBe(0);
 
-    const db = new Database(join(home, 'tortoisegate', 'ledger.db'));
+    const db = new Database(join(home, 'sudowall', 'ledger.db'));
     db.exec('DROP TRIGGER ledger_entries_no_update');
     db.prepare(
       "UPDATE ledger_entries SET event_json = replace(event_json, 'Echo', 'Ecko') WHERE type = 'tool.result'",
@@ -122,7 +122,7 @@ describe('redaction never leaks', () => {
     const { stderr, results } = await session(home);
     // The upstream really received and echoed the secret: redaction only applies to storage.
     expect(JSON.stringify(results[0])).toContain(SECRET);
-    const dir = join(home, 'tortoisegate');
+    const dir = join(home, 'sudowall');
     const exp = cli(home, ['ledger', 'export']).stdout;
     const files = ['ledger.db', 'ledger.db-wal', 'ledger.db-shm']
       .map((f) => join(dir, f))
@@ -147,11 +147,11 @@ describe('ledger unavailable', () => {
     return session(home, ['--mode', mode, '--config', cfg]);
   }
 
-  it('enforce mode blocks every call with TG_LEDGER_UNAVAILABLE', async () => {
+  it('enforce mode blocks every call with SW_LEDGER_UNAVAILABLE', async () => {
     const { results, stderr } = await mismatched('enforce');
     expect(results[0]).toMatchObject({
       isError: true,
-      _meta: { 'tortoisegate/decision': { code: 'TG_LEDGER_UNAVAILABLE' } },
+      _meta: { 'sudowall/decision': { code: 'SW_LEDGER_UNAVAILABLE' } },
     });
     expect(stderr).toMatch(/EVENT SINK FAILED/);
   });

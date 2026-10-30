@@ -9,56 +9,56 @@ import { ledgerCommand } from './ledger-cmd.js';
 import { uiCommand } from './ui-cmd.js';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { TortoiseGateError, parseConfig } from '@tortoisegate/core';
+import { SudoWallError, parseConfig } from '@sudowall/core';
 import {
   GATEWAY_VERSION,
   MissingEnvError,
   createLogger,
   runGateway,
   type LogLevel,
-} from '@tortoisegate/gateway';
+} from '@sudowall/gateway';
 
 export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3, verifyFailed: 4 } as const;
 
-const USAGE = `Tortoise Gate ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
+const USAGE = `SudoWall ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
 Usage:
-  tortoisegate demo [--ci] [--keep] [--no-open] [--approval-timeout <s>]
+  sudowall demo [--ci] [--keep] [--no-open] [--approval-timeout <s>]
       Two-minute walkthrough on a private local test chain: a scripted agent (no LLM) reads
       poisoned emails and tries three payments; you decide the paused one in the approval UI;
       the ledger is verified, then shown catching an edit. Installs the pinned Anvil if missing.
-  tortoisegate init [--template <name>] [--dir <dir>] [--force]
+  sudowall init [--template <name>] [--dir <dir>] [--force]
       Write a starter config (observe mode) and a policy template to your config directory.
-  tortoisegate protect [--client <name>] [--project <dir>] [--config <file>] [--apply] [--offline]
+  sudowall protect [--client <name>] [--project <dir>] [--config <file>] [--apply] [--offline]
       Put the gate in front of the MCP servers configured in Claude Code, Claude Desktop and
       Cursor. Without --apply it only shows what it would change; with --apply it backs each
       file up first. Clients: claude-code, claude-desktop, cursor, all (default).
-  tortoisegate unprotect [--client <name>] [--project <dir>] [--apply]
+  sudowall unprotect [--client <name>] [--project <dir>] [--apply]
       Restore the original server entries.
-  tortoisegate status [--client <name>] [--project <dir>]
+  sudowall status [--client <name>] [--project <dir>]
       Show which MCP servers run through the gate.
-  tortoisegate wrap [--config <file>] [--mode observe|enforce] -- <command> [args...]
+  sudowall wrap [--config <file>] [--mode observe|enforce] -- <command> [args...]
       Run one stdio MCP server behind the gate. Put this in your MCP client's config in place
       of the server command. Speaks MCP on stdin/stdout; logs go to stderr.
-  tortoisegate serve --config <file>
+  sudowall serve --config <file>
       Run the gateway as configured (one or more upstreams; stdio or HTTP on 127.0.0.1).
-  tortoisegate ledger verify [--db <file>] [--key-dir <dir> | --public-key <base64url>]
+  sudowall ledger verify [--db <file>] [--key-dir <dir> | --public-key <base64url>]
       Check the hash chain and signed checkpoints. Prints OK, or the first bad entry and why.
-  tortoisegate ledger inspect <seq | event id> [--db <file>]
-  tortoisegate ledger export [--db <file>] [--out <file>]
+  sudowall ledger inspect <seq | event id> [--db <file>]
+  sudowall ledger export [--db <file>] [--out <file>]
       Write the ledger as JSON Lines (docs/ledger-spec.md section 6).
-  tortoisegate ledger key show [--key-dir <dir>]
-  tortoisegate incident <event id | seq> [--format text|markdown|json] [--tigergraph] [--db <file>]
+  sudowall ledger key show [--key-dir <dir>]
+  sudowall incident <event id | seq> [--format text|markdown|json] [--tigergraph] [--db <file>]
       Explain one decision: the rule, and where each value in the call came from (which tool
       result, read by which earlier call), with proof that the ledger entries verify.
-  tortoisegate graph sync [--db <file>]
-      Push the data-flow graph to TigerGraph (TG_TIGERGRAPH_HOST, TG_TIGERGRAPH_TOKEN or
-      TG_TIGERGRAPH_USERNAME/TG_TIGERGRAPH_PASSWORD). Sends ids, verdicts and keyed hashes only.
-  tortoisegate ui [--config <file>] [--port <n>] [--db <file>] [--key-dir <dir>]
+  sudowall graph sync [--db <file>]
+      Push the data-flow graph to TigerGraph (SW_TIGERGRAPH_HOST, SW_TIGERGRAPH_TOKEN or
+      SW_TIGERGRAPH_USERNAME/SW_TIGERGRAPH_PASSWORD). Sends ids, verdicts and keyed hashes only.
+  sudowall ui [--config <file>] [--port <n>] [--db <file>] [--key-dir <dir>]
       Serve the local web UI on 127.0.0.1: live decisions, approvals, ledger Verify.
       Prints the address to open; it contains this run's access token.
-  tortoisegate --version
-  tortoisegate --help
+  sudowall --version
+  sudowall --help
 
 Options:
   --config <file>     JSON config file (see docs/configuration.md)
@@ -92,7 +92,7 @@ function readConfigFile(path: string): unknown {
   try {
     text = readFileSync(path, 'utf8');
   } catch (e) {
-    throw new TortoiseGateError(
+    throw new SudoWallError(
       'INVALID_CONFIG',
       `cannot read config file ${path}: ${(e as Error).message}`,
     );
@@ -100,7 +100,7 @@ function readConfigFile(path: string): unknown {
   try {
     return JSON.parse(text) as unknown;
   } catch (e) {
-    throw new TortoiseGateError(
+    throw new SudoWallError(
       'INVALID_CONFIG',
       `config file ${path} is not valid JSON: ${(e as Error).message}`,
     );
@@ -217,7 +217,7 @@ export async function main(argv: string[]): Promise<number> {
   if (values.mode !== undefined && values.mode !== 'observe' && values.mode !== 'enforce') {
     throw new UsageError(`--mode must be observe or enforce, not "${values.mode}"`);
   }
-  const log = createLogger({ level, base: { component: 'tortoisegate' } });
+  const log = createLogger({ level, base: { component: 'sudowall' } });
   if (command === 'ledger') {
     return ledgerCommand(positionals.slice(1), {
       db: values.db,
@@ -298,7 +298,7 @@ export async function main(argv: string[]): Promise<number> {
       throw new UsageError(`unexpected argument "${String(positionals[1])}" before --`);
     const base = values.config === undefined ? {} : readConfigFile(values.config);
     if (base === null || typeof base !== 'object' || Array.isArray(base)) {
-      throw new TortoiseGateError('INVALID_CONFIG', 'config must be a JSON object');
+      throw new SudoWallError('INVALID_CONFIG', 'config must be a JSON object');
     }
     const [cmd, ...args] = tail;
     raw = {
@@ -316,7 +316,7 @@ export async function main(argv: string[]): Promise<number> {
       throw new UsageError('serve takes no command; list upstreams in the config file');
     const c = readConfigFile(values.config);
     if (c === null || typeof c !== 'object' || Array.isArray(c)) {
-      throw new TortoiseGateError('INVALID_CONFIG', 'config must be a JSON object');
+      throw new SudoWallError('INVALID_CONFIG', 'config must be a JSON object');
     }
     raw = c as Record<string, unknown>;
   } else {
@@ -332,7 +332,7 @@ export async function main(argv: string[]): Promise<number> {
   const gw = await runGateway({ config, log });
   if (gw.http !== undefined) {
     process.stderr.write(
-      `Tortoise Gate listening on ${gw.http.url}\nBearer token (this run only): ${gw.http.token}\n`,
+      `SudoWall listening on ${gw.http.url}\nBearer token (this run only): ${gw.http.token}\n`,
     );
   }
   log.info('gateway started', { mode: config.mode, upstreams: config.upstreams.map((u) => u.id) });
@@ -356,18 +356,18 @@ export async function main(argv: string[]): Promise<number> {
 function fail(e: unknown): number {
   const code = (e as { code?: unknown }).code;
   if (e instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
-    process.stderr.write(`tortoisegate: ${(e as Error).message}\n\n${USAGE}`);
+    process.stderr.write(`sudowall: ${(e as Error).message}\n\n${USAGE}`);
     return EXIT.usage;
   }
-  if (e instanceof TortoiseGateError || e instanceof MissingEnvError) {
-    process.stderr.write(`tortoisegate: ${e.message}\n`);
+  if (e instanceof SudoWallError || e instanceof MissingEnvError) {
+    process.stderr.write(`sudowall: ${e.message}\n`);
     return EXIT.config;
   }
   if (e instanceof RuntimeError) {
-    process.stderr.write(`tortoisegate: ${e.message}\n`);
+    process.stderr.write(`sudowall: ${e.message}\n`);
     return EXIT.runtime;
   }
-  process.stderr.write(`tortoisegate: ${(e as Error).stack ?? String(e)}\n`);
+  process.stderr.write(`sudowall: ${(e as Error).stack ?? String(e)}\n`);
   return EXIT.runtime;
 }
 
@@ -383,7 +383,7 @@ function isEntryPoint(): boolean {
 }
 
 if (isEntryPoint()) {
-  // `tortoisegate ... | head` closes stdout early; stop quietly instead of crashing with EPIPE.
+  // `sudowall ... | head` closes stdout early; stop quietly instead of crashing with EPIPE.
   process.stdout.on('error', (e: NodeJS.ErrnoException) => {
     if (e.code === 'EPIPE') process.exit(0);
     throw e;

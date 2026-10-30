@@ -88,7 +88,7 @@ export interface Incident {
   ledger: { ok: boolean; message: string; entries: number[]; allSigned: boolean };
 }
 
-const TOKEN_KEY = 'tortoisegate-token';
+const TOKEN_KEY = 'sudowall-token';
 
 /** The token arrives in the URL fragment; keep it for this tab and remove it from the address bar. */
 export function takeToken(): string | null {

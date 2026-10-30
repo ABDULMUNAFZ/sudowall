@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Reference } from '@tortoisegate/provenance';
+import type { Reference } from '@sudowall/provenance';
 import type { CompiledPolicy } from './load.js';
 
 /** A stable UUIDv8 naming one policy list as a provenance reference source. */

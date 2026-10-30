@@ -9,8 +9,8 @@ import {
   rawPublicKey,
   verifyDatabase,
   type StateDb,
-} from '@tortoisegate/ledger';
-import { IncidentNotFound, incidentReport, sha256ValueId } from '@tortoisegate/graph';
+} from '@sudowall/ledger';
+import { IncidentNotFound, incidentReport, sha256ValueId } from '@sudowall/graph';
 import { ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
 

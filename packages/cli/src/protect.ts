@@ -3,9 +3,9 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 /**
- * `tortoisegate protect`: finds the MCP client configs on this machine (Claude Code, Claude
+ * `sudowall protect`: finds the MCP client configs on this machine (Claude Code, Claude
  * Desktop, Cursor) and puts the gate in front of every local (stdio) server by rewriting its entry
- * to `npx -y tortoisegate@<version> wrap --config <config> -- <original command>`. Every other
+ * to `npx -y sudowall@<version> wrap --config <config> -- <original command>`. Every other
  * field, `env` included, is kept, so the original entry can be restored exactly from the wrapped
  * one. Remote (url) servers are reported, not changed: the gate cannot sit in front of them yet.
  */
@@ -110,15 +110,18 @@ function groupServers(doc: Json, at: string[]): Json {
 export interface WrapOptions {
   /** Exact package version to run, e.g. `0.2.0`. */
   version: string;
-  /** Absolute path of the Tortoise Gate config the wrapped servers use. */
+  /** Absolute path of the SudoWall config the wrapped servers use. */
   config: string;
 }
 
-/** True when a server entry already runs through `tortoisegate wrap`. */
+/** The package argument of a wrapped entry; `tortoisegate` is the product's former name. */
+const RUNNER = /^(sudowall|tortoisegate)(@[^\s]+)?$/;
+
+/** True when a server entry already runs through `sudowall wrap`. */
 export function isWrapped(entry: Json): boolean {
   const args = entry['args'];
   if (!Array.isArray(args)) return false;
-  const i = args.findIndex((a) => typeof a === 'string' && /^tortoisegate(@[^\s]+)?$/.test(a));
+  const i = args.findIndex((a) => typeof a === 'string' && RUNNER.test(a));
   return i !== -1 && args[i + 1] === 'wrap' && args.indexOf('--', i) !== -1;
 }
 
@@ -134,14 +137,14 @@ export function wrapEntry(entry: Json, o: WrapOptions): Json {
   return {
     ...entry,
     command: 'npx',
-    args: ['-y', `tortoisegate@${o.version}`, 'wrap', '--config', o.config, '--', command, ...args],
+    args: ['-y', `sudowall@${o.version}`, 'wrap', '--config', o.config, '--', command, ...args],
   };
 }
 
 /** Restores the entry `wrapEntry` produced, exactly. */
 export function unwrapEntry(entry: Json): Json {
   const args = entry['args'] as unknown[];
-  const i = args.findIndex((a) => typeof a === 'string' && /^tortoisegate(@[^\s]+)?$/.test(a));
+  const i = args.findIndex((a) => typeof a === 'string' && RUNNER.test(a));
   const dash = args.indexOf('--', i);
   const [command, ...rest] = args.slice(dash + 1).map(String);
   if (command === undefined) throw new Error('wrapped entry has no command after --');
@@ -308,9 +311,9 @@ export function applyPlan(plan: FilePlan, now = new Date()): string | undefined 
   }
   const mode = statSync(plan.file).mode & 0o777;
   const stamp = now.toISOString().replace(/[:.]/g, '-');
-  const backup = `${plan.file}.tortoisegate-backup-${stamp}`;
+  const backup = `${plan.file}.sudowall-backup-${stamp}`;
   writeFileSync(backup, plan.original, { mode: 0o600 });
-  const tmp = join(dirname(plan.file), `.${String(process.pid)}.tortoisegate.tmp`);
+  const tmp = join(dirname(plan.file), `.${String(process.pid)}.sudowall.tmp`);
   writeFileSync(tmp, plan.next, { mode });
   chmodSync(tmp, mode);
   renameSync(tmp, plan.file);

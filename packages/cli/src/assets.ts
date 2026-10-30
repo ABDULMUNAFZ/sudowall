@@ -20,15 +20,15 @@ export const BUNDLED = existsSync(join(HERE, 'web-ui', 'index.html'));
 const REPO = join(HERE, '..', '..', '..');
 const PKG_ASSETS = join(HERE, '..', 'assets');
 
-/** The CLI entry point, for starting `tortoisegate serve` as a child process. */
+/** The CLI entry point, for starting `sudowall serve` as a child process. */
 export function cliEntry(): string {
   return join(HERE, 'main.js');
 }
 
-/** The built web app served by `tortoisegate ui`. */
+/** The built web app served by `sudowall ui`. */
 export function webUiDir(): string {
   if (BUNDLED) return join(HERE, 'web-ui');
-  return join(dirname(require.resolve('@tortoisegate/web-ui/package.json')), 'dist');
+  return join(dirname(require.resolve('@sudowall/web-ui/package.json')), 'dist');
 }
 
 /** Directory holding the shipped policy templates (`<name>.yaml`). */

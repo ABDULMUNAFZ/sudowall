@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseConfig } from '@tortoisegate/core';
-import { parsePolicyYaml } from '@tortoisegate/policy';
+import { parseConfig } from '@sudowall/core';
+import { parsePolicyYaml } from '@sudowall/policy';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 
@@ -49,7 +49,7 @@ describe('init', () => {
   it('defaults to the per-user config directory', () => {
     const r = cli(['init']);
     expect(r.code, r.stderr).toBe(0);
-    expect(existsSync(join(r.home, 'tortoisegate', 'config.json'))).toBe(true);
+    expect(existsSync(join(r.home, 'sudowall', 'config.json'))).toBe(true);
   });
 
   it('refuses to overwrite existing files unless --force', () => {
@@ -72,8 +72,8 @@ describe('demo --ci', () => {
   it('runs the whole walkthrough on a private chain and cleans up after itself', () => {
     const r = cli(['demo', '--ci'], 240_000);
     expect(r.code, `${r.stdout}\n${r.stderr}`).toBe(0);
-    expect(r.stdout).toContain('Gate: TG_APPROVAL_DENIED');
-    expect(r.stdout).toContain('Gate: TG_BLOCKED. block-lookalike-recipient');
+    expect(r.stdout).toContain('Gate: SW_APPROVAL_DENIED');
+    expect(r.stdout).toContain('Gate: SW_BLOCKED. block-lookalike-recipient');
     expect(r.stdout).toMatch(
       /Gate: allowed\. Sent 0\.005 ETH\. Transaction 0x[0-9a-f]{64} success/,
     );
@@ -82,7 +82,7 @@ describe('demo --ci', () => {
     expect(r.stdout).toContain('ok    ledger verify, then after an edit: OK, then caught');
     expect(r.stdout).not.toContain('FAIL ');
     // The demo keeps its state in a temp dir and never touches the user's real state.
-    expect(existsSync(join(r.home, 'tortoisegate', 'ledger.db'))).toBe(false);
+    expect(existsSync(join(r.home, 'sudowall', 'ledger.db'))).toBe(false);
   });
 
   it('keeps its ledger with --keep, and incident explains the paused payment from it', () => {
@@ -152,9 +152,9 @@ describe('demo waiting for a human', () => {
       expect(Date.now() - started).toBeGreaterThan(60_000);
       expect(stderr).not.toContain('Request timed out');
       expect(stdout).toContain('If nobody decides within 65 s, the gate denies it.');
-      expect(stdout).toContain('Gate: TG_APPROVAL_TIMEOUT');
+      expect(stdout).toContain('Gate: SW_APPROVAL_TIMEOUT');
       expect(stdout).toContain('Attacker received: 0 ETH');
-      expect(stdout).toContain('ok    pay address injected in an email: TG_APPROVAL_TIMEOUT');
+      expect(stdout).toContain('ok    pay address injected in an email: SW_APPROVAL_TIMEOUT');
       expect(stdout).not.toContain('FAIL ');
       expect(code).toBe(130);
     },

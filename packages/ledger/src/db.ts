@@ -68,7 +68,7 @@ export function migrateComponent(db: StateDb, component: string, migrations: rea
     const current = row?.version ?? 0;
     if (current > migrations.length) {
       throw new Error(
-        `state database ${component} schema is version ${current}, newer than this build supports (${migrations.length}); upgrade Tortoise Gate`,
+        `state database ${component} schema is version ${current}, newer than this build supports (${migrations.length}); upgrade SudoWall`,
       );
     }
     for (let v = current; v < migrations.length; v++) db.exec(migrations[v] ?? '');

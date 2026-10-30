@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import { parseConfig } from '@tortoisegate/core';
+import { parseConfig } from '@sudowall/core';
 import { runGateway, type RunningGateway } from '../src/gateway.js';
 import { silentLogger } from '../src/log.js';
 import { MemoryNameStore } from '../src/namespacing.js';
@@ -142,7 +142,7 @@ describe('policy config', () => {
   it('refuses to start when the policy file is missing or invalid', async () => {
     const dir = tempDir();
     const bad = join(dir, 'bad.yaml');
-    writeFileSync(bad, 'schema: tortoise-gate/policy@1\nname: p\nversion: 0\n');
+    writeFileSync(bad, 'schema: sudowall/policy@1\nname: p\nversion: 0\n');
     for (const [path, msg] of [
       [join(dir, 'missing.yaml'), /cannot read policy file/],
       [bad, /invalid policy[\s\S]*version/],
@@ -163,7 +163,7 @@ describe('environment references', () => {
   it('refuses to start when a { fromEnv } variable is not set', async () => {
     const config = parseConfig({
       schemaVersion: 1,
-      upstreams: [{ ...rawUpstream('raw'), env: { TOKEN: { fromEnv: 'TG_TEST_UNSET_VAR' } } }],
+      upstreams: [{ ...rawUpstream('raw'), env: { TOKEN: { fromEnv: 'SW_TEST_UNSET_VAR' } } }],
     });
     await expect(
       runGateway({
@@ -173,6 +173,6 @@ describe('environment references', () => {
         stateDir: tempDir(),
         env: {},
       }),
-    ).rejects.toThrow(/TG_TEST_UNSET_VAR is referenced by the config but is not set/);
+    ).rejects.toThrow(/SW_TEST_UNSET_VAR is referenced by the config but is not set/);
   });
 });

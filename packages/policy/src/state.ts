@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { migrateComponent, type StateDb } from '@tortoisegate/ledger';
+import { migrateComponent, type StateDb } from '@sudowall/ledger';
 import type { PolicyStateView } from './evaluate.js';
 
 const MIGRATIONS = [

@@ -1,5 +1,5 @@
 // Conformance: real SDK clients against the official reference servers, once directly and once
-// through `tortoisegate wrap` / `serve`. Each scenario's observable results must be identical.
+// through `sudowall wrap` / `serve`. Each scenario's observable results must be identical.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { openStateDb } from '@tortoisegate/ledger';
+import { openStateDb } from '@sudowall/ledger';
 import { Client as V2Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport as V2Stdio } from '@modelcontextprotocol/client/stdio';
 import { Client as V1Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -79,7 +79,7 @@ async function connect(
 }
 
 interface Target {
-  /** The server command line, run directly or behind `tortoisegate wrap --`. */
+  /** The server command line, run directly or behind `sudowall wrap --`. */
   argv(): string[];
   env(): Record<string, string>;
   /** Resets server-side state so both runs start equal. */
@@ -184,7 +184,7 @@ async function run(kind: ClientKind, t: Target, via: 'direct' | 'gateway', home:
 
 /** Events recorded in the ledger, in order. */
 function events(home: string): Record<string, unknown>[] {
-  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  const db = openStateDb(join(home, 'sudowall', 'ledger.db'), { readonly: true });
   try {
     return (
       db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {

@@ -14,7 +14,7 @@ import {
   type Subgraph,
 } from '../src/index.js';
 
-/** Events from a real `tortoisegate demo --ci` ledger, with local paths replaced. */
+/** Events from a real `sudowall demo --ci` ledger, with local paths replaced. */
 const EVENTS: LedgerEvent[] = readFileSync(
   fileURLToPath(new URL('./fixtures/demo-events.jsonl', import.meta.url)),
   'utf8',
@@ -139,22 +139,22 @@ describe('TigerGraph adapter (no server)', () => {
     expect(tigerGraphConfigFromEnv({})).toBeUndefined();
     expect(() =>
       tigerGraphConfigFromEnv({
-        TG_TIGERGRAPH_HOST: 'http://tg.example.com',
-        TG_TIGERGRAPH_TOKEN: 't',
+        SW_TIGERGRAPH_HOST: 'http://tg.example.com',
+        SW_TIGERGRAPH_TOKEN: 't',
       }),
     ).toThrow(/https/);
-    expect(() => tigerGraphConfigFromEnv({ TG_TIGERGRAPH_HOST: 'https://tg.example.com' })).toThrow(
+    expect(() => tigerGraphConfigFromEnv({ SW_TIGERGRAPH_HOST: 'https://tg.example.com' })).toThrow(
       /TOKEN/,
     );
     expect(
       tigerGraphConfigFromEnv({
-        TG_TIGERGRAPH_HOST: 'http://127.0.0.1:14240/',
-        TG_TIGERGRAPH_USERNAME: 'u',
-        TG_TIGERGRAPH_PASSWORD: 'p',
+        SW_TIGERGRAPH_HOST: 'http://127.0.0.1:14240/',
+        SW_TIGERGRAPH_USERNAME: 'u',
+        SW_TIGERGRAPH_PASSWORD: 'p',
       }),
     ).toEqual({
       host: 'http://127.0.0.1:14240',
-      graph: 'TortoiseGate',
+      graph: 'SudoWall',
       auth: { username: 'u', password: 'p' },
     });
   });
@@ -166,7 +166,7 @@ describe('TigerGraph adapter (no server)', () => {
       return Promise.resolve(new Response('{"error":false,"results":[]}', { status: 200 }));
     }) as unknown as typeof fetch;
     const tg = new TigerGraph(
-      { host: 'https://tg.example.com', graph: 'TortoiseGate', auth: { token: 't' } },
+      { host: 'https://tg.example.com', graph: 'SudoWall', auth: { token: 't' } },
       fake,
     );
     await buildGraph(EVENTS, tg, hmacValueId(Buffer.alloc(32, 7)));
@@ -181,7 +181,7 @@ describe('TigerGraph adapter (no server)', () => {
 
 const tgConfig = tigerGraphConfigFromEnv(process.env);
 describe.skipIf(tgConfig === undefined)(
-  'TigerGraph parity (real server: set TG_TIGERGRAPH_HOST)',
+  'TigerGraph parity (real server: set SW_TIGERGRAPH_HOST)',
   () => {
     /**
      * Compare what both backends can express: TigerGraph never receives `display`, and it returns

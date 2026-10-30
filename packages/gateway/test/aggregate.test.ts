@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ToolCallEvent } from '@tortoisegate/core';
+import type { ToolCallEvent } from '@sudowall/core';
 import { FileNameStore, MemoryNameStore } from '../src/namespacing.js';
 import { DECISION_META_KEY } from '../src/session.js';
 import {
@@ -148,7 +148,7 @@ describe('aggregate mode: routing and fidelity', () => {
     const allowed = await h.client.response('7');
     const res = blocked['result'] as { isError: boolean; _meta: Record<string, { code: string }> };
     expect(res.isError).toBe(true);
-    expect(res._meta[DECISION_META_KEY]?.code).toBe('TG_BLOCKED');
+    expect(res._meta[DECISION_META_KEY]?.code).toBe('SW_BLOCKED');
     expect(textOf(allowed)).toBe('{"ok":1}');
     expect(readLines(rec).some((l) => l.includes('"tools/call"'))).toBe(false);
   });

@@ -1,4 +1,4 @@
-import type { JsonObject } from '@tortoisegate/core';
+import type { JsonObject } from '@sudowall/core';
 
 /**
  * Attack and benign cases for provenance matching. "Flagged" means the report has a match with

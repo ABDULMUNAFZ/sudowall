@@ -8,7 +8,7 @@ The official MCP SDK is TypeScript. The gateway, CLI, local web UI and future El
 
 ## Decision
 
-One repository with pnpm workspaces and Turborepo. TypeScript `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and `verbatimModuleSyntax`. ESM only. Packages are published under `@tortoisegate/*`, with the CLI as `tortoisegate`. All dependencies are pinned to exact versions (`save-exact`).
+One repository with pnpm workspaces and Turborepo. TypeScript `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and `verbatimModuleSyntax`. ESM only. Packages are published under `@sudowall/*`, with the CLI as `sudowall`. All dependencies are pinned to exact versions (`save-exact`).
 
 TypeScript is pinned to 6.0.x because typescript-eslint 8.72.1 supports `<6.1.0`.
 

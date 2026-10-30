@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Current version of every persisted Tortoise Gate document (events, config). */
+/** Current version of every persisted SudoWall document (events, config). */
 export const SCHEMA_VERSION = 1;
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;

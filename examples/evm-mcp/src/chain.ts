@@ -71,21 +71,21 @@ export interface WalletConfig {
 
 /**
  * Reads the wallet configuration from the environment. Base Sepolia only when both
- * TG_EVM_RPC_URL and TG_EVM_PRIVATE_KEY are set; otherwise a local Anvil chain at
- * TG_EVM_ANVIL_URL (default http://127.0.0.1:8545) with Anvil's account 0. The key is never
+ * SW_EVM_RPC_URL and SW_EVM_PRIVATE_KEY are set; otherwise a local Anvil chain at
+ * SW_EVM_ANVIL_URL (default http://127.0.0.1:8545) with Anvil's account 0. The key is never
  * logged or returned.
  */
 export function walletConfig(env: NodeJS.ProcessEnv = process.env): WalletConfig {
-  const rpc = env['TG_EVM_RPC_URL'];
-  const key = env['TG_EVM_PRIVATE_KEY'];
+  const rpc = env['SW_EVM_RPC_URL'];
+  const key = env['SW_EVM_PRIVATE_KEY'];
   if ((rpc === undefined) !== (key === undefined)) {
     throw new Error(
-      'set both TG_EVM_RPC_URL and TG_EVM_PRIVATE_KEY for Base Sepolia, or neither for Anvil',
+      'set both SW_EVM_RPC_URL and SW_EVM_PRIVATE_KEY for Base Sepolia, or neither for Anvil',
     );
   }
   if (rpc !== undefined && key !== undefined) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(key))
-      throw new Error('TG_EVM_PRIVATE_KEY must be 0x followed by 64 hex digits');
+      throw new Error('SW_EVM_PRIVATE_KEY must be 0x followed by 64 hex digits');
     return {
       mode: 'base-sepolia',
       rpcUrl: rpc,
@@ -93,10 +93,10 @@ export function walletConfig(env: NodeJS.ProcessEnv = process.env): WalletConfig
       account: privateKeyToAccount(key as Hash),
     };
   }
-  const url = env['TG_EVM_ANVIL_URL'] ?? 'http://127.0.0.1:8545';
+  const url = env['SW_EVM_ANVIL_URL'] ?? 'http://127.0.0.1:8545';
   const host = new URL(url).hostname;
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    throw new Error('TG_EVM_ANVIL_URL must point at a local Anvil (127.0.0.1, localhost or [::1])');
+    throw new Error('SW_EVM_ANVIL_URL must point at a local Anvil (127.0.0.1, localhost or [::1])');
   }
   return { mode: 'anvil', rpcUrl: url, chain: foundry, account: mnemonicToAccount(ANVIL_MNEMONIC) };
 }

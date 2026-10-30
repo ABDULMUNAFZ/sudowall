@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ConfigSchema, TortoiseGateError, parseConfig, type ConfigInput } from '../src/index.js';
+import { ConfigSchema, SudoWallError, parseConfig, type ConfigInput } from '../src/index.js';
 
 const minimal: ConfigInput = {
   schemaVersion: 1,
@@ -13,8 +13,8 @@ function expectInvalid(raw: unknown): void {
   try {
     parseConfig(raw);
   } catch (e) {
-    expect(e).toBeInstanceOf(TortoiseGateError);
-    expect((e as TortoiseGateError).code).toBe('INVALID_CONFIG');
+    expect(e).toBeInstanceOf(SudoWallError);
+    expect((e as SudoWallError).code).toBe('INVALID_CONFIG');
     return;
   }
   throw new Error('expected parseConfig to throw');
@@ -43,7 +43,7 @@ describe('config schema', () => {
           id: 'evm',
           transport: 'stdio',
           command: 'node',
-          env: { PRIVATE_KEY: { fromEnv: 'TG_TESTNET_KEY' }, LOG: 'info' },
+          env: { PRIVATE_KEY: { fromEnv: 'SW_TESTNET_KEY' }, LOG: 'info' },
         },
         {
           id: 'remote',

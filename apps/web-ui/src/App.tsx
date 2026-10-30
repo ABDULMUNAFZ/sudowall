@@ -271,9 +271,9 @@ export function App() {
   if (api === null) {
     return (
       <main className="empty">
-        <h1>Tortoise Gate</h1>
+        <h1>SudoWall</h1>
         <p>
-          Open the address printed by <code>tortoisegate ui</code>; it contains the access token.
+          Open the address printed by <code>sudowall ui</code>; it contains the access token.
         </p>
       </main>
     );
@@ -306,7 +306,7 @@ export function App() {
   return (
     <main>
       <header className="top">
-        <h1>Tortoise Gate</h1>
+        <h1>SudoWall</h1>
         <p className="tagline">Nothing moves until it&rsquo;s checked.</p>
         <p className="about" data-testid="about">
           Every tool call your AI agent makes through the gate is checked here. Risky ones wait for

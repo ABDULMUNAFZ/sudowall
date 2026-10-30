@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { TortoiseGateError, type Config, type ToolCallEvent } from '@tortoisegate/core';
-import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@tortoisegate/policy';
+import { SudoWallError, type Config, type ToolCallEvent } from '@sudowall/core';
+import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@sudowall/policy';
 import { DbApprovalChannel, type ApprovalChannel, type ApprovalDetails } from './approvals.js';
 import { checkEnvReferences } from './env.js';
 import { HttpFrontend } from './http-frontend.js';
@@ -91,7 +91,7 @@ export function loadConfiguredPolicy(config: Config): CompiledPolicy | undefined
   try {
     return loadPolicyFile(config.policy.path);
   } catch (e) {
-    if (e instanceof PolicyError) throw new TortoiseGateError('INVALID_CONFIG', e.message);
+    if (e instanceof PolicyError) throw new SudoWallError('INVALID_CONFIG', e.message);
     throw e;
   }
 }

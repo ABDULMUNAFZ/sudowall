@@ -1,4 +1,6 @@
-# Real-world test: Claude Code behind Tortoise Gate
+# Real-world test: Claude Code behind SudoWall
+
+> Recorded before the rename. SudoWall was called Tortoise Gate until version 0.3.0: the package and command were `tortoisegate`. This log keeps the commands exactly as they were run.
 
 A test of the published package with a real AI agent, not the scripted demo. Run on 2026-10-30 on macOS 26 (Intel), Node.js 24.22, Claude Code 2.1.312 with model `claude-sonnet-5-5`.
 

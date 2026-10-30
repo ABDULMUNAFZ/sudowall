@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Get started with Tortoise Gate</title>
+    <title>Get started with SudoWall</title>
     <meta
       name="description"
-      content="Install Tortoise Gate, put it in front of your AI agent's MCP tools, write a policy, approve risky actions and explain any decision."
+      content="Install SudoWall, put it in front of your AI agent's MCP tools, write a policy, approve risky actions and explain any decision."
     />
     <meta name="referrer" content="no-referrer" />
     <meta
@@ -15,7 +15,7 @@
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 20c0-7 5.4-12 12-12s12 5 12 12z' fill='%232f6b4f'/%3E%3Cpath d='M9 20l3-6h8l3 6' fill='none' stroke='%23eef1ea' stroke-width='1.6'/%3E%3Crect x='3' y='20' width='26' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='8' width='26' height='18' rx='2' fill='%232f6b4f'/%3E%3Cpath d='M3 14h26M3 20h10M19 20h10M10 8v6M22 8v6M7 14v6M25 14v6M9 20v6M23 20v6' fill='none' stroke='%23eef1ea' stroke-width='1.4'/%3E%3Cpath d='M13 26v-6a3 3 0 0 1 6 0v6z' fill='%23eef1ea'/%3E%3Crect x='2' y='26' width='28' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="site.css" />
   </head>
@@ -24,18 +24,24 @@
       <header class="site">
         <a class="mark" href="./">
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M4 20c0-7 5.4-12 12-12s12 5 12 12z" fill="#2f6b4f" />
-            <path d="M9 20l3-6h8l3 6" fill="none" stroke="#eef1ea" stroke-width="1.6" />
-            <rect x="3" y="20" width="26" height="3" rx="1.5" fill="currentColor" />
+            <rect x="3" y="8" width="26" height="18" rx="2" fill="#2f6b4f" />
+            <path
+              d="M3 14h26M3 20h10M19 20h10M10 8v6M22 8v6M7 14v6M25 14v6M9 20v6M23 20v6"
+              fill="none"
+              stroke="#eef1ea"
+              stroke-width="1.4"
+            />
+            <path d="M13 26v-6a3 3 0 0 1 6 0v6z" fill="#eef1ea" />
+            <rect x="2" y="26" width="28" height="3" rx="1.5" fill="currentColor" />
           </svg>
-          Tortoise Gate
+          SudoWall
         </a>
         <nav aria-label="Site">
           <a href="./">Home</a>
           <a href="get-started.html" aria-current="page">Get started</a>
           <a href="real-run.html">See it real</a>
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Source</a>
-          <a href="https://www.npmjs.com/package/tortoisegate">npm</a>
+          <a href="https://github.com/ABDULMUNAFZ/sudowall">Source</a>
+          <a href="https://www.npmjs.com/package/sudowall">npm</a>
         </nav>
       </header>
 
@@ -43,8 +49,8 @@
         <div class="page-head prose">
           <h1>Put the gate in front of your agent</h1>
           <p class="lede">
-            Tortoise Gate runs on your machine, next to your agent. It speaks MCP on both sides, so
-            your agent and your tools do not change.
+            SudoWall runs on your machine, next to your agent. It speaks MCP on both sides, so your
+            agent and your tools do not change.
           </p>
         </div>
 
@@ -53,8 +59,8 @@
             <h2 id="needs">What you need</h2>
             <p>
               Node.js 24 on macOS or Linux, and an agent that uses MCP tools, such as Claude Code,
-              Claude Desktop or Cursor. Tortoise Gate is on npm as
-              <a href="https://www.npmjs.com/package/tortoisegate"><code>tortoisegate</code></a
+              Claude Desktop or Cursor. SudoWall is on npm as
+              <a href="https://www.npmjs.com/package/sudowall"><code>sudowall</code></a
               >, so every command below works with <code>npx</code> and nothing to install globally.
             </p>
           </div>
@@ -69,7 +75,7 @@
                 A two-minute walkthrough on a private local test chain: a scripted agent reads two
                 poisoned emails and tries three payments, and you decide the paused one.
               </p>
-              <pre><code>npx tortoisegate demo</code></pre>
+              <pre><code>npx sudowall demo</code></pre>
             </li>
             <li>
               <h3>Create a config and a policy</h3>
@@ -77,10 +83,10 @@
                 This writes <code>config.json</code> in observe mode, which records every decision
                 but blocks nothing, and <code>policy.yaml</code> from the money-moving template. It
                 prints where it wrote them (on macOS,
-                <code>~/Library/Application Support/tortoisegate/</code>; on Linux,
-                <code>~/.config/tortoisegate/</code>). Use that path as <code>CONFIG</code> below.
+                <code>~/Library/Application Support/sudowall/</code>; on Linux,
+                <code>~/.config/sudowall/</code>). Use that path as <code>CONFIG</code> below.
               </p>
-              <pre><code>npx tortoisegate init</code></pre>
+              <pre><code>npx sudowall init</code></pre>
             </li>
             <li>
               <h3>Protect the agents you already use</h3>
@@ -89,19 +95,19 @@
                 Cursor. Without <code>--apply</code> it only shows what it would change. With it, it
                 backs each config file up, then routes every local server through the gate.
               </p>
-              <pre><code>npx tortoisegate protect
-npx tortoisegate protect --apply
-npx tortoisegate status
-npx tortoisegate unprotect --apply   # restores the original entries</code></pre>
+              <pre><code>npx sudowall protect
+npx sudowall protect --apply
+npx sudowall status
+npx sudowall unprotect --apply   # restores the original entries</code></pre>
               <p>
                 Restart the client afterwards so it starts the protected servers. Remote (URL)
                 servers are listed but not covered yet. To wrap one server by hand instead, put
-                <code>tortoisegate wrap --</code> in front of its command:
+                <code>sudowall wrap --</code> in front of its command:
               </p>
-              <pre><code>claude mcp add memory -- npx -y tortoisegate wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>
+              <pre><code>claude mcp add memory -- npx -y sudowall wrap --config "$CONFIG" -- npx -y @modelcontextprotocol/server-memory</code></pre>
               <p>
                 For several servers behind one gate, list them in a config and use
-                <code>tortoisegate serve --config gateway.json</code>:
+                <code>sudowall serve --config gateway.json</code>:
               </p>
               <pre><code>{
   "schemaVersion": 1,
@@ -122,7 +128,7 @@ npx tortoisegate unprotect --apply   # restores the original entries</code></pre
                 with the recipient, where it came from and the rule. It listens on 127.0.0.1 only
                 and prints an address that carries an access token.
               </p>
-              <pre><code>npx tortoisegate ui --config "$CONFIG"</code></pre>
+              <pre><code>npx sudowall ui --config "$CONFIG"</code></pre>
               <p>
                 When the decisions look right, change <code>"mode"</code> to
                 <code>"enforce"</code> in the config.
@@ -135,8 +141,8 @@ npx tortoisegate unprotect --apply   # restores the original entries</code></pre
                 traces each value in a call to the tool result it came from, and verifies the
                 ledger.
               </p>
-              <pre><code>npx tortoisegate incident &lt;event id or ledger entry number&gt;
-npx tortoisegate ledger verify</code></pre>
+              <pre><code>npx sudowall incident &lt;event id or ledger entry number&gt;
+npx sudowall ledger verify</code></pre>
             </li>
           </ol>
         </section>
@@ -171,14 +177,13 @@ npx tortoisegate ledger verify</code></pre>
           <div class="prose">
             <p>
               Full reference:
-              <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/policy-dsl.md"
+              <a href="https://github.com/ABDULMUNAFZ/sudowall/blob/main/docs/policy-dsl.md"
                 >policy language</a
               >,
-              <a
-                href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/policy-templates.md"
+              <a href="https://github.com/ABDULMUNAFZ/sudowall/blob/main/docs/policy-templates.md"
                 >templates</a
               >,
-              <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/configuration.md"
+              <a href="https://github.com/ABDULMUNAFZ/sudowall/blob/main/docs/configuration.md"
                 >configuration</a
               >.
             </p>
@@ -203,8 +208,8 @@ npx tortoisegate ledger verify</code></pre>
       <footer>
         <p>
           Open source under Apache-2.0.
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Read the code</a>, or
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/issues/new?template=tried-it.yml"
+          <a href="https://github.com/ABDULMUNAFZ/sudowall">Read the code</a>, or
+          <a href="https://github.com/ABDULMUNAFZ/sudowall/issues/new?template=tried-it.yml"
             >tell us how it went</a
           >.
         </p>

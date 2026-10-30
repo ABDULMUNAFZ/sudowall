@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { rawGet } from '@tortoisegate/core';
+import { rawGet } from '@sudowall/core';
 import type { Channel, CloseReason, Related } from './channel.js';
 import { RpcCode, classify, errorResponse } from './jsonrpc.js';
 import type { Logger } from './log.js';

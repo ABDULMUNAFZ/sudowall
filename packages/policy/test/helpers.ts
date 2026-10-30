@@ -4,7 +4,7 @@ import type {
   NearKind,
   ProvenanceReport,
   TrustLabel,
-} from '@tortoisegate/core';
+} from '@sudowall/core';
 import { compilePolicy, type CompiledPolicy, type PolicyStateView } from '../src/index.js';
 
 export const SRC = '0e7b5b2a-3f7e-4c1a-9b8e-2d5c6a7f8e91';
@@ -17,7 +17,7 @@ export const ADDR = {
 } as const;
 
 export const BASE = {
-  schema: 'tortoise-gate/policy@1',
+  schema: 'sudowall/policy@1',
   name: 'test',
   version: 1,
   lists: {

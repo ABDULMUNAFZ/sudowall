@@ -1,4 +1,4 @@
-import { NearKindSchema } from '@tortoisegate/core';
+import { NearKindSchema } from '@sudowall/core';
 import { z } from 'zod';
 
 /** Kinds a policy can name for sink arguments and lists (those provenance normalises today). */
@@ -78,7 +78,8 @@ const RuleSchema = z.strictObject({
 });
 
 export const PolicySchema = z.strictObject({
-  schema: z.literal('tortoise-gate/policy@1'),
+  // `tortoise-gate/policy@1` is the same format under the product's former name.
+  schema: z.enum(['sudowall/policy@1', 'tortoise-gate/policy@1']),
   name: z.string().min(1).max(100),
   version: z.int().positive(),
   defaults: z

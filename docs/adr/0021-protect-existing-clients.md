@@ -8,11 +8,11 @@ Putting the gate in front of a server by hand means rewriting each server entry 
 
 ## Decision
 
-- **Dry run by default.** `tortoisegate protect` prints the plan per file and server. Only `--apply` writes.
+- **Dry run by default.** `sudowall protect` prints the plan per file and server. Only `--apply` writes.
 - **Known locations only**, from each client's documentation: Claude Code `~/.claude.json` (top-level `mcpServers` and `projects[path].mcpServers`) and a project's `.mcp.json`; Claude Desktop `claude_desktop_config.json` (macOS, Linux, Windows paths); Cursor `~/.cursor/mcp.json` and a project's `.cursor/mcp.json`.
-- **Wrap form:** `npx -y tortoisegate@<exact version> wrap --config <absolute config> -- <original command> <original args>`. Every other field of the entry (`env`, `type`, `timeout`, ...) is kept, so `unprotect` restores the entry exactly (property-tested). The version is pinned so a server never changes behaviour under the user.
+- **Wrap form:** `npx -y sudowall@<exact version> wrap --config <absolute config> -- <original command> <original args>`. Every other field of the entry (`env`, `type`, `timeout`, ...) is kept, so `unprotect` restores the entry exactly (property-tested). The version is pinned so a server never changes behaviour under the user.
 - **Remote servers are not touched**, and the output says they are not covered.
-- **Safe writes:** the pinned package is downloaded first (otherwise every protected server would fail to start, or the client's connect timeout would be spent on the download); each file is backed up next to itself (`.tortoisegate-backup-<time>`, mode 0600); the new file keeps the old permissions and is written to a temporary file and renamed; if the file changed after it was read (a running client rewrote it), nothing is written.
+- **Safe writes:** the pinned package is downloaded first (otherwise every protected server would fail to start, or the client's connect timeout would be spent on the download); each file is backed up next to itself (`.sudowall-backup-<time>`, mode 0600); the new file keeps the old permissions and is written to a temporary file and renamed; if the file changed after it was read (a running client rewrote it), nothing is written.
 - **No secrets in output:** values after key/token/secret flags, `--flag=value` forms, well-known key prefixes and long random strings are masked when commands are printed.
 
 ## Consequences

@@ -1,6 +1,6 @@
 ## Product
 
-Tortoise Gate is a firewall for AI agents. It sits between an AI agent and the tools it uses, checks each action before it runs, blocks or pauses risky actions for human approval, and keeps a tamper-evident record of everything the agent did. It is a real product for paying customers, not a demo. Tagline: "Nothing moves until it's checked."
+SudoWall is a firewall for AI agents. It sits between an AI agent and the tools it uses, checks each action before it runs, blocks or pauses risky actions for human approval, and keeps a tamper-evident record of everything the agent did. It is a real product for paying customers, not a demo. Tagline: "Nothing moves until it's checked."
 
 ## v1 scope
 
@@ -42,7 +42,7 @@ packages/
   ledger/      event store, hash chain, signing, checkpoints, verify
   graph/       graph model, local store, TigerGraph adapter, queries
   gateway/     MCP proxy, decision pipeline, approvals, local web server
-  cli/         `tortoisegate` command
+  cli/         `sudowall` command
   vault/       credential storage (post-deadline)
   sdk/         non-MCP agents (post-deadline)
 apps/

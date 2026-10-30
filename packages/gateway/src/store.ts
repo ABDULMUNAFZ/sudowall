@@ -1,17 +1,28 @@
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { Config } from '@tortoisegate/core';
+import type { Config } from '@sudowall/core';
 import {
   Ledger,
   Redactor,
   deriveKey,
   loadOrCreateKeys,
   type InstallationKeys,
-} from '@tortoisegate/ledger';
-import { PolicyStateStore } from '@tortoisegate/policy';
-import { ProvenanceEngine } from '@tortoisegate/provenance';
+} from '@sudowall/ledger';
+import { PolicyStateStore } from '@sudowall/policy';
+import { ProvenanceEngine } from '@sudowall/provenance';
 import { ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
+
+/** The product's former name. Its directories are still used if they exist and the new ones do not. */
+const LEGACY_NAME = 'tortoisegate';
+
+/** `<base>/sudowall`, or `<base>/tortoisegate` when only that one exists (data from before the rename). */
+function productDir(base: string): string {
+  const dir = join(base, 'sudowall');
+  const legacy = join(base, LEGACY_NAME);
+  return !existsSync(dir) && existsSync(legacy) ? legacy : dir;
+}
 
 /**
  * Per-user state directory (XDG on Linux; macOS and Windows equivalents).
@@ -20,25 +31,25 @@ import type { Logger } from './log.js';
  */
 export function defaultStateDir(env: NodeJS.ProcessEnv = process.env): string {
   if (process.platform === 'win32') {
-    return join(env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'), 'tortoisegate');
+    return productDir(env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'));
   }
-  if (env['XDG_STATE_HOME']) return join(env['XDG_STATE_HOME'], 'tortoisegate');
+  if (env['XDG_STATE_HOME']) return productDir(env['XDG_STATE_HOME']);
   if (process.platform === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'tortoisegate');
+    return productDir(join(homedir(), 'Library', 'Application Support'));
   }
-  return join(homedir(), '.local', 'state', 'tortoisegate');
+  return productDir(join(homedir(), '.local', 'state'));
 }
 
 /** Per-user config directory, which holds the installation keys. Same XDG rule as above. */
 export function defaultConfigDir(env: NodeJS.ProcessEnv = process.env): string {
   if (process.platform === 'win32') {
-    return join(env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'), 'tortoisegate');
+    return productDir(env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'));
   }
-  if (env['XDG_CONFIG_HOME']) return join(env['XDG_CONFIG_HOME'], 'tortoisegate');
+  if (env['XDG_CONFIG_HOME']) return productDir(env['XDG_CONFIG_HOME']);
   if (process.platform === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'tortoisegate');
+    return productDir(join(homedir(), 'Library', 'Application Support'));
   }
-  return join(homedir(), '.config', 'tortoisegate');
+  return productDir(join(homedir(), '.config'));
 }
 
 export interface StorePaths {
@@ -132,7 +143,7 @@ export class GatewayStore {
     return this.policyStateCache;
   }
 
-  /** Approvals, in the shared state database (decided in `tortoisegate ui`). */
+  /** Approvals, in the shared state database (decided in `sudowall ui`). */
   approvals(): ApprovalStore {
     this.approvalsCache ??= new ApprovalStore(this.ledger().db);
     return this.approvalsCache;

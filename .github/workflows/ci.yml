@@ -81,7 +81,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter tortoisegate run bench:latency --gate | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: pnpm --filter sudowall run bench:latency --gate | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
 
   web-ui-e2e:
@@ -96,8 +96,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter @tortoisegate/web-ui exec playwright install --with-deps chromium
-      - run: pnpm --filter @tortoisegate/web-ui run test:e2e
+      - run: pnpm --filter @sudowall/web-ui exec playwright install --with-deps chromium
+      - run: pnpm --filter @sudowall/web-ui run test:e2e
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -127,7 +127,7 @@ jobs:
         run: |
           bash scripts/install-foundry.sh
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
-      # Builds release/tortoisegate, packs it, installs the tarball into an empty directory whose
+      # Builds release/sudowall, packs it, installs the tarball into an empty directory whose
       # path has spaces, and runs --version, init, wrap and demo --ci from there.
       - run: pnpm run package
       - run: pnpm run smoke:package

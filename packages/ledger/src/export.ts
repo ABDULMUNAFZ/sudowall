@@ -1,4 +1,4 @@
-import { tgjson } from '@tortoisegate/core';
+import { tgjson } from '@sudowall/core';
 import type { StateDb } from './db.js';
 import { readLedgerMeta, type CheckpointRow, type EntryRow } from './ledger.js';
 import {

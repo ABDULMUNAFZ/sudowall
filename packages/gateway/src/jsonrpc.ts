@@ -1,4 +1,4 @@
-import { RawJsonError, rawGet, scanJson, type RawNode } from '@tortoisegate/core';
+import { RawJsonError, rawGet, scanJson, type RawNode } from '@sudowall/core';
 
 /**
  * A JSON-RPC message as received: its exact text, plus a span index for inspection.

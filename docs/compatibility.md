@@ -33,11 +33,11 @@ Scenarios per server:
 
 ### Manual: Claude Code 2.1.312 (smoke test)
 
-| Client ↔ gateway                                     | Upstream                         | Negotiated     | Result                                                                           |
-| ---------------------------------------------------- | -------------------------------- | -------------- | -------------------------------------------------------------------------------- |
-| stdio (`tortoisegate wrap`)                          | `server-everything` 2.1.0, stdio | **2026-07-28** | Connected. Denied tool: model saw the reason, did not retry. Allowed tool worked |
-| Streamable HTTP (`tortoisegate serve`, bearer token) | `server-everything` 2.1.0, stdio | **2026-07-28** | Same                                                                             |
-| stdio, added with `claude mcp add`                   | `server-memory` 2.0.1            | (health check) | `claude mcp list`: `✔ Connected`                                                 |
+| Client ↔ gateway                                 | Upstream                         | Negotiated     | Result                                                                           |
+| ------------------------------------------------ | -------------------------------- | -------------- | -------------------------------------------------------------------------------- |
+| stdio (`sudowall wrap`)                          | `server-everything` 2.1.0, stdio | **2026-07-28** | Connected. Denied tool: model saw the reason, did not retry. Allowed tool worked |
+| Streamable HTTP (`sudowall serve`, bearer token) | `server-everything` 2.1.0, stdio | **2026-07-28** | Same                                                                             |
+| stdio, added with `claude mcp add`               | `server-memory` 2.0.1            | (health check) | `claude mcp list`: `✔ Connected`                                                 |
 
 ## Differences from a direct connection
 
@@ -77,7 +77,7 @@ Tool traffic from `out.jsonl`, and Claude's final answer:
 ```
 INIT mcp_servers: [{'name': 'everything', 'status': 'connected'}]
 TOOL_USE mcp__everything__get-sum {"a": 2, "b": 3}
-TOOL_RESULT is_error=True "Blocked by Tortoise Gate: Tool \"get-sum\" on server \"stdio\" is on the deny list."
+TOOL_RESULT is_error=True "Blocked by SudoWall: Tool \"get-sum\" on server \"stdio\" is on the deny list."
 TOOL_USE mcp__everything__echo {"message": "hello gate"}
 TOOL_RESULT [{"type": "text", "text": "Echo: hello gate"}]
 TEXT The `get-sum` call was blocked, so I couldn't add 2 and 3. The `echo` call worked.
@@ -85,7 +85,7 @@ TEXT The `get-sum` call was blocked, so I couldn't add 2 and 3. The `echo` call 
 RESULT success
 ```
 
-Events (`home/tortoisegate/events.jsonl`):
+Events (`home/sudowall/events.jsonl`):
 
 ```
 session.started 2026-07-28 {'name': 'claude-code', 'version': '2.1.312'}
@@ -108,7 +108,7 @@ cat > tg.json <<EOF
    "args":["$REPO/packages/cli/node_modules/@modelcontextprotocol/server-everything/dist/index.js","stdio"]}]}
 EOF
 node $REPO/packages/cli/dist/main.js serve --config tg.json
-# stderr: Tortoise Gate listening on http://127.0.0.1:44755/mcp
+# stderr: SudoWall listening on http://127.0.0.1:44755/mcp
 #         Bearer token (this run only): <43 characters>
 cat > mcp.json <<EOF
 {"mcpServers":{"gate":{"type":"http","url":"http://127.0.0.1:44755/mcp","headers":{"Authorization":"Bearer <token>"}}}}
@@ -121,7 +121,7 @@ claude -p "Use the get-sum tool to add 2 and 3. Then use the echo tool to echo '
 ```
 INIT [{'name': 'gate', 'status': 'connected'}]
 TOOL_USE mcp__gate__get-sum {"a": 2, "b": 3}
-TOOL_RESULT is_error=True "Blocked by Tortoise Gate: Tool \"get-sum\" on server \"everything\" is on the deny list."
+TOOL_RESULT is_error=True "Blocked by SudoWall: Tool \"get-sum\" on server \"everything\" is on the deny list."
 TOOL_USE mcp__gate__echo {"message": "hello http"}
 TOOL_RESULT [{"type": "text", "text": "Echo: hello http"}]
 TEXT ... Get-sum is on the gate's deny list, so it was stopped on purpose rather than failing on the server. ...

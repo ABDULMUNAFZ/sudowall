@@ -2,7 +2,7 @@
 
 ## Added latency per tool call (Phase 1 gateway)
 
-Benchmark: `pnpm --filter tortoisegate run bench:latency` (`packages/cli/bench/latency.mjs`). One v2 SDK client makes 2000 sequential `tools/call echo` requests (64-byte message, after 200 warm-up calls) to the reference `server-everything` 2.1.0 over stdio, first directly, then through `tortoisegate wrap`. Through the gateway, every call includes the write-ahead `tool.call` event and the `tool.result` event appended to the JSONL event file (no fsync).
+Benchmark: `pnpm --filter sudowall run bench:latency` (`packages/cli/bench/latency.mjs`). One v2 SDK client makes 2000 sequential `tools/call echo` requests (64-byte message, after 200 warm-up calls) to the reference `server-everything` 2.1.0 over stdio, first directly, then through `sudowall wrap`. Through the gateway, every call includes the write-ahead `tool.call` event and the `tool.result` event appended to the JSONL event file (no fsync).
 
 Local run, 2026-10-29. AMD Ryzen 7 7735HS (16 threads), Linux 7.2.11 (Fedora 44), Node.js 24.22.0, on AC power with other work running:
 

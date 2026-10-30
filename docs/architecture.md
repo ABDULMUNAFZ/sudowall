@@ -1,6 +1,6 @@
 # Architecture
 
-Tortoise Gate is a local process that sits between an MCP client (the agent host, such as Claude Code) and the MCP servers that provide its tools. To the client it is an MCP server. To each upstream it is an MCP client. Every `tools/call` passes through a deterministic decision pipeline before it reaches an upstream.
+SudoWall is a local process that sits between an MCP client (the agent host, such as Claude Code) and the MCP servers that provide its tools. To the client it is an MCP server. To each upstream it is an MCP client. Every `tools/call` passes through a deterministic decision pipeline before it reaches an upstream.
 
 ## Pinned versions (verified 2026-10-29)
 
@@ -41,14 +41,14 @@ The gateway handles each revision independently on each side: a 2026-07-28 clien
 | `provenance` | Source recording, value extraction and normalisation, matching, near-match and address-poisoning detection                 | 3       |
 | `policy`     | YAML policy DSL, evaluator, persistent state (first-seen, windows), explanations, templates                                | 4       |
 | `graph`      | Data-flow graph built from the ledger, local SQLite store, TigerGraph adapter, causal-path queries                         | 8       |
-| `cli`        | `tortoisegate` binary: `wrap`, `serve` (Phase 1); `ledger ...`, `approvals` later                                          | 1+      |
+| `cli`        | `sudowall` binary: `wrap`, `serve` (Phase 1); `ledger ...`, `approvals` later                                              | 1+      |
 
 ## Data flow for one tool call
 
 ```mermaid
 sequenceDiagram
     participant C as MCP client (agent host)
-    participant G as Tortoise Gate
+    participant G as SudoWall
     participant P as Provenance + Policy (pure)
     participant L as Ledger (SQLite)
     participant A as Approver (CLI / web UI)
@@ -100,9 +100,9 @@ flowchart LR
 Rules for the pipeline:
 
 - **Purity.** `analyze` and `evaluate` take all their inputs as arguments. They make no network calls and no LLM calls, and read no clock. The caller passes the current time in, so the same input always gives the same `Decision`.
-- **Write-ahead logging.** The `tool.call` event is committed to the event sink before the call is forwarded. If it cannot be written: in `enforce` mode the call is blocked with `TG_LEDGER_UNAVAILABLE`; in `observe` mode the call is allowed and the gateway logs a loud error (observe never changes behaviour). This was the user's Phase 1/2 decision and replaces the Phase 0 "block in every mode" rule. The latency budget accounts for this write.
+- **Write-ahead logging.** The `tool.call` event is committed to the event sink before the call is forwarded. If it cannot be written: in `enforce` mode the call is blocked with `SW_LEDGER_UNAVAILABLE`; in `observe` mode the call is allowed and the gateway logs a loud error (observe never changes behaviour). This was the user's Phase 1/2 decision and replaces the Phase 0 "block in every mode" rule. The latency budget accounts for this write.
 - **Forwarding is byte-faithful.** The gateway relays raw JSON-RPC text and never re-serialises it ([ADR 0010](adr/0010-raw-json-rpc-relay.md)). Only single spans are spliced (id, namespaced name, `_meta` envelope, unsupported capabilities). Redaction applies only to what is stored.
-- **Blocked and denied calls** return a `CallToolResult` with `isError: true`, a short reason, and `_meta["tortoisegate/decision"]` = `{code, ruleIds, eventId}` ([ADR 0012](adr/0012-blocked-call-result.md)). Verified with the v2 SDK and Claude Code.
+- **Blocked and denied calls** return a `CallToolResult` with `isError: true`, a short reason, and `_meta["sudowall/decision"]` = `{code, ruleIds, eventId}` ([ADR 0012](adr/0012-blocked-call-result.md)). Verified with the v2 SDK and Claude Code.
 
 ### Tool namespacing
 
@@ -150,7 +150,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph host[User's machine]
-      client[MCP client / agent] -- "TB1: stdio pipe or HTTP on 127.0.0.1" --> gate[Tortoise Gate]
+      client[MCP client / agent] -- "TB1: stdio pipe or HTTP on 127.0.0.1" --> gate[SudoWall]
       browser[Browser: local web UI] -- "TB3: HTTP on 127.0.0.1 + per-session token" --> gate
       gate -- "TB4: filesystem" --> store[(ledger.db, signing key, policy, config)]
       gate -- "TB2: stdio child process" --> local[Local MCP server]

@@ -1,7 +1,7 @@
 import { mkdir, open, rename, rm, stat, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { EventSchema, type Event } from '@tortoisegate/core';
-import { prepareForStorage, type Ledger, type Redactor } from '@tortoisegate/ledger';
+import { EventSchema, type Event } from '@sudowall/core';
+import { prepareForStorage, type Ledger, type Redactor } from '@sudowall/ledger';
 import { z } from 'zod';
 
 /** Where gateway events go. `write` resolves only once the event is accepted by the store. */

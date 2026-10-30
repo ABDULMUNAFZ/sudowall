@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { migrateComponent, openStateDb, type StateDb } from '@tortoisegate/ledger';
+import { migrateComponent, openStateDb, type StateDb } from '@sudowall/ledger';
 import { ProvenanceEngine, type TrustedSelector } from '../src/index.js';
 
 export const KEY = randomBytes(32);

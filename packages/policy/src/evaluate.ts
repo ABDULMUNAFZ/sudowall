@@ -7,8 +7,8 @@ import {
   type JsonValue,
   type ProvenanceReport,
   type TrustLabel,
-} from '@tortoisegate/core';
-import type { AmountHint } from '@tortoisegate/provenance';
+} from '@sudowall/core';
+import type { AmountHint } from '@sudowall/provenance';
 import { AmountError, amountGreater } from './decimal.js';
 import { normalizeKind, type CompiledPolicy } from './load.js';
 import type { Condition, PolicyKind, Rule, Sink } from './schema.js';

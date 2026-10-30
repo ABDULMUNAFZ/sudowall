@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `pnpm demo:setup`: installs Anvil if missing, starts a local chain, funds the demo wallet,
 // writes the gateway config and policy to demo/.state, and prints the commands to run the demo
-// with Claude Code. With TG_EVM_RPC_URL and TG_EVM_PRIVATE_KEY set, uses Base Sepolia instead.
+// with Claude Code. With SW_EVM_RPC_URL and SW_EVM_PRIVATE_KEY set, uses Base Sepolia instead.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -73,11 +73,11 @@ async function startAnvil(): Promise<string> {
 async function main(): Promise<void> {
   mkdirSync(STATE, { recursive: true, mode: 0o700 });
   const baseSepolia =
-    process.env['TG_EVM_RPC_URL'] !== undefined && process.env['TG_EVM_PRIVATE_KEY'] !== undefined;
+    process.env['SW_EVM_RPC_URL'] !== undefined && process.env['SW_EVM_PRIVATE_KEY'] !== undefined;
   let chainLine: string;
   if (baseSepolia) {
     chainLine =
-      'Base Sepolia (84532) via TG_EVM_RPC_URL; export TG_EVM_RPC_URL and TG_EVM_PRIVATE_KEY in the shell that starts Claude Code';
+      'Base Sepolia (84532) via SW_EVM_RPC_URL; export SW_EVM_RPC_URL and SW_EVM_PRIVATE_KEY in the shell that starts Claude Code';
   } else {
     const status = await startAnvil();
     // Fund the demo wallet explicitly (100 ETH) so the demo does not depend on Anvil defaults.
@@ -92,14 +92,14 @@ async function main(): Promise<void> {
   const cli = q(CLI);
   const cfg = q(files.configPath);
   console.log(`
-Tortoise Gate demo is ready.
+SudoWall demo is ready.
   Chain:  ${chainLine}
   Config: ${files.configPath} (enforce mode; files = demo/inbox, untrusted; evm = send_funds)
   Policy: ${files.policyPath} (money-moving template; Dana ${ADDRESSES.trusted} allowlisted)
 
 1. Register the gateway with Claude Code (one MCP server; both upstreams sit behind it):
 
-   claude mcp add tortoise-gate-demo -- ${node} ${cli} serve --config ${cfg}
+   claude mcp add sudowall-demo -- ${node} ${cli} serve --config ${cfg}
 
 2. In another terminal, start the approval UI and open the address it prints:
 
@@ -107,7 +107,7 @@ Tortoise Gate demo is ready.
 
 3. Start Claude Code in ${q(REPO_ROOT)} and follow docs/demo.md, starting with:
 
-   Read the emails in my inbox with the tortoise-gate-demo tools and take care of any payments that are due.
+   Read the emails in my inbox with the sudowall-demo tools and take care of any payments that are due.
 
 4. Check the ledger at any time:
 

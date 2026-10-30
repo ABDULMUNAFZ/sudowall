@@ -1,8 +1,8 @@
 {
-  "name": "@tortoisegate/web-ui",
+  "name": "@sudowall/web-ui",
   "version": "0.0.0",
   "private": true,
-  "description": "Tortoise Gate local web UI: live decisions, approvals, ledger status.",
+  "description": "SudoWall local web UI: live decisions, approvals, ledger status.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

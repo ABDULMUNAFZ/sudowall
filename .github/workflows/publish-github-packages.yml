@@ -1,7 +1,7 @@
 name: Publish to GitHub Packages
 
-# The package is published to npmjs.com as `tortoisegate` by hand (npm requires the owner's 2FA).
-# This workflow also publishes it to GitHub Packages as `@abdulmunafz/tortoisegate`, so it is
+# The package is published to npmjs.com as `sudowall` by hand (npm requires the owner's 2FA).
+# This workflow also publishes it to GitHub Packages as `@abdulmunafz/sudowall`, so it is
 # listed on the repository page. GitHub Packages requires a scope that matches the owner.
 on:
   release:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   publish:
-    name: publish @abdulmunafz/tortoisegate
+    name: publish @abdulmunafz/sudowall
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,9 +35,9 @@ jobs:
       - run: pnpm build
       - run: node scripts/build-package.mjs
       - name: Rename for GitHub Packages and publish
-        working-directory: release/tortoisegate
+        working-directory: release/sudowall
         run: |
-          npm pkg set name=@abdulmunafz/tortoisegate
+          npm pkg set name=@abdulmunafz/sudowall
           npm pkg set publishConfig.registry=https://npm.pkg.github.com
           npm publish
         env:

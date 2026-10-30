@@ -8,11 +8,11 @@ import {
   writeDemoConfig,
   type DemoFiles,
   type DemoOptions as CliDemoOptions,
-} from 'tortoisegate/demo-config';
+} from 'sudowall/demo-config';
 
-// The demo config lives in the CLI (`tortoisegate demo` uses it too); this module keeps the
+// The demo config lives in the CLI (`sudowall demo` uses it too); this module keeps the
 // names the setup script and the end-to-end test have always used.
-export { demoPolicy, type DemoFiles } from 'tortoisegate/demo-config';
+export { demoPolicy, type DemoFiles } from 'sudowall/demo-config';
 
 const require = createRequire(import.meta.url);
 
@@ -25,7 +25,7 @@ export const PAYOUT_EMAIL = join(INBOX, DEMO_EMAILS.payout);
 /** Demo addresses (testnet only); documented in demo/README.md. */
 export const ADDRESSES = DEMO_ADDRESSES;
 
-export const CLI = join(dirname(require.resolve('tortoisegate/package.json')), 'dist', 'main.js');
+export const CLI = join(dirname(require.resolve('sudowall/package.json')), 'dist', 'main.js');
 
 export type DemoOptions = Omit<CliDemoOptions, 'assets'>;
 

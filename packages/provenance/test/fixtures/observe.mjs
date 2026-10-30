@@ -1,6 +1,6 @@
 // Records content in a shared provenance index from a separate process.
 //   node observe.mjs <db path> <key hex> <iso time> <text>
-import { openStateDb } from '@tortoisegate/ledger';
+import { openStateDb } from '@sudowall/ledger';
 import { ProvenanceEngine } from '../../dist/index.js';
 
 const [path, keyHex, at, text] = process.argv.slice(2);

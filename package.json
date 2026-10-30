@@ -1,5 +1,5 @@
 {
-  "name": "tortoise-gate",
+  "name": "sudowall",
   "private": true,
   "description": "Open-source firewall for AI agents. Nothing moves until it's checked.",
   "license": "Apache-2.0",

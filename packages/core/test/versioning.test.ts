@@ -1,21 +1,15 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import {
-  TortoiseGateError,
-  migrate,
-  parseConfig,
-  parseEvent,
-  type Migration,
-} from '../src/index.js';
+import { SudoWallError, migrate, parseConfig, parseEvent, type Migration } from '../src/index.js';
 
 function codeOf(fn: () => unknown): string {
   try {
     fn();
   } catch (e) {
-    if (e instanceof TortoiseGateError) return e.code;
+    if (e instanceof SudoWallError) return e.code;
     throw e;
   }
-  throw new Error('expected a TortoiseGateError');
+  throw new Error('expected a SudoWallError');
 }
 
 describe('schema versioning', () => {

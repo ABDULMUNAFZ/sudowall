@@ -1,7 +1,7 @@
 import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseLossless } from '@tortoisegate/core';
-import { defaultConfigDir, defaultStateDir } from '@tortoisegate/gateway';
+import { parseLossless } from '@sudowall/core';
+import { defaultConfigDir, defaultStateDir } from '@sudowall/gateway';
 import {
   SIGNING_KEY_FILE,
   exportLines,
@@ -12,7 +12,7 @@ import {
   verifyDatabase,
   type EntryRow,
   type StateDb,
-} from '@tortoisegate/ledger';
+} from '@sudowall/ledger';
 import { createPrivateKey } from 'node:crypto';
 import { EXIT, UsageError } from './main.js';
 

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
-import type { TrustLabel } from '@tortoisegate/core';
-import { migrateComponent, type StateDb } from '@tortoisegate/ledger';
+import type { TrustLabel } from '@sudowall/core';
+import { migrateComponent, type StateDb } from '@sudowall/ledger';
 import type { Extracted } from './extract.js';
 
 export const PROVENANCE_MIGRATIONS = [

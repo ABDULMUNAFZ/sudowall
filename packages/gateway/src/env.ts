@@ -1,4 +1,4 @@
-import type { EnvValue, Upstream } from '@tortoisegate/core';
+import type { EnvValue, Upstream } from '@sudowall/core';
 
 export class MissingEnvError extends Error {
   constructor(readonly variable: string) {
@@ -16,7 +16,7 @@ export function resolveEnvValue(v: EnvValue, env: NodeJS.ProcessEnv): string {
 
 /**
  * Variables `npm exec` / `npx` sets for the one command it runs. When the gateway was itself
- * started with npx (`npx -y tortoisegate wrap -- npx -y some-server`), an upstream that inherits
+ * started with npx (`npx -y sudowall wrap -- npx -y some-server`), an upstream that inherits
  * them makes its own `npx` run the wrong package (`npm_config_package`) or a `-c` script
  * (`npm_config_call`), and fails with "command not found". Normal npm settings such as a custom
  * registry are not in this list and stay.

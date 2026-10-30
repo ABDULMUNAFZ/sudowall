@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { openStateDb } from '@tortoisegate/ledger';
+import { openStateDb } from '@sudowall/ledger';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { GATEWAY_VERSION } from '@tortoisegate/gateway';
+import { GATEWAY_VERSION } from '@sudowall/gateway';
 import { upstreamIdFor } from '../src/main.js';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
@@ -33,7 +33,7 @@ function cli(args: string[], env: Record<string, string> = {}) {
 
 /** Events recorded in the ledger, in order. */
 function events(home: string): Record<string, unknown>[] {
-  const db = openStateDb(join(home, 'tortoisegate', 'ledger.db'), { readonly: true });
+  const db = openStateDb(join(home, 'sudowall', 'ledger.db'), { readonly: true });
   try {
     return (
       db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {
@@ -66,14 +66,14 @@ describe('upstream id for a wrapped command', () => {
   });
 });
 
-describe('tortoisegate command line', () => {
+describe('sudowall command line', () => {
   it('prints the version and exits 0', () => {
     const r = cli(['--version']);
     expect(r).toMatchObject({ code: 0, stdout: `${GATEWAY_VERSION}\n` });
   });
 
   it('runs through a symlinked bin (as npm installs it)', () => {
-    const link = join(tmp(), 'tortoisegate');
+    const link = join(tmp(), 'sudowall');
     symlinkSync(CLI, link);
     const r = spawnSync(process.execPath, [link, '--version'], { encoding: 'utf8' });
     expect(r.stdout).toBe(`${GATEWAY_VERSION}\n`);
@@ -109,13 +109,13 @@ describe('tortoisegate command line', () => {
       JSON.stringify({
         schemaVersion: 1,
         upstreams: [
-          { id: 'x', transport: 'stdio', command: 'x', env: { T: { fromEnv: 'TG_NOPE' } } },
+          { id: 'x', transport: 'stdio', command: 'x', env: { T: { fromEnv: 'SW_NOPE' } } },
         ],
       }),
     );
     const env = cli(['serve', '--config', join(dir, 'env.json')]);
     expect(env.code).toBe(3);
-    expect(env.stderr).toMatch(/TG_NOPE is referenced by the config but is not set/);
+    expect(env.stderr).toMatch(/SW_NOPE is referenced by the config but is not set/);
 
     writeFileSync(join(dir, 'schema.json'), '{"schemaVersion":1,"upstreams":[],"mode":"loose"}');
     const schema = cli(['serve', '--config', join(dir, 'schema.json')]);
@@ -140,10 +140,10 @@ describe('wrap', () => {
     const res = await client.callTool({ name: 'get-sum', arguments: { a: 1, b: 2 } });
     expect(res.isError).toBe(true);
     expect(res.content).toEqual([
-      { type: 'text', text: expect.stringMatching(/^Blocked by Tortoise Gate: /) as unknown },
+      { type: 'text', text: expect.stringMatching(/^Blocked by SudoWall: /) as unknown },
     ]);
-    expect(res._meta?.['tortoisegate/decision']).toMatchObject({
-      code: 'TG_BLOCKED',
+    expect(res._meta?.['sudowall/decision']).toMatchObject({
+      code: 'SW_BLOCKED',
       ruleIds: ['deny-list-0'],
     });
     const ok = await client.callTool({ name: 'echo', arguments: { message: 'still fine' } });
@@ -155,7 +155,7 @@ describe('wrap', () => {
       (e) => e['type'] === 'tool.call' && (e as { tool?: string }).tool === 'get-sum',
     );
     expect(call).toMatchObject({ decision: { verdict: 'block', effective: 'block' } });
-    expect((res._meta?.['tortoisegate/decision'] as { eventId: string }).eventId).toBe(
+    expect((res._meta?.['sudowall/decision'] as { eventId: string }).eventId).toBe(
       (call as { id: string }).id,
     );
   });

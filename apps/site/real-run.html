@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>A real agent run through Tortoise Gate</title>
+    <title>A real agent run through SudoWall</title>
     <meta
       name="description"
-      content="Claude Code with a real model, two real MCP servers and the published tortoisegate package: what the user asked, what the agent did, and what the gate decided."
+      content="Claude Code with a real model, two real MCP servers and the published package: what the user asked, what the agent did, and what the gate decided."
     />
     <meta name="referrer" content="no-referrer" />
     <meta
@@ -15,7 +15,7 @@
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 20c0-7 5.4-12 12-12s12 5 12 12z' fill='%232f6b4f'/%3E%3Cpath d='M9 20l3-6h8l3 6' fill='none' stroke='%23eef1ea' stroke-width='1.6'/%3E%3Crect x='3' y='20' width='26' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='8' width='26' height='18' rx='2' fill='%232f6b4f'/%3E%3Cpath d='M3 14h26M3 20h10M19 20h10M10 8v6M22 8v6M7 14v6M25 14v6M9 20v6M23 20v6' fill='none' stroke='%23eef1ea' stroke-width='1.4'/%3E%3Cpath d='M13 26v-6a3 3 0 0 1 6 0v6z' fill='%23eef1ea'/%3E%3Crect x='2' y='26' width='28' height='3' rx='1.5' fill='%231f2a22'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="site.css" />
   </head>
@@ -24,18 +24,24 @@
       <header class="site">
         <a class="mark" href="./">
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M4 20c0-7 5.4-12 12-12s12 5 12 12z" fill="#2f6b4f" />
-            <path d="M9 20l3-6h8l3 6" fill="none" stroke="#eef1ea" stroke-width="1.6" />
-            <rect x="3" y="20" width="26" height="3" rx="1.5" fill="currentColor" />
+            <rect x="3" y="8" width="26" height="18" rx="2" fill="#2f6b4f" />
+            <path
+              d="M3 14h26M3 20h10M19 20h10M10 8v6M22 8v6M7 14v6M25 14v6M9 20v6M23 20v6"
+              fill="none"
+              stroke="#eef1ea"
+              stroke-width="1.4"
+            />
+            <path d="M13 26v-6a3 3 0 0 1 6 0v6z" fill="#eef1ea" />
+            <rect x="2" y="26" width="28" height="3" rx="1.5" fill="currentColor" />
           </svg>
-          Tortoise Gate
+          SudoWall
         </a>
         <nav aria-label="Site">
           <a href="./">Home</a>
           <a href="get-started.html">Get started</a>
           <a href="real-run.html" aria-current="page">See it real</a>
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Source</a>
-          <a href="https://www.npmjs.com/package/tortoisegate">npm</a>
+          <a href="https://github.com/ABDULMUNAFZ/sudowall">Source</a>
+          <a href="https://www.npmjs.com/package/sudowall">npm</a>
         </nav>
       </header>
 
@@ -44,8 +50,9 @@
           <h1>A real agent, real tools, a real decision</h1>
           <p class="lede">
             Not the scripted demo. Claude Code with a real model, two real MCP servers and the
-            <code>tortoisegate</code> package installed from npm, on a local test chain. Recorded on
-            30 October 2026.
+            package installed from npm, on a local test chain. Recorded on 30 October 2026 with
+            version 0.1.0, when SudoWall was still called Tortoise Gate, so the screenshots show the
+            old name.
           </p>
         </div>
 
@@ -53,10 +60,11 @@
           <div class="prose">
             <h2 id="setup">The setup</h2>
             <p>
-              A new project folder, <code>npm install tortoisegate</code>,
-              <code>tortoisegate init</code>, and one edit to the policy: Dana&rsquo;s real address
-              on the trusted list. Behind the gate, in enforce mode: the official filesystem MCP
-              server on an inbox with two emails, and a payments server on a local test chain.
+              A new project folder, <code>npm install tortoisegate@0.1.0</code> (the package&rsquo;s
+              name before the rename), <code>init</code>, and one edit to the policy: Dana&rsquo;s
+              real address on the trusted list. Behind the gate, in enforce mode: the official
+              filesystem MCP server on an inbox with two emails, and a payments server on a local
+              test chain.
             </p>
             <p>
               The inbox is a trap. An invoice hides a white-on-white instruction telling an AI
@@ -105,7 +113,7 @@
               src="img/approval.jpg"
               width="800"
               height="548"
-              alt="Tortoise Gate approval card: evm/send_funds to 0xFe5c1268f8c1CF1b4381938bf1D9C684d99091ed, amount 0.005, rules ask-untrusted-recipient and ask-first-seen-recipient, exact match with untrusted content from files/read_text_file, with Deny and Approve buttons"
+              alt="SudoWall approval card: evm/send_funds to 0xFe5c1268f8c1CF1b4381938bf1D9C684d99091ed, amount 0.005, rules ask-untrusted-recipient and ask-first-seen-recipient, exact match with untrusted content from files/read_text_file, with Deny and Approve buttons"
             />
             <figcaption>
               First payment: paused. The gate shows the address was an exact match for text in the
@@ -128,8 +136,8 @@
             <div class="quote">
               <span class="who">Agent, afterwards</span>
               <p>
-                Neither payment went through. Tortoise Gate blocked both, and I haven&rsquo;t tried
-                to get around it.
+                Neither payment went through. SudoWall blocked both, and I haven&rsquo;t tried to
+                get around it.
               </p>
             </div>
           </div>
@@ -199,8 +207,7 @@
           <div class="prose next">
             <p>
               Full write-up, including what this test does not show:
-              <a
-                href="https://github.com/ABDULMUNAFZ/tortoise-gate/blob/main/docs/real-world-test.md"
+              <a href="https://github.com/ABDULMUNAFZ/sudowall/blob/main/docs/real-world-test.md"
                 >docs/real-world-test.md</a
               >. To do this with your own agent, <a href="get-started.html">get started</a>.
             </p>
@@ -211,8 +218,8 @@
       <footer>
         <p>
           Open source under Apache-2.0.
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate">Read the code</a>, or
-          <a href="https://github.com/ABDULMUNAFZ/tortoise-gate/issues/new?template=tried-it.yml"
+          <a href="https://github.com/ABDULMUNAFZ/sudowall">Read the code</a>, or
+          <a href="https://github.com/ABDULMUNAFZ/sudowall/issues/new?template=tried-it.yml"
             >tell us how it went</a
           >.
         </p>

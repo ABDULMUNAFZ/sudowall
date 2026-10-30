@@ -20,31 +20,31 @@ export interface TigerGraphConfig {
   auth: { token: string } | { username: string; password: string };
 }
 
-/** Reads TG_TIGERGRAPH_* variables; undefined when TG_TIGERGRAPH_HOST is not set. */
+/** Reads SW_TIGERGRAPH_* variables; undefined when SW_TIGERGRAPH_HOST is not set. */
 export function tigerGraphConfigFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): TigerGraphConfig | undefined {
-  const host = env['TG_TIGERGRAPH_HOST'];
+  const host = env['SW_TIGERGRAPH_HOST'];
   if (host === undefined || host === '') return undefined;
   const url = new URL(host);
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !local) {
-    throw new Error('TG_TIGERGRAPH_HOST must use https unless it is on this machine');
+    throw new Error('SW_TIGERGRAPH_HOST must use https unless it is on this machine');
   }
-  const token = env['TG_TIGERGRAPH_TOKEN'];
-  const username = env['TG_TIGERGRAPH_USERNAME'];
-  const password = env['TG_TIGERGRAPH_PASSWORD'];
+  const token = env['SW_TIGERGRAPH_TOKEN'];
+  const username = env['SW_TIGERGRAPH_USERNAME'];
+  const password = env['SW_TIGERGRAPH_PASSWORD'];
   let auth: TigerGraphConfig['auth'];
   if (token !== undefined && token !== '') auth = { token };
   else if (username !== undefined && password !== undefined) auth = { username, password };
   else {
     throw new Error(
-      'set TG_TIGERGRAPH_TOKEN, or TG_TIGERGRAPH_USERNAME and TG_TIGERGRAPH_PASSWORD, with TG_TIGERGRAPH_HOST',
+      'set SW_TIGERGRAPH_TOKEN, or SW_TIGERGRAPH_USERNAME and SW_TIGERGRAPH_PASSWORD, with SW_TIGERGRAPH_HOST',
     );
   }
   return {
     host: host.replace(/\/+$/, ''),
-    graph: env['TG_TIGERGRAPH_GRAPH'] ?? 'TortoiseGate',
+    graph: env['SW_TIGERGRAPH_GRAPH'] ?? 'SudoWall',
     auth,
   };
 }

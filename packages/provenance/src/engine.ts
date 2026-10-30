@@ -11,8 +11,8 @@ import {
   type ProvenanceReport,
   type Source,
   type TrustLabel,
-} from '@tortoisegate/core';
-import type { StateDb } from '@tortoisegate/ledger';
+} from '@sudowall/core';
+import type { StateDb } from '@sudowall/ledger';
 import { extractValues } from './extract.js';
 import { ProvenanceIndex, type IndexHit, type SourceRecord } from './index-store.js';
 import {

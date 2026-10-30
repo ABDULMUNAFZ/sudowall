@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { canonicalSha256 } from '@tortoisegate/core';
-import { evmChecksum, normalizeEmail, normalizeEvm, normalizeUrl } from '@tortoisegate/provenance';
+import { canonicalSha256 } from '@sudowall/core';
+import { evmChecksum, normalizeEmail, normalizeEvm, normalizeUrl } from '@sudowall/provenance';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {

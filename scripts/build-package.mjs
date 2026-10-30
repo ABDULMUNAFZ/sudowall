@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Builds the publishable `tortoisegate` npm package into release/tortoisegate/.
+// Builds the publishable `sudowall` npm package into release/sudowall/.
 //
-// Our own workspace code (@tortoisegate/* and the demo payments server) is bundled into two
+// Our own workspace code (@sudowall/* and the demo payments server) is bundled into two
 // files; every third-party library stays an ordinary, exactly pinned dependency, so the package
 // ships no vendored third-party code. Run `pnpm build` first: the bundle reads the built
 // workspace packages and the built web UI.
@@ -19,7 +19,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'release', 'tortoisegate');
+const OUT = join(ROOT, 'release', 'sudowall');
 const readJson = (p) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
 
 /** Exact versions of every third-party dependency declared anywhere in the workspace. */
@@ -56,7 +56,7 @@ const ownCodeOnly = {
     b.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.path.startsWith('node:')) return { path: args.path, external: true };
       const name = packageName(args.path);
-      if (name.startsWith('@tortoisegate/') || name === 'tortoisegate') return undefined;
+      if (name.startsWith('@sudowall/') || name === 'sudowall') return undefined;
       externals.add(name);
       return { path: args.path, external: true };
     });
@@ -114,20 +114,20 @@ const dependencies = Object.fromEntries(
 );
 const cli = readJson('packages/cli/package.json');
 const pkg = {
-  name: 'tortoisegate',
+  name: 'sudowall',
   version: cli.version,
   description:
     "Open-source firewall for AI agents. Checks every MCP tool call before it runs, pauses or blocks risky ones, and keeps a tamper-evident log. Nothing moves until it's checked.",
   license: 'Apache-2.0',
   type: 'module',
   // npm normalises bin paths on publish and warns about a leading ./, so write the normal form.
-  bin: { tortoisegate: 'dist/main.js' },
+  bin: { sudowall: 'dist/main.js' },
   files: ['dist', 'assets', 'LICENSE', 'README.md'],
   engines: { node: '>=24.0.0' },
   os: ['darwin', 'linux'],
-  repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/tortoise-gate.git' },
-  homepage: 'https://tortoise-gate.vercel.app/',
-  bugs: { url: 'https://github.com/ABDULMUNAFZ/tortoise-gate/issues' },
+  repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/sudowall.git' },
+  homepage: 'https://sudowall.vercel.app/',
+  bugs: { url: 'https://github.com/ABDULMUNAFZ/sudowall/issues' },
   keywords: [
     'ai-agents',
     'mcp',
@@ -140,7 +140,7 @@ const pkg = {
   dependencies,
 };
 writeFileSync(join(OUT, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
-console.log(`built ${relative(ROOT, OUT)} (tortoisegate ${pkg.version})`);
+console.log(`built ${relative(ROOT, OUT)} (sudowall ${pkg.version})`);
 console.log(
   `dependencies: ${Object.entries(dependencies)
     .map(([n, v]) => `${n}@${v}`)

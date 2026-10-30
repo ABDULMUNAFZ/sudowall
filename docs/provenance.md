@@ -50,7 +50,7 @@ Per (value, exact text, trust label) group the index keeps only the 16 newest ro
 
 ## Corpus results
 
-`packages/provenance/test/corpus.ts`, run by `pnpm --filter @tortoisegate/provenance test`. "Flagged" means the report has an untrusted `exact`/`normalized` match or any `near` match: what a policy acts on. 2026-10-29:
+`packages/provenance/test/corpus.ts`, run by `pnpm --filter @sudowall/provenance test`. "Flagged" means the report has an untrusted `exact`/`normalized` match or any `near` match: what a policy acts on. 2026-10-29:
 
 | Set    | Cases | Flagged | Not flagged | False negatives | False positives |
 | ------ | ----- | ------- | ----------- | --------------- | --------------- |

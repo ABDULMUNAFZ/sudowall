@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openStateDb } from '@tortoisegate/ledger';
+import { openStateDb } from '@sudowall/ledger';
 import { describe, expect, it } from 'vitest';
 import {
   compilePolicy,
@@ -24,7 +24,7 @@ const errorOf = (f: () => unknown): string => {
   throw new Error('expected a PolicyError');
 };
 
-const MINIMAL = `schema: tortoise-gate/policy@1
+const MINIMAL = `schema: sudowall/policy@1
 name: p
 version: 1
 `;
@@ -33,7 +33,7 @@ describe('policy loading', () => {
   it('applies defaults and hashes the validated document', () => {
     const p = parsePolicyYaml(MINIMAL);
     expect(p.doc).toEqual({
-      schema: 'tortoise-gate/policy@1',
+      schema: 'sudowall/policy@1',
       name: 'p',
       version: 1,
       defaults: { sink: 'ask', other: 'allow' },
@@ -43,10 +43,16 @@ describe('policy loading', () => {
     });
     // Formatting and key order do not change the hash; content does.
     const same = parsePolicyYaml(
-      'version: 1\nname: p\nschema: "tortoise-gate/policy@1"\ndefaults: {sink: ask}\n',
+      'version: 1\nname: p\nschema: "sudowall/policy@1"\ndefaults: {sink: ask}\n',
     );
     expect(same.sha256).toBe(p.sha256);
     expect(parsePolicyYaml(MINIMAL.replace('version: 1', 'version: 2')).sha256).not.toBe(p.sha256);
+  });
+
+  it('still loads policies written before the rename (tortoise-gate/policy@1)', () => {
+    const p = parsePolicyYaml(MINIMAL.replace('sudowall/policy@1', 'tortoise-gate/policy@1'));
+    expect(p.doc.schema).toBe('tortoise-gate/policy@1');
+    expect(p.doc.defaults).toEqual({ sink: 'ask', other: 'allow' });
   });
 
   it.each([

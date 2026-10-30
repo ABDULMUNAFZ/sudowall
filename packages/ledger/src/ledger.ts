@@ -1,5 +1,5 @@
 import { randomUUID, sign } from 'node:crypto';
-import { EventSchema, tgjson, type Event } from '@tortoisegate/core';
+import { EventSchema, tgjson, type Event } from '@sudowall/core';
 import { z } from 'zod';
 import { migrateComponent, openStateDb, type OpenStateDbOptions, type StateDb } from './db.js';
 import {

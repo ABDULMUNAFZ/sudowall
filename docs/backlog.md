@@ -45,9 +45,9 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 ## Approvals and UI
 
 - Push updates to the UI (server-sent events) instead of 1 s polling; file notification instead of DB polling in the gateway.
-- Approve from the terminal (`tortoisegate approvals approve <id>`) and from the desktop notification.
+- Approve from the terminal (`sudowall approvals approve <id>`) and from the desktop notification.
 - Mark approvals of a crashed gateway as abandoned at once (today they expire).
-- Ship the built web UI inside the published CLI package (today the CLI resolves the workspace `@tortoisegate/web-ui` package).
+- Ship the built web UI inside the published CLI package (today the CLI resolves the workspace `@sudowall/web-ui` package).
 
 ## Supply chain and release
 
