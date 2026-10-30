@@ -17,7 +17,7 @@ Website: https://sudowall.vercel.app
 
 ## Quickstart
 
-See it work in two minutes (Node.js 24, macOS or Linux):
+See it work in two minutes (Node.js 24; macOS, Linux or Windows):
 
 ```sh
 npx sudowall demo
