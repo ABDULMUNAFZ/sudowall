@@ -1,6 +1,6 @@
 # Pitch and demo script
 
-Every claim here matches what the code does today (0.2.0). If the code changes, change this file.
+Every claim here matches what the code does today (0.3.0). If the code changes, change this file.
 
 ## 90-second live demo
 
@@ -24,7 +24,7 @@ If the network is slow, record this run beforehand and play it; say that it is a
 2. **Why now (15 s).** MCP made it easy to give agents many tools. Agents that move money are already live, and losses there are immediate.
 3. **What we built (40 s).** A firewall at the one place every action must pass: the tool call. It labels where data came from, catches values copied from untrusted content and lookalikes of trusted ones, applies fixed rules (no AI judge) to allow, ask or block, and keeps a tamper-evident record. One command to try it (`npx sudowall demo`), one command to put it in front of the MCP servers you already use in Claude Code, Claude Desktop and Cursor (`npx sudowall protect`). It adds about 1 ms per tool call at the median.
 4. **Live demo (60 s).** The script above, shortened.
-5. **What is real and what is next (20 s).** Real today: the gateway for MCP over stdio and HTTP on both protocol versions, source tracking, the policy engine, approvals in a local UI, the signed ledger, incident forensics on a data-flow graph (locally or on TigerGraph), one-command `protect` for Claude Code, Claude Desktop and Cursor, the npm package, and 369 automated tests including a real-chain end-to-end test. We also ran it in front of Claude Code with a real model: it stopped the injected payment and the lookalike, and let the real one through. Next: remote (URL) MCP servers, an SDK for agents that do not use MCP, team policy and audit export.
+5. **What is real and what is next (20 s).** Real today: the gateway for MCP over stdio and HTTP on both protocol versions, source tracking, the policy engine, approvals in a local UI, the signed ledger, incident forensics on a data-flow graph (locally or on TigerGraph), one-command `protect` for Claude Code, Claude Desktop and Cursor, the npm package, and 372 automated tests including a real-chain end-to-end test. We also ran it in front of Claude Code with a real model: it stopped the injected payment and the lookalike, and let the real one through. Next: remote (URL) MCP servers, an SDK for agents that do not use MCP, team policy and audit export.
 6. **The ask (15 s).** Design partners building agents that move money or touch customer data, and funding to harden it for production.
 
 ## Honest answers to likely questions
