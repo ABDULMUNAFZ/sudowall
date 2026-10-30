@@ -11,7 +11,7 @@ Install: `npx sudowall demo` ([npm](https://www.npmjs.com/package/sudowall)). Th
 
 SudoWall is an open-source firewall for AI agents. It sits between an agent and its MCP tools. It checks every tool call before it runs, blocks risky calls or asks you about them, and keeps a tamper-evident record of what the agent did. A hidden instruction in an email should not be able to make your agent leak data or send money.
 
-Website: https://sudowall.vercel.app
+Website: https://www.sudowall.tech
 
 > **Status: alpha (0.1.0).** Working end to end and tested, but young. Do not put it in front of real funds yet. This README lists only what actually works.
 
@@ -80,7 +80,7 @@ Then restart the client and open `npx sudowall ui` to watch decisions. The gate 
 
 ## Demo with Claude Code and a real model
 
-A recorded test of the published package with Claude Code and a real model, three runs, real screenshots: [docs/real-world-test.md](docs/real-world-test.md) and https://sudowall.vercel.app/real-run.html.
+A recorded test of the published package with Claude Code and a real model, three runs, real screenshots: [docs/real-world-test.md](docs/real-world-test.md) and https://www.sudowall.tech/real-run.html.
 
 Claude Code pays invoices from an inbox through SudoWall, on a local Anvil chain (testnet only). Full walkthrough and a recorded run: [docs/demo.md](docs/demo.md).
 

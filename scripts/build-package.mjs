@@ -128,7 +128,7 @@ const pkg = {
   engines: { node: '>=24.0.0' },
   os: ['darwin', 'linux', 'win32'],
   repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/sudowall.git' },
-  homepage: 'https://sudowall.vercel.app/',
+  homepage: 'https://www.sudowall.tech/',
   bugs: { url: 'https://github.com/ABDULMUNAFZ/sudowall/issues' },
   keywords: [
     'ai-agents',

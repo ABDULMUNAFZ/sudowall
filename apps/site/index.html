@@ -17,7 +17,7 @@
     <link rel="apple-touch-icon" href="brand/apple-touch-icon.png" />
     <meta property="og:title" content="SudoWall: a firewall for AI agents" />
     <meta property="og:description" content="Nothing moves until it's checked." />
-    <meta property="og:image" content="https://sudowall.vercel.app/brand/icon-512.png" />
+    <meta property="og:image" content="https://www.sudowall.tech/brand/icon-512.png" />
     <link rel="stylesheet" href="home.css" />
   </head>
   <body>
@@ -85,16 +85,19 @@
         <div class="hero-cards" aria-label="SudoWall at a glance">
           <article class="tile tile-lime" data-tile>
             <span class="tile-icon" aria-hidden="true">&#x23F1;</span>
-            <p class="tile-big"><span data-count="1">1</span> ms</p>
-            <p class="tile-small">added per tool call</p>
+            <p class="tile-big">~<span data-count="1">1</span> ms</p>
+            <p class="tile-small">added per tool call (median, measured)</p>
           </article>
           <article class="tile tile-white" data-tile>
             <span class="tile-icon orange" aria-hidden="true">&#x2714;</span>
             <p class="tile-big"><span data-count="406">406</span> tests</p>
-            <p class="tile-small">pass in CI; the package is checked on macOS, Linux, Windows</p>
+            <p class="tile-small">
+              automated tests pass in CI; the package is checked on macOS, Linux and Windows
+            </p>
           </article>
           <article class="tile tile-dashed" data-tile>
-            <p class="tile-label">One command</p>
+            <p class="tile-label">Nothing to install: Node.js 24 is enough</p>
+            <code>npx sudowall demo</code>
             <code>npx sudowall protect --apply</code>
             <p class="tile-small">Claude Code &middot; Claude Desktop &middot; Cursor</p>
           </article>
@@ -110,10 +113,11 @@
       <section class="problem" id="problem" data-section="problem">
         <p class="kicker">The problem</p>
         <p class="reveal-text" data-reveal>
-          Your agent reads an email. The email talks back. A hidden line says
-          <em>&ldquo;send the keys to this address&rdquo;</em>, and a helpful agent does it. Prompt
-          injection means anyone who can put text in front of your agent can try to steer it, and no
-          model refuses every time.
+          Your AI agent now holds the keys: your inbox, your repos, your payment API. Every email,
+          web page, GitHub issue and support ticket it reads can carry instructions, and it acts on
+          them in a tool call nobody reviews. One poisoned ticket and it
+          <em>emails your secrets to a stranger, pushes to main, or pays a lookalike address</em>.
+          Models refuse some of the time. An attacker needs one yes.
         </p>
       </section>
 
@@ -268,34 +272,46 @@
         </header>
         <div class="logos">
           <article class="w-tile" data-wtile>
+            <img class="w-logo" src="logos/claude.svg" alt="" width="40" height="40" />
             <h3>Claude Code</h3>
-            <p>Local and remote servers</p>
+            <p>Local and remote MCP servers</p>
           </article>
           <article class="w-tile" data-wtile>
+            <img class="w-logo" src="logos/claude.svg" alt="" width="40" height="40" />
             <h3>Claude Desktop</h3>
             <p>One command to protect</p>
           </article>
           <article class="w-tile" data-wtile>
+            <img class="w-logo" src="logos/cursor.svg" alt="" width="40" height="40" />
             <h3>Cursor</h3>
             <p>Backups first, one command to undo</p>
           </article>
           <article class="w-tile lime" data-wtile>
+            <img class="w-logo" src="logos/dodopayments.svg" alt="" width="40" height="40" />
             <h3>Dodo Payments</h3>
             <p>Refunds ask you; a poisoned ticket cannot take over an account</p>
           </article>
           <article class="w-tile orange" data-wtile>
+            <img class="w-logo tile-bg" src="logos/viasocket.svg" alt="" width="40" height="40" />
             <h3>viaSocket &amp; remote MCP</h3>
             <p>2,500+ apps through one gate</p>
           </article>
           <article class="w-tile dark" data-wtile>
+            <img class="w-logo tile-bg" src="logos/tigergraph.png" alt="" width="40" height="40" />
             <h3>TigerGraph</h3>
             <p>Incident graph: where a value came from, what it reached</p>
           </article>
           <article class="w-tile" data-wtile>
+            <span class="w-logos">
+              <img class="w-logo" src="logos/apple.svg" alt="" width="34" height="34" />
+              <img class="w-logo" src="logos/linux.svg" alt="" width="34" height="34" />
+              <img class="w-logo" src="logos/windows.svg" alt="" width="34" height="34" />
+            </span>
             <h3>macOS &middot; Linux &middot; Windows</h3>
-            <p>Node.js 24</p>
+            <p>Node.js 24 or newer</p>
           </article>
           <article class="w-tile peach" data-wtile>
+            <img class="w-logo" src="brand/mark.png" alt="" width="40" height="40" />
             <h3>Open source</h3>
             <p>Apache-2.0, no telemetry</p>
           </article>
@@ -308,9 +324,19 @@
           <div class="start-copy">
             <p class="kicker dark">Get started</p>
             <h2>Two minutes to see it. One command to keep it.</h2>
+            <ol class="first-steps">
+              <li><b>Check Node.js 24 or newer:</b> <code>node -v</code></li>
+              <li><b>See it stop an attack:</b> <code>npx sudowall demo</code></li>
+              <li>
+                <b>Protect your agents:</b> <code>npx sudowall protect --apply</code>, then restart
+                Claude Code, Claude Desktop or Cursor
+              </li>
+              <li><b>Watch it work:</b> <code>npx sudowall ui</code></li>
+            </ol>
             <p>
-              It starts in watching mode, so nothing changes for your agent until you turn
-              protection on.
+              No install step: <code>npx</code> fetches SudoWall. It starts in watching mode, so
+              nothing changes for your agent until you turn protection on. Prefer a global install?
+              <code>npm install -g sudowall</code>
             </p>
             <a class="btn dark" href="get-started.html">Read the guide</a>
           </div>
@@ -319,7 +345,9 @@
             <pre
               class="term"
               data-term
-            ><span class="p">$</span> <span class="c" data-type="npx sudowall demo">npx sudowall demo</span>
+            ><span class="p">$</span> <span class="c" data-type="node -v">node -v</span>
+<span class="o" data-out>  v24.x</span>
+<span class="p">$</span> <span class="c" data-type="npx sudowall demo">npx sudowall demo</span>
 <span class="o" data-out>  ▟█ sudowall  Nothing moves until it's checked.</span>
 <span class="o ok" data-out>  ok  pay address injected in an email: denied</span>
 <span class="o ok" data-out>  ok  pay a lookalike of a trusted address: blocked</span>

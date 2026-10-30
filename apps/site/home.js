@@ -237,7 +237,7 @@
         ease: 'none',
         onUpdate: () => (t.textContent = text.slice(0, Math.round(st.n))),
       });
-      const count = i === 0 ? 3 : 1;
+      const count = i === 1 ? 3 : 1;
       for (let k = 0; k < count && o < outs.length; k++, o++) {
         tl.to(outs[o], { opacity: 1, duration: 0.25 }, k === 0 ? '+=0.25' : '+=0.15');
       }

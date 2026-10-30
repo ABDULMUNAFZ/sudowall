@@ -1022,3 +1022,49 @@ section {
     transition: none;
   }
 }
+
+/* Works-with logos and the first steps. */
+.w-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  margin-bottom: auto;
+}
+.w-logo.tile-bg {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 6px;
+}
+.w-logos {
+  display: flex;
+  gap: 10px;
+  margin-bottom: auto;
+}
+.w-logos .w-logo {
+  width: 34px;
+  height: 34px;
+}
+.w-tile {
+  gap: 4px;
+  min-height: 200px;
+}
+.tile-dashed code + code {
+  margin-top: 6px;
+}
+.first-steps {
+  margin: 18px 0 10px;
+  padding-left: 22px;
+  font-size: 17px;
+}
+.first-steps li {
+  margin: 8px 0;
+}
+.first-steps code,
+.start-copy p code {
+  background: var(--ink);
+  color: var(--lime);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}

@@ -73,7 +73,7 @@ A capable model can catch an obvious trap by itself. You cannot rely on that eve
 - The emails were written to test this. A real attack may be subtler, and an attack that rewords an instruction rather than copying a value is outside what value matching catches (see the README's honest limits).
 - Testnet only, by design.
 
-Screenshots from this run are on the website: https://tortoise-gate.vercel.app/real-run.html
+Screenshots from this run are on the website: https://www.sudowall.tech/real-run.html
 
 ## Follow-up: `tortoisegate protect` with Claude Code (0.2.0)
 

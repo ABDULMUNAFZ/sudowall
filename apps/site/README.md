@@ -2,7 +2,7 @@
 
 `index.html` is the whole site: static, no build step, no cookies, no third-party requests.
 
-It is deployed to Vercel as the `sudowall` project at https://sudowall.vercel.app. The project is connected to this repository with its root directory set to `apps/site` and no build step, so every push to `main` that changes this folder deploys it; pushes that do not touch it are skipped (`git diff --quiet HEAD^ HEAD -- .`). A manual deploy from this folder also works:
+It is deployed to Vercel as the `sudowall` project at https://www.sudowall.tech. The project is connected to this repository with its root directory set to `apps/site` and no build step, so every push to `main` that changes this folder deploys it; pushes that do not touch it are skipped (`git diff --quiet HEAD^ HEAD -- .`). A manual deploy from this folder also works:
 
 ```sh
 vercel deploy --prod
