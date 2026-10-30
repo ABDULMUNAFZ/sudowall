@@ -126,7 +126,7 @@ const pkg = {
   bin: { sudowall: 'dist/main.js' },
   files: ['dist', 'assets', 'LICENSE', 'README.md'],
   engines: { node: '>=24.0.0' },
-  os: ['darwin', 'linux'],
+  os: ['darwin', 'linux', 'win32'],
   repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/sudowall.git' },
   homepage: 'https://sudowall.vercel.app/',
   bugs: { url: 'https://github.com/ABDULMUNAFZ/sudowall/issues' },
