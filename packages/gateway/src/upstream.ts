@@ -87,6 +87,7 @@ export class UpstreamConnection {
           max,
           this.log,
           this.cfg.upstreamLifecycle.shutdownGraceMs,
+          this.cfg.limits.maxWriteBufferBytes,
         );
       } else {
         const headers: Record<string, string> = {};
@@ -103,14 +104,15 @@ export class UpstreamConnection {
     this.channel = ch;
     ch.onMessage((text) => {
       this.lastTraffic = Date.now();
-      // A process that speaks is alive: reset the restart backoff.
-      this.attempts = 0;
       const m = classify(text);
       if (m.kind === 'invalid') {
         this.events.invalid(m.reason);
         return;
       }
       if (m.kind === 'response') {
+        // Only a valid answer to a request proves the process works: noise or invalid output
+        // must not reset the restart backoff.
+        this.attempts = 0;
         const w = this.waiters.get(m.idKey);
         if (w !== undefined) {
           this.waiters.delete(m.idKey);
@@ -210,20 +212,27 @@ export class UpstreamConnection {
   learnFromHandshake(result: Message, era: Era): void {
     this.era = era;
     const res = rawGet(result.root, 'result');
-    if (res === undefined) return;
+    if (res?.kind !== 'object') {
+      // A malformed handshake result: keep what is known, assume nothing about capabilities.
+      this.capabilities = {};
+      return;
+    }
     const parsed = JSON.parse(result.text.slice(res.start, res.end)) as Record<string, unknown>;
     if (era === 'legacy') {
       this.protocolVersion =
         typeof parsed['protocolVersion'] === 'string' ? parsed['protocolVersion'] : undefined;
-      const info = parsed['serverInfo'] as { name?: unknown; version?: unknown } | undefined;
+      const raw = parsed['serverInfo'];
+      const info = (isRecord(raw) ? raw : undefined) as
+        { name?: unknown; version?: unknown } | undefined;
       this.serverInfo = {
         name: typeof info?.name === 'string' ? info.name : null,
         version: typeof info?.version === 'string' ? info.version : null,
       };
     } else {
       this.protocolVersion = MODERN_PROTOCOL;
-      const meta = parsed['_meta'] as Record<string, unknown> | undefined;
-      const info = meta?.['io.modelcontextprotocol/serverInfo'] as
+      const meta = isRecord(parsed['_meta']) ? parsed['_meta'] : undefined;
+      const raw = meta?.['io.modelcontextprotocol/serverInfo'];
+      const info = (isRecord(raw) ? raw : undefined) as
         { name?: unknown; version?: unknown } | undefined;
       this.serverInfo = {
         name: typeof info?.name === 'string' ? info.name : null,
@@ -231,8 +240,7 @@ export class UpstreamConnection {
       };
     }
     const caps = parsed['capabilities'];
-    this.capabilities =
-      caps !== null && typeof caps === 'object' ? (caps as Record<string, unknown>) : {};
+    this.capabilities = isRecord(caps) ? caps : {};
     if (this.channel instanceof HttpUpstreamChannel)
       this.channel.protocolVersion = this.protocolVersion;
   }
@@ -275,6 +283,9 @@ export class UpstreamConnection {
     this.channel = undefined;
   }
 }
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /** Adds the 2026-07-28 per-request envelope to a params object (gateway as client). */
 export function modernMeta(params: Record<string, unknown>): Record<string, unknown> {

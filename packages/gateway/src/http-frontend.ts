@@ -14,6 +14,12 @@ export interface HttpFrontendOptions {
   port: number;
   path: string;
   maxMessageBytes: number;
+  /** Concurrent 2025-era client sessions (`limits.maxSessions`). */
+  maxSessions?: number;
+  /** Idle session lifetime (`limits.sessionIdleMs`). */
+  sessionIdleMs?: number;
+  /** Unread bytes allowed per response stream (`limits.maxWriteBufferBytes`). */
+  maxWriteBufferBytes?: number;
   /** Bearer token clients must send. Generated per run if not given. */
   token?: string;
   log: Logger;
@@ -38,20 +44,45 @@ class HttpSessionChannel implements Channel {
     close: [] as ((r: CloseReason) => void)[],
   };
   closed = false;
+  /** Last time a request arrived or a response finished (for idle expiry). */
+  lastActive = Date.now();
 
-  constructor(private readonly log: Logger) {}
+  constructor(
+    private readonly log: Logger,
+    private readonly maxWriteBuffer: number,
+  ) {}
+
+  /** True while the session has work or a stream open: it is not idle. */
+  get busy(): boolean {
+    return this.responders.size > 0 || this.getStream !== undefined;
+  }
+
+  /** Writes an SSE event; a client that stopped reading past the limit is disconnected. */
+  private writeEvent(res: ServerResponse, text: string): boolean {
+    writeSse(res, text);
+    if (res.writableLength <= this.maxWriteBuffer) return true;
+    this.log.warn('HTTP client is not reading its stream; closing it', {
+      unreadBytes: res.writableLength,
+    });
+    res.destroy();
+    return false;
+  }
 
   send(text: string, related?: Related): void {
     const r = related && this.responders.get(related.requestIdKey);
     if (r === undefined) {
-      if (this.getStream !== undefined) writeSse(this.getStream, text);
+      if (this.getStream !== undefined) this.writeEvent(this.getStream, text);
       else this.log.debug('server message with no open stream dropped', { bytes: text.length });
       return;
     }
     let out = text;
     if (r.restoreId !== undefined && related?.final === true) out = restoreId(text, r.restoreId);
+    if (related?.final === true) this.lastActive = Date.now();
     if (r.sse) {
-      writeSse(r.res, out);
+      if (!this.writeEvent(r.res, out)) {
+        if (related !== undefined) this.responders.delete(related.requestIdKey);
+        return;
+      }
       if (related?.final === true) {
         this.responders.delete(related.requestIdKey);
         r.res.end();
@@ -92,7 +123,12 @@ function writeSse(res: ServerResponse, text: string): void {
   if (!res.headersSent) {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
   }
-  res.write(`event: message\ndata: ${text}\n\n`);
+  // Every line of the payload is its own data field (a raw newline would end the field).
+  const data = text
+    .split(/\r\n|\r|\n/)
+    .map((l) => `data: ${l}`)
+    .join('\n');
+  res.write(`event: message\n${data}\n\n`);
 }
 
 function restoreId(text: string, idText: string): string {
@@ -125,9 +161,26 @@ export class HttpFrontend {
   >();
   private stateless: { channel: HttpSessionChannel; close(): Promise<void> } | undefined;
   private nextStatelessId = 1;
+  private idleTimer: NodeJS.Timeout | undefined;
 
   constructor(private readonly opts: HttpFrontendOptions) {
     this.token = opts.token ?? randomBytes(32).toString('base64url');
+  }
+
+  private get maxWriteBuffer(): number {
+    return this.opts.maxWriteBufferBytes ?? 64 * 1024 * 1024;
+  }
+
+  /** Closes 2025-era sessions that had no request and no open stream for `sessionIdleMs`. */
+  private sweepIdle(): void {
+    const idle = this.opts.sessionIdleMs ?? 60 * 60 * 1000;
+    const now = Date.now();
+    for (const [id, s] of this.sessions) {
+      if (s.channel.busy || now - s.channel.lastActive < idle) continue;
+      this.opts.log.info('closing idle HTTP session', { sessionId: id });
+      this.sessions.delete(id);
+      void s.close();
+    }
   }
 
   async listen(): Promise<{ port: number; url: string }> {
@@ -145,6 +198,14 @@ export class HttpFrontend {
       });
     });
     this.port = (server.address() as AddressInfo).port;
+    const idle = this.opts.sessionIdleMs ?? 60 * 60 * 1000;
+    this.idleTimer = setInterval(
+      () => {
+        this.sweepIdle();
+      },
+      Math.max(1000, Math.min(60_000, Math.floor(idle / 4))),
+    );
+    this.idleTimer.unref();
     return { port: this.port, url: `http://${HTTP_HOST}:${this.port}${this.opts.path}` };
   }
 
@@ -197,6 +258,7 @@ export class HttpFrontend {
       s.channel.getStream = res;
       res.on('close', () => {
         if (s.channel.getStream === res) s.channel.getStream = undefined;
+        s.channel.lastActive = Date.now();
       });
       return;
     }
@@ -260,8 +322,15 @@ export class HttpFrontend {
       m.kind !== 'response' &&
       rawGet(m.root, 'params', '_meta', 'io.modelcontextprotocol/protocolVersion') !== undefined;
     if (m.kind === 'request' && m.method === 'initialize') {
+      const max = this.opts.maxSessions ?? 64;
+      if (this.sessions.size >= max) this.sweepIdle();
+      if (this.sessions.size >= max) {
+        res.setHeader('retry-after', '5');
+        this.reject(res, 503, `too many open sessions (limit ${String(max)}); close one first`);
+        return;
+      }
       newSessionId = randomUUID();
-      const channel = new HttpSessionChannel(this.opts.log);
+      const channel = new HttpSessionChannel(this.opts.log, this.maxWriteBuffer);
       const handle = this.opts.openSession(channel, newSessionId);
       target = { channel, close: () => handle.close() };
       this.sessions.set(newSessionId, target);
@@ -278,7 +347,7 @@ export class HttpFrontend {
       target = this.statelessSession();
       if (m.kind === 'request') {
         // Concurrent stateless clients may reuse ids; give each request a unique one.
-        restore = m.idKey;
+        restore = m.idText;
         text = applyEdits(body, [
           { start: m.id.start, end: m.id.end, replacement: `"h${this.nextStatelessId++}"` },
         ]);
@@ -287,12 +356,26 @@ export class HttpFrontend {
       this.reject(res, 400, 'missing Mcp-Session-Id (send initialize first)');
       return;
     }
+    target.channel.lastActive = Date.now();
     if (m.kind !== 'request') {
       target.channel.deliver(text);
       res.writeHead(202).end();
       return;
     }
     const idKey = restore === undefined ? m.idKey : (classify(text) as { idKey: string }).idKey;
+    if (target.channel.responders.has(idKey)) {
+      // Never replace the stream an in-flight request will be answered on.
+      res
+        .writeHead(409, { 'content-type': 'application/json' })
+        .end(
+          errorResponse(
+            m.idText,
+            RpcCode.InvalidRequest,
+            'a request with this id is already in flight',
+          ),
+        );
+      return;
+    }
     const accept = req.headers.accept ?? '';
     if (newSessionId !== undefined) res.setHeader('mcp-session-id', newSessionId);
     const responder: Responder = {
@@ -315,13 +398,14 @@ export class HttpFrontend {
 
   private statelessSession(): { channel: HttpSessionChannel; close(): Promise<void> } {
     if (this.stateless !== undefined && !this.stateless.channel.closed) return this.stateless;
-    const channel = new HttpSessionChannel(this.opts.log);
+    const channel = new HttpSessionChannel(this.opts.log, this.maxWriteBuffer);
     const handle = this.opts.openSession(channel, randomUUID());
     this.stateless = { channel, close: () => handle.close() };
     return this.stateless;
   }
 
   async close(): Promise<void> {
+    if (this.idleTimer !== undefined) clearInterval(this.idleTimer);
     const all = [...this.sessions.values(), ...(this.stateless ? [this.stateless] : [])];
     this.sessions.clear();
     await Promise.all(all.map((s) => s.close()));

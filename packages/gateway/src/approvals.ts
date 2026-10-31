@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { Config, JsonValue, ToolCallEvent } from '@sudowall/core';
+import { parseLossless, type Config, type JsonValue, type ToolCallEvent } from '@sudowall/core';
 import { migrateComponent, type StateDb } from '@sudowall/ledger';
 import type { Logger } from './log.js';
 
@@ -75,7 +75,8 @@ const toRow = (r: DbRow): ApprovalRow => ({
   tool: r.tool,
   argumentsSha256: r.arguments_sha256,
   explanation: r.explanation,
-  details: JSON.parse(r.details_json) as ApprovalDetails,
+  // Lossless: a big amount in the arguments is shown with every digit it was sent with.
+  details: parseLossless(r.details_json) as unknown as ApprovalDetails,
   createdAt: r.created_at,
   expiresAt: r.expires_at,
   status: r.status,

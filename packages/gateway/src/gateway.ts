@@ -106,6 +106,7 @@ export function createPipeline(config: Config, store: GatewayStore): DecisionPip
     provenance: () => store.provenance(),
     state: () => store.policyState(),
     onErrorNonSink: config.failure.onPolicyErrorNonSink,
+    windowSeconds: config.provenance.windowSeconds,
   });
 }
 
@@ -154,6 +155,7 @@ export async function runGateway(
       (opts.stdin ?? process.stdin) as NodeJS.ReadStream,
       (opts.stdout ?? process.stdout) as NodeJS.WriteStream,
       config.limits.maxMessageBytes,
+      config.limits.maxWriteBufferBytes,
     );
     const session = new Session({ ...base, client: channel, clientTransport: 'stdio' });
     let resolveDone!: () => void;
@@ -180,6 +182,9 @@ export async function runGateway(
     port: config.listen.port,
     path: config.listen.path,
     maxMessageBytes: config.limits.maxMessageBytes,
+    maxSessions: config.limits.maxSessions,
+    sessionIdleMs: config.limits.sessionIdleMs,
+    maxWriteBufferBytes: config.limits.maxWriteBufferBytes,
     log,
     openSession: (channel, sessionId) => {
       const s = new Session({

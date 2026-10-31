@@ -49,6 +49,8 @@ export interface ObservedContent {
   origin: string;
   content: JsonValue;
   observedAt: Date;
+  /** The gateway session that observed it. */
+  sessionId?: string;
 }
 
 /**
@@ -81,6 +83,7 @@ export function observeResult(engine: ProvenanceEngine, event: ToolResultEvent):
     origin: event.tool,
     content,
     observedAt: new Date(event.ts),
+    sessionId: event.sessionId,
   });
 }
 
@@ -115,7 +118,9 @@ export class StaticDenyListPipeline implements DecisionPipeline {
   }
 
   decideToolCall(ctx: ToolCallContext): PipelineVerdict {
-    const provenance = this.provenance?.().analyze(ctx.arguments, { now: ctx.now }) ?? null;
+    const provenance =
+      this.provenance?.().analyze(ctx.arguments, { now: ctx.now, sessionId: ctx.sessionId }) ??
+      null;
     const matched = this.deny
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => globMatch(s.server, ctx.server.id) && globMatch(s.tool, ctx.tool))
