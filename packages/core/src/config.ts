@@ -218,6 +218,13 @@ export const ConfigSchema = z
           .min(60)
           .max(90 * 86400)
           .default(86400),
+        /**
+         * Which untrusted content makes `session_tainted` true. `installation`: content any
+         * gateway process sharing the state database observed (an MCP client usually runs one
+         * gateway per server, so this is what links a web read in one server to a shell call in
+         * another). `session`: only content this gateway session observed.
+         */
+        taintScope: z.enum(['installation', 'session']).default('installation'),
       })
       .prefault({}),
     /** Policy engine config (Phase 4). */

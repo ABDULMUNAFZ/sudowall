@@ -50,6 +50,8 @@ export const sha256ValueId: ValueIdFn = (kind, normalised) =>
 interface Match {
   argPath: string;
   valueKind: string;
+  /** Keyed tag of the matched value (distinguishes two values in one argument). */
+  valueRef?: string;
   matchType: string;
   nearKind?: string;
   sourceLabel: string;
@@ -147,7 +149,9 @@ export function deltaFor(event: Json, valueId: ValueIdFn): GraphDelta {
       const value: VertexRef = {
         type: 'Value',
         id: createHash('sha256')
-          .update(`${id}\u0000${m.argPath}\u0000${m.valueKind}`)
+          .update(
+            `${id}\u0000${m.argPath}\u0000${m.valueKind}${m.valueRef === undefined ? '' : `\u0000${m.valueRef}`}`,
+          )
           .digest('hex')
           .slice(0, 32),
       };
@@ -162,14 +166,20 @@ export function deltaFor(event: Json, valueId: ValueIdFn): GraphDelta {
       edges.push({ type: 'used_in', from: value, to: call, attrs: { argPath: m.argPath } });
       for (const sourceId of new Set(m.evidence.map((e) => e.sourceId))) {
         const source: VertexRef = { type: 'Source', id: sourceId };
-        // Sources from tool results get their full attributes from tool.result; this only makes
-        // sure sources that are not tool results (a policy list) exist with their label.
-        vertices.push({ ...source, attrs: { label: m.sourceLabel } });
+        // Sources from tool results get their attributes (and their own label) from tool.result.
+        // The match's label is the least trusted of all its sources, so it is only this source's
+        // own label when it is `user` (a policy list, which has no tool result). It also goes on
+        // the edge.
+        vertices.push({ ...source, attrs: m.sourceLabel === 'user' ? { label: 'user' } : {} });
         edges.push({
           type: 'contained',
           from: source,
           to: value,
-          attrs: { matchType: m.matchType, nearKind: m.nearKind ?? '' },
+          attrs: {
+            matchType: m.matchType,
+            nearKind: m.nearKind ?? '',
+            sourceLabel: m.sourceLabel,
+          },
         });
       }
     }
