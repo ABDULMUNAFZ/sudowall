@@ -131,7 +131,9 @@ interface Row {
 
 function documentedRows(): Row[] {
   const md = readFileSync(DOC, 'utf8');
-  const section = md.slice(md.indexOf('## `money-moving.yaml`'));
+  const start = md.indexOf('## `money-moving.yaml`');
+  const end = md.indexOf('\n## ', start + 1);
+  const section = md.slice(start, end === -1 ? undefined : end);
   return section
     .split('\n')
     .filter((l) => /^\| `[a-z-]+` /.test(l))

@@ -67,17 +67,30 @@ const execute = (code: string): CallInput => ({
 });
 
 describe('dodo-payments template', () => {
-  it('runs plain read-only code, even with a value from the ticket', () => {
+  it('asks before read-only code too: code text cannot prove it is read-only', () => {
     const c = setup();
     c.readTicket();
-    expect(c.decide(execute('return await client.payments.list({ page_size: 10 });')).verdict).toBe(
-      'allow',
-    );
-    // Looking a customer up by the address in the ticket is normal support work.
+    const list = c.decide(execute('return await client.payments.list({ page_size: 10 });'));
+    expect(list.verdict).toBe('ask');
+    expect(list.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
+    // Looking a customer up by the address in the ticket is normal support work: a person checks it.
     const lookup = execute(
       "return await client.customers.list({ email: 'billing@attacker.example' });",
     );
-    expect(c.decide(lookup).verdict).toBe('allow');
+    expect(c.decide(lookup).verdict).toBe('ask');
+  });
+
+  it('never allows a write disguised as a read (audit H1)', () => {
+    const c = setup();
+    c.readTicket();
+    for (const code of [
+      // A read-like pattern in a comment or string used to satisfy the read-only exception.
+      "// client.payments.list(\nreturn await client.refunds . create({ payment_id: 'pay_1' });",
+      "const s = 'x.retrieve(y)'; const k = 'cre' + 'ate'; return client.refunds[k]({ payment_id: 'pay_1' });",
+      "return await client.payments.list({}).then(() => client.refunds\n.create({ payment_id: 'pay_1' }));",
+    ]) {
+      expect(c.decide(execute(code)).verdict, code).not.toBe('allow');
+    }
   });
 
   it('asks before code that moves money or changes anything', () => {
@@ -91,7 +104,7 @@ describe('dodo-payments template', () => {
     ]) {
       const d = c.decide(execute(code));
       expect(d.verdict, code).toBe('ask');
-      expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-write']);
+      expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
     }
   });
 

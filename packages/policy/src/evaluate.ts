@@ -201,15 +201,19 @@ const LABEL_TEXT: Record<TrustLabel, string> = {
 };
 
 function evidenceText(ev: Evidence[], describe: SourceDescriber | undefined): string {
-  const seen = new Set<string>();
-  const parts: string[] = [];
+  // Matches of one argument and match class (several values, or list and content hits) read as
+  // one sentence naming all their sources, labelled with the least trusted of them.
+  const groups = new Map<string, { arg: string; match: ArgumentMatch; names: Set<string> }>();
   for (const { arg, match } of ev) {
     const key = `${arg}\0${describeMatch(match)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const names = [
-      ...new Set(match.evidence.map((e) => describe?.(e.sourceId) ?? 'a recorded source')),
-    ];
+    const g = groups.get(key) ?? { arg, match, names: new Set<string>() };
+    if (TRUST_RANK[match.sourceLabel] > TRUST_RANK[g.match.sourceLabel]) g.match = match;
+    for (const e of match.evidence) g.names.add(describe?.(e.sourceId) ?? 'a recorded source');
+    groups.set(key, g);
+  }
+  const parts: string[] = [];
+  for (const { arg, match, names: set } of groups.values()) {
+    const names = [...set];
     const from =
       names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '');
     const what = LABEL_TEXT[match.sourceLabel];
@@ -240,7 +244,9 @@ export function evaluatePolicy(
     const candidates: (Sink | undefined)[] =
       'sink' in rule.match
         ? sinks.filter((s) => 'sink' in rule.match && s.id === rule.match.sink)
-        : globMatch(rule.match.server, call.serverId) && globMatch(rule.match.tool, call.tool)
+        : globMatch(rule.match.server, call.serverId) &&
+            globMatch(rule.match.tool, call.tool) &&
+            !(rule.match.exclude ?? []).some((g) => globMatch(g, call.tool))
           ? [undefined]
           : [];
     for (const sink of candidates) {
