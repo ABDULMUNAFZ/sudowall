@@ -174,6 +174,17 @@ export function IncidentView({ i }: { i: Incident }) {
           </li>
         ))}
       </ol>
+      {i.pathTruncated && (
+        <p className="muted" data-testid="incident-truncated">
+          The path is longer than shown: tracing stopped at its depth limit.
+        </p>
+      )}
+      {i.unreadableEntries.length > 0 && (
+        <p className="error">
+          {i.unreadableEntries.length === 1 ? 'Ledger entry' : 'Ledger entries'}{' '}
+          {i.unreadableEntries.join(', ')} could not be read and were left out of this trace.
+        </p>
+      )}
       <p className={i.ledger.ok ? 'ok' : 'error'} data-testid="incident-ledger">
         {i.ledger.ok ? 'Ledger verified' : 'Ledger verification FAILED'}: {i.ledger.message}.
         Entries {i.ledger.entries.join(', ')}
