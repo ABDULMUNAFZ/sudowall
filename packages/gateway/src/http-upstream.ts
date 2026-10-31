@@ -240,6 +240,8 @@ export class HttpUpstreamChannel implements Channel {
         return events;
       }
     }
+    parser.push(decoder.decode());
+    parser.end();
     return events;
   }
 

@@ -41,6 +41,19 @@ export class SseParser {
     }
   }
 
+  /**
+   * The stream ended. A trailing CR is now a complete line end (no LF can follow), so an event
+   * it terminates is delivered. An event without its blank line is dropped, as the standard says.
+   */
+  end(): void {
+    if (this.buf.endsWith('\r')) this.line(this.buf.slice(0, -1));
+    this.buf = '';
+    this.bufBytes = 0;
+    this.data = [];
+    this.dataBytes = 0;
+    this.discarding = false;
+  }
+
   /** UTF-8 bytes buffered and not yet delivered. */
   get pending(): number {
     return this.bufBytes + this.dataBytes;
