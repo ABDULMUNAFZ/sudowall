@@ -1,10 +1,15 @@
 import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { parseLossless } from '@sudowall/core';
 import { defaultConfigDir, defaultStateDir } from '@sudowall/gateway';
 import {
+  ANCHOR_FILE,
   SIGNING_KEY_FILE,
   exportLines,
+  parseAnchorText,
+  readAnchor,
   keyIdFor,
   openStateDb,
   rawPublicKey,
@@ -20,6 +25,10 @@ export interface LedgerFlags {
   db: string | undefined;
   keyDir: string | undefined;
   publicKey: string | undefined;
+  /** `<checkpointSeq>:<hash>` or the path of an anchor file. */
+  expectCheckpoint?: string | undefined;
+  /** Fail on unsigned entries or a missing anchor, not only on tampering. */
+  strict?: boolean;
   out: string | undefined;
 }
 
@@ -42,7 +51,30 @@ function withDb<T>(path: string, fn: (db: StateDb) => T): T {
   }
 }
 
-export function ledgerCommand(args: string[], flags: LedgerFlags): number {
+/** The checkpoint verification must reach: from the flag, else the installation's anchor file. */
+function expectedCheckpoint(
+  flag: string | undefined,
+  keyDir: string,
+): { checkpointSeq: number; checkpointHash: string; ledgerId?: string } | undefined {
+  if (flag !== undefined) {
+    try {
+      return parseAnchorText(existsSync(flag) ? readFileSync(flag, 'utf8') : flag);
+    } catch (e) {
+      throw new UsageError(
+        `--expect-checkpoint must be <seq>:<64 hex> or an anchor file (${(e as Error).message})`,
+      );
+    }
+  }
+  try {
+    return readAnchor(join(keyDir, ANCHOR_FILE));
+  } catch (e) {
+    throw new UsageError(
+      `the anchor ${join(keyDir, ANCHOR_FILE)} is damaged: ${(e as Error).message}`,
+    );
+  }
+}
+
+export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise<number> {
   const dbPath = flags.db ?? join(defaultStateDir(), 'ledger.db');
   const keyDir = flags.keyDir ?? defaultConfigDir();
   const [sub, arg, extra] = args;
@@ -52,16 +84,36 @@ export function ledgerCommand(args: string[], flags: LedgerFlags): number {
         flags.publicKey !== undefined
           ? Buffer.from(flags.publicKey, 'base64url')
           : installationPublicKey(keyDir);
+      const anchor = expectedCheckpoint(flags.expectCheckpoint, keyDir);
       const r = withDb(dbPath, (db) =>
-        verifyDatabase(db, expected === undefined ? {} : { expectedPublicKey: expected }),
+        verifyDatabase(db, {
+          ...(expected === undefined ? {} : { expectedPublicKey: expected }),
+          ...(anchor === undefined ? {} : { expectedCheckpoint: anchor }),
+        }),
       );
       if (r.ok) {
         out(
           `OK: ${r.entries} entries, ${r.checkpoints} checkpoints, last signed entry ${r.lastSignedSeq}, ` +
             `${r.unsignedTail} unsigned (newer than the last checkpoint). Ledger ${r.ledgerId}, key ${r.keyId}.`,
         );
+        if (r.unsigned) {
+          out(
+            'WARNING: no entry is signed yet. The history is hash-chained only; anyone who can write the file can rewrite it.',
+          );
+        }
+        if (anchor === undefined) {
+          out(
+            'Note: no anchor was available, so an older copy of this history would also pass. Keep `sudowall ledger anchor` output off the machine.',
+          );
+        } else {
+          out(`Anchored: reaches checkpoint ${String(anchor.checkpointSeq)} as recorded.`);
+        }
         if (expected === undefined) {
           out('Note: no expected public key was available, so the signer was not checked.');
+        }
+        if (flags.strict === true && (r.unsignedTail > 0 || anchor === undefined)) {
+          out('FAILED (--strict): unsigned entries or no anchor.');
+          return EXIT.verifyFailed;
         }
         return EXIT.ok;
       }
@@ -104,16 +156,41 @@ export function ledgerCommand(args: string[], flags: LedgerFlags): number {
       });
     }
     case 'export': {
-      return withDb(dbPath, (db) => {
-        if (flags.out === undefined) {
-          for (const line of exportLines(db)) out(line);
-          return EXIT.ok;
-        }
-        const w = createWriteStream(flags.out, { mode: 0o600, flags: 'wx' });
-        for (const line of exportLines(db)) w.write(`${line}\n`);
-        w.end();
+      if (!existsSync(dbPath)) throw new UsageError(`no ledger database at ${dbPath}`);
+      const db = openStateDb(dbPath, { readonly: true });
+      try {
+        // One read snapshot; the stream waits for the reader (backpressure) and for the data to
+        // be flushed, and a write error fails the command.
+        db.prepare('BEGIN').run();
+        const lines = Readable.from(
+          (function* () {
+            for (const line of exportLines(db)) yield `${line}\n`;
+          })(),
+        );
+        await pipeline(
+          lines,
+          flags.out === undefined
+            ? process.stdout
+            : createWriteStream(flags.out, { mode: 0o600, flags: 'wx' }),
+          { end: flags.out !== undefined },
+        );
         return EXIT.ok;
-      });
+      } finally {
+        if (db.inTransaction) db.prepare('COMMIT').run();
+        db.close();
+      }
+    }
+    case 'anchor': {
+      const a = readAnchor(join(keyDir, ANCHOR_FILE));
+      if (a === undefined) {
+        out(`no anchor in ${keyDir} yet (one is written with the first signed checkpoint)`);
+        return EXIT.runtime;
+      }
+      out(JSON.stringify(a, null, 2));
+      out(
+        `verify later with: sudowall ledger verify --expect-checkpoint ${String(a.checkpointSeq)}:${a.checkpointHash}`,
+      );
+      return EXIT.ok;
     }
     case 'key': {
       if (arg !== 'show' || extra !== undefined) throw new UsageError('usage: ledger key show');
@@ -138,6 +215,6 @@ export function ledgerCommand(args: string[], flags: LedgerFlags): number {
       return EXIT.ok;
     }
     default:
-      throw new UsageError('usage: ledger verify | inspect <seq> | export | key show');
+      throw new UsageError('usage: ledger verify | inspect <seq> | export | anchor | key show');
   }
 }

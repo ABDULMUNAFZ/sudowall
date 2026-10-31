@@ -16,6 +16,8 @@ import {
   type ValueIdFn,
 } from '@sudowall/graph';
 import {
+  ANCHOR_FILE,
+  readAnchor,
   HMAC_SECRET_FILE,
   SIGNING_KEY_FILE,
   deriveKey,
@@ -88,12 +90,14 @@ export async function incidentCommand(args: string[], flags: IncidentFlags): Pro
       await buildGraph(readLedgerEvents(db), backend, valueId);
     }
     const expected = publicKey(p.keyDir);
+    const anchor = readAnchor(join(p.keyDir, ANCHOR_FILE));
     const report = await incidentReport({
       db,
       ref,
       valueId,
       ...(backend ? { backend } : {}),
       ...(expected ? { expectedPublicKey: expected } : {}),
+      ...(anchor ? { expectedCheckpoint: anchor } : {}),
     });
     if (format === 'json') out(JSON.stringify(report, null, 2));
     else if (format === 'markdown') out(renderMarkdown(report));
