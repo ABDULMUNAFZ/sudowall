@@ -2,6 +2,33 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## Unreleased
+
+Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).
+
+### Security
+
+- **Dodo Payments template v2:** every `execute` call asks; code with a value from untrusted content that writes or uses dynamic code is blocked. Read-looking code is no longer allowed unasked.
+- **Everyday template v2:** a final rule asks when a tool that is not named like a read gets a value from untrusted content, a lookalike of one, or a URL on the same host as an untrusted one. Policy selectors accept `exclude: [glob, ...]`.
+- **New near kind `same-host`** for URLs on the host of an untrusted URL with another path or query.
+- **Provenance failures fail closed:** if a result cannot be recorded, calls that would be allowed ask until the provenance window has passed (`provenance-gap`).
+- **Rollback detection:** each checkpoint updates a monotonic `ledger-anchor.json`; `ledger verify` (and the UI and incident reports) fail with `ROLLBACK` on an older history or a damaged anchor. New `ledger verify --expect-checkpoint` and `--strict`, and `ledger anchor`.
+- Upstream stderr is redacted for credentials before it is logged.
+- A slow sink can no longer let a timed-out or cancelled call be forwarded afterwards.
+- Client notifications that carry a request method are dropped instead of forwarded.
+
+### Fixed
+
+- Request ids are compared in canonical form (`1` and `1.0`, `"a"` and `"\u0061"` are the same id), replies keep the id as the client spelled it, and duplicate ids are refused while the first is still being admitted.
+- New limits: `maxPendingRequests` (-32004), `maxSessions` (HTTP 503), `sessionIdleMs`, `maxWriteBufferBytes`. SSE events are size-checked before delivery, and multi-line payloads are framed correctly.
+- A second HTTP request with an in-flight id gets 409 and no longer replaces the first one's stream.
+- Remote upstreams: notifications are not awaited, cancellation aborts the request stream, and the GET stream reconnects with backoff.
+- Provenance: numeric result fields are indexed, each value in an argument is its own match, lookups are bounded and prefer untrusted rows, and old rows are pruned after 90 days. `provenance.taintScope: session` is available.
+- Ledger verification of a database reads one snapshot; `ledger export` respects backpressure.
+- `protect`: stricter detection of wrapped entries, header variables do not overwrite existing ones, `unprotect` keeps later env changes, URL secrets are masked, and config writes take a lock.
+- Incident reports show when a path was cut at the depth limit and which ledger entries could not be read, and label sources by their own trust.
+- The app: polls no longer race, settings errors are shown, the Overview labels watching-only counts separately, Activity shows how each call ended and pages back with "Show older", and Record shows signing and anchor status.
+
 ## 0.7.0 (2026-10-30)
 
 ### Changed

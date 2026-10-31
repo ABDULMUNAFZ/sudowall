@@ -6,12 +6,12 @@
 
 | The agent's code                                                                                                                                                                         | SudoWall                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Plain reads: `client.payments.list(...)`, `client.customers.retrieve(...)`                                                                                                               | runs                                   |
+| Plain reads: `client.payments.list(...)`, `client.customers.retrieve(...)`                                                                                                               | asks you first                         |
 | Anything that can move money or change something: refunds, payments, subscriptions, discounts, checkout links, customers, webhooks                                                       | asks you first                         |
 | Code too dynamic to check: `client['refunds'][m](...)`, `eval`, `fetch`, `Function`, `Reflect`, `import()`                                                                               | asks you first                         |
 | A change that uses an email, URL or amount copied from untrusted content, for example a support ticket asking to "update my email to ..." or "send payment notifications to https://..." | blocked: account takeover or data leak |
 
-Matching is on the code text. It cannot prove that code is harmless, so anything that is not plainly read-only asks. Give the server a restricted API key as well, and use test mode while you try it.
+Every `execute` call asks you first (template version 2). Matching on the code text can make a decision stricter, never looser: a read-looking call can still write (`client.payments.list({}) && client.refunds.create(...)`, a write behind a variable or a string-built property name), so the template no longer lets any code run unasked. Give the server a restricted API key as well, and use test mode while you try it.
 
 ## Set it up
 
@@ -64,4 +64,4 @@ Run on 2026-10-30: the real `dodopayments-mcp` 2.59.0 and a filesystem "helpdesk
 | `client.customers.update('cus_77', { email: '<ticket's>' })` | blocked (`SW_BLOCKED`)                                    |
 | `client.webhooks.create({ url: '<ticket's URL>' })`          | blocked (`SW_BLOCKED`)                                    |
 
-The run used a placeholder API key, so no request reached a Dodo account; the policy decisions do not depend on the key. The rules are also covered by unit tests (`packages/policy/test/dodo-template.test.ts`).
+This run used template version 1, which allowed plain reads; version 2 asks for the `payments.list` call as well and decides the other three calls the same way. The run used a placeholder API key, so no request reached a Dodo account; the policy decisions do not depend on the key. The rules are also covered by unit tests (`packages/policy/test/dodo-template.test.ts`).
