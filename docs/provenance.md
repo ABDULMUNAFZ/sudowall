@@ -10,7 +10,7 @@
 
 ## What is extracted
 
-From every string in a result (joined in document order with `\n`; evidence offsets index that text), after removing invisible characters and mapping lookalike letters to ASCII:
+From every string in a result, and every number written as `key: number` (so a bare `{"amount": 250}` is extracted like the text `amount: 250`), joined in document order with `\n` (evidence offsets index that text), after removing invisible characters and mapping lookalike letters to ASCII:
 
 | Kind          | Recognised                                                                                                      | Normalised form                                                                                                       |
 | ------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -25,16 +25,17 @@ Bare numbers (`in 2026 we had 1.5 issues`) are not amounts.
 
 For each string argument (and each amount argument named by a policy sink), the whole value is tried as an address, email or URL. If it is not one, values embedded in the text are extracted. Each value is then looked up:
 
-| Report                       | Meaning                                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `exact`                      | The argument text equals the text in the source                                                                                                   |
-| `normalized`                 | Equal after normalisation (case, punycode, decimal spelling, invisible characters in the _source_)                                                |
-| `near` / `zero-width`        | The argument contains invisible characters and equals a source value without them                                                                 |
-| `near` / `split`             | The argument is a value broken up with whitespace                                                                                                 |
-| `near` / `confusable`        | The argument uses lookalike letters (Cyrillic, Greek, …), or its confusable skeleton (`0`/`o`, `1`/`l`, `rn`/`m`) equals a different source value |
-| `near` / `address-poisoning` | A different EVM address with the same first 4 and last 4 hex digits as a seen address or an allowlisted one                                       |
+| Report                       | Meaning                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `exact`                      | The argument text equals the text in the source                                                                                                                                                        |
+| `normalized`                 | Equal after normalisation (case, punycode, decimal spelling, invisible characters in the _source_)                                                                                                     |
+| `near` / `zero-width`        | The argument contains invisible characters and equals a source value without them                                                                                                                      |
+| `near` / `split`             | The argument is a value broken up with whitespace                                                                                                                                                      |
+| `near` / `confusable`        | The argument uses lookalike letters (Cyrillic, Greek, …), or its confusable skeleton (`0`/`o`, `1`/`l`, `rn`/`m`) equals a different source value                                                      |
+| `near` / `address-poisoning` | A different EVM address with the same first 4 and last 4 hex digits as a seen address or an allowlisted one                                                                                            |
+| `near` / `same-host`         | A URL on the same host as a URL in a source, with a different path or query (`https://evil.example/collect?d=...` after `https://evil.example/`). Weaker than the others: the templates only ask on it |
 
-Each match carries the least trusted label among its sources and up to 16 evidence spans (newest first). `report.sessionTainted` is true if any untrusted content was observed in the window.
+Matches are reported per value: an argument holding two different values yields two matches, each with its own `valueRef`, and a hit against a policy list is a separate match from hits against content. Each match carries the least trusted label among its sources and up to 16 evidence spans, least trusted first, then newest. Lookups read at most 256 rows per variant, untrusted rows first, so a value repeated in many trusted results cannot push an untrusted one out of the report. `report.sessionTainted` is true if untrusted content was observed in the window (see [taint scope](#taint-scope)).
 
 ## Privacy-preserving index
 
@@ -44,9 +45,13 @@ It stores, per value: HMAC-SHA256 tags (key derived from the installation secret
 
 ## Time window
 
-Only content observed within `provenance.windowSeconds` (default 86400, 24 hours) can match. Longer windows catch attacks where the payment comes long after the poisoned content was read, but raise the chance that an unrelated old value matches and asks the user needlessly. Shorter windows reduce noise but let a patient attacker wait the window out. The index keeps rows older than the window (time-based pruning is deferred), so widening the window takes effect on existing data.
+Only content observed within `provenance.windowSeconds` (default 86400, 24 hours) can match. Longer windows catch attacks where the payment comes long after the poisoned content was read, but raise the chance that an unrelated old value matches and asks the user needlessly. Shorter windows reduce noise but let a patient attacker wait the window out. Rows are kept for 90 days, the largest window allowed, and older rows are pruned as new content is observed (every 1,000 observations), so widening the window takes effect on data already indexed and the index does not grow without bound.
 
 Per (value, exact text, trust label) group the index keeps only the 16 newest rows; older rows of the group are deleted when a new one is written. The engine reports at most 16 evidence spans and only distinguishes these groups, so no match changes. Without this, a value that appears in thousands of results (an agent's own wallet address in every balance check) made each lookup linear in the number of repeats: 22 ms per `analyze` at 8,000 repeats before the change.
+
+## Taint scope
+
+`session_tainted` conditions ask whether untrusted content has entered the session. With `provenance.taintScope: installation` (the default) any untrusted content observed by any gateway process of the user in the window counts. An MCP client starts one gateway per server, so the email is read through one gateway and the shell command runs through another; scoping taint to one gateway session would miss exactly that case. `session` counts only content observed in the same session, for a single gateway that aggregates every server and wants fewer prompts. Value matches (`provenance`, `near`) always use the whole shared index.
 
 ## Corpus results
 
@@ -57,7 +62,7 @@ Per (value, exact text, trust label) group the index keeps only the 16 newest ro
 | Attack | 17    | 17      | 0           | 0               | -               |
 | Benign | 9     | 0       | 9           | -               | 0               |
 
-Attack cases: exact, case-changed, zero-width in source and in argument, Cyrillic lookalike, whitespace-split, address poisoning (against a seen and against an allowlisted address), embedded in free text, email exact/case/homograph, URL exact/host case/punycode, amount with token context and with label context. Benign cases: unseen address, outside the window, number without context, shared prefix only, other mailbox at the same domain, other URL path, the allowlisted address itself, trusted-tool source only, plain numbers.
+Attack cases: exact, case-changed, zero-width in source and in argument, Cyrillic lookalike, whitespace-split, address poisoning (against a seen and against an allowlisted address), embedded in free text, email exact/case/homograph, URL exact/host case/punycode, amount with token context and with label context. Benign cases: unseen address, outside the window, number without context, shared prefix only, other mailbox at the same domain, other URL path (reported as `near` / `same-host`, which the corpus does not count as flagged because templates only ask on it), the allowlisted address itself, trusted-tool source only, plain numbers.
 
 This corpus was written by us alongside the code, so it shows the matcher does what it was designed to do. It is not an estimate of real-world detection rates.
 

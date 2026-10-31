@@ -16,7 +16,14 @@ import {
   type Transport,
 } from '@sudowall/core';
 import type { Channel, CloseReason, Related } from './channel.js';
-import { RpcCode, classify, errorResponse, resultResponse, type Message } from './jsonrpc.js';
+import {
+  RpcCode,
+  classify,
+  errorResponse,
+  idKeyOf,
+  resultResponse,
+  type Message,
+} from './jsonrpc.js';
 import type { Logger } from './log.js';
 import { MemoryNameStore, Namespacer, type NameStore } from './namespacing.js';
 import type { ApprovalChannel, ApprovalOutcome } from './approvals.js';
@@ -41,6 +48,8 @@ const UNSUPPORTED_CLIENT_CAPS = ['sampling', 'elicitation', 'roots', 'tasks'];
 const UNSUPPORTED_SERVER_CAPS = ['tasks'];
 /** 2026-07-28 form of task support (`capabilities.extensions`); removed on both sides. */
 const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
+/** Pages of a list method the gateway reads from one upstream before reporting the list incomplete. */
+const MAX_LIST_PAGES = 100;
 /** `_meta` key carrying the machine-readable gateway decision on results the gateway produced. */
 export const DECISION_META_KEY = 'sudowall/decision';
 
@@ -107,6 +116,11 @@ export class Session {
   private readonly now: () => Date;
   readonly aggregate: boolean;
   private readonly pending = new Map<string, Pending>();
+  /**
+   * Requests accepted but not yet tracked in `pending` (aggregate routing awaits list refreshes
+   * first). Their ids count as in flight, so a duplicate id cannot slip in during the await.
+   */
+  private readonly admitting = new Map<string, symbol>();
   /** upstream id key -> client id key (aggregate mode). */
   private readonly byUpstreamId = new Map<string, string>();
   private clientInfo: ClientInfo | null = null;
@@ -204,12 +218,38 @@ export class Session {
       this.onClientNotification(m);
       return;
     }
-    if (this.pending.has(m.idKey)) {
+    if (this.pending.has(m.idKey) || this.admitting.has(m.idKey)) {
       this.replyError(m, RpcCode.InvalidRequest, 'a request with this id is already in flight');
       return;
     }
-    if (this.aggregate) void this.aggregateRequest(m);
-    else void this.passthroughRequest(m);
+    const max = this.cfg.limits.maxPendingRequests;
+    if (this.pending.size + this.admitting.size >= max) {
+      this.replyError(
+        m,
+        RpcCode.TooManyRequests,
+        `too many requests in flight on this session (limit ${String(max)})`,
+      );
+      return;
+    }
+    const ticket = Symbol(m.idKey);
+    this.admitting.set(m.idKey, ticket);
+    const run = this.aggregate ? this.aggregateRequest(m) : this.passthroughRequest(m);
+    void run
+      .catch((e: unknown) => {
+        this.log.error('request handling failed', {
+          method: m.method,
+          error: (e as Error).message,
+        });
+        // Answer it unless it was already answered: still tracked, or never tracked at all.
+        const tracked = this.pending.get(m.idKey);
+        if (tracked !== undefined) this.finish(tracked);
+        if (tracked !== undefined || this.admitting.get(m.idKey) === ticket) {
+          this.replyError(m, RpcCode.InternalError, `gateway error: ${(e as Error).message}`);
+        }
+      })
+      .finally(() => {
+        if (this.admitting.get(m.idKey) === ticket) this.admitting.delete(m.idKey);
+      });
   }
 
   /** Records the client's protocol revision and identity from a 2026-07-28 envelope. */
@@ -225,9 +265,18 @@ export class Session {
   }
 
   private onClientNotification(m: Extract<Message, { kind: 'notification' }>): void {
+    if (!m.method.startsWith('notifications/')) {
+      // A request method sent without an id (a `tools/call` notification) would bypass the
+      // request gate. MCP has no such notifications; drop them.
+      this.log.warn('client notification with a request method dropped', { method: m.method });
+      return;
+    }
     if (m.method === 'notifications/cancelled') {
       const rid = rawGet(m.root, 'params', 'requestId');
-      const key = rid && m.text.slice(rid.start, rid.end);
+      const key =
+        rid !== undefined && (rid.kind === 'string' || rid.kind === 'number')
+          ? idKeyOf(m.text, rid)
+          : undefined;
       const p = key === undefined ? undefined : this.pending.get(key);
       if (p !== undefined) {
         p.cancelled = true;
@@ -512,7 +561,13 @@ export class Session {
   ): Promise<Record<string, unknown>[]> {
     const items: Record<string, unknown>[] = [];
     let cursor: string | undefined;
-    for (let page = 0; page < 100; page++) {
+    const cursors = new Set<string>();
+    for (let page = 0; ; page++) {
+      if (page === MAX_LIST_PAGES) {
+        throw new Error(
+          `${method} on upstream ${u.id} still had more results after ${String(MAX_LIST_PAGES)} pages; the list is incomplete`,
+        );
+      }
       const params: Record<string, unknown> = cursor === undefined ? {} : { cursor };
       const res = await u.request(
         method,
@@ -527,6 +582,10 @@ export class Session {
       if (Array.isArray(list)) for (const it of list) if (isObj(it)) items.push(it);
       cursor = typeof result['nextCursor'] === 'string' ? result['nextCursor'] : undefined;
       if (cursor === undefined) break;
+      if (cursors.has(cursor)) {
+        throw new Error(`${method} on upstream ${u.id} repeated a cursor; the list is incomplete`);
+      }
+      cursors.add(cursor);
     }
     return items;
   }
@@ -858,7 +917,9 @@ export class Session {
         error: (e as Error).message,
       });
     }
-    if (p.cancelled || this.closed) return;
+    // The request may have timed out, been cancelled, or its session closed during the write:
+    // it must never run after the client was told it failed.
+    if (this.gone(p)) return;
     if (!recorded && mode === 'enforce') {
       this.blockCall(
         p,
@@ -945,6 +1006,7 @@ export class Session {
         return;
       }
     }
+    if (this.gone(p)) return;
     if (!up.send(forwardText)) {
       this.finish(p);
       this.replyError(
@@ -1016,7 +1078,7 @@ export class Session {
       },
     };
     if (this.clientEra === 'modern') result['resultType'] = 'complete';
-    this.client.send(resultResponse(m.idKey, result), { requestIdKey: m.idKey, final: true });
+    this.client.send(resultResponse(m.idText, result), { requestIdKey: m.idKey, final: true });
     void this.recordResult(p, outcome, null, null, null);
   }
 
@@ -1032,7 +1094,28 @@ export class Session {
         return;
       }
       this.finish(p);
-      let text = p.rewrite ? p.rewrite(m) : m.text;
+      let text = m.text;
+      if (p.rewrite !== undefined) {
+        try {
+          text = p.rewrite(m);
+        } catch (e) {
+          // A malformed handshake result must not take the gateway down.
+          this.log.error('upstream response could not be processed', {
+            upstream: up.id,
+            method: p.method,
+            error: (e as Error).message,
+          });
+          this.client.send(
+            errorResponse(
+              p.clientIdText,
+              RpcCode.InternalError,
+              `upstream "${up.id}" sent a malformed ${p.method} result`,
+            ),
+            { requestIdKey: p.clientIdKey, final: true },
+          );
+          return;
+        }
+      }
       let outcome: ToolResultEvent['outcome'] = 'ok';
       let error: ToolResultEvent['error'] = null;
       let resultValue: JsonValue | null = null;
@@ -1088,12 +1171,12 @@ export class Session {
       this.onServerRequest(up, m);
       return;
     }
-    this.onServerNotification(m);
+    this.onServerNotification(up, m);
   }
 
   private onServerRequest(up: UpstreamConnection, m: Extract<Message, { kind: 'request' }>): void {
     if (m.method === 'ping') {
-      if (this.aggregate) up.send(resultResponse(m.idKey, {}));
+      if (this.aggregate) up.send(resultResponse(m.idText, {}));
       else this.client.send(m.text);
       return;
     }
@@ -1103,15 +1186,18 @@ export class Session {
     });
     up.send(
       errorResponse(
-        m.idKey,
+        m.idText,
         RpcCode.MethodNotFound,
         `SudoWall does not support server-initiated ${m.method}`,
       ),
     );
   }
 
-  private onServerNotification(m: Extract<Message, { kind: 'notification' }>): void {
-    const related = this.relatedFor(m);
+  private onServerNotification(
+    up: UpstreamConnection,
+    m: Extract<Message, { kind: 'notification' }>,
+  ): void {
+    const related = this.relatedFor(up, m);
     if (!this.aggregate) {
       this.client.send(m.text, related);
       return;
@@ -1126,13 +1212,20 @@ export class Session {
   }
 
   /** Routes progress notifications to the request they belong to (for HTTP response streams). */
-  private relatedFor(m: Extract<Message, { kind: 'notification' }>): Related | undefined {
+  private relatedFor(
+    up: UpstreamConnection,
+    m: Extract<Message, { kind: 'notification' }>,
+  ): Related | undefined {
     if (m.method !== 'notifications/progress') return undefined;
     const tok = rawGet(m.root, 'params', 'progressToken');
-    if (tok === undefined) return undefined;
-    const key = m.text.slice(tok.start, tok.end);
+    if (tok === undefined || (tok.kind !== 'string' && tok.kind !== 'number')) return undefined;
+    const key = idKeyOf(m.text, tok);
+    // Only a request this upstream is working on: another upstream reusing the token cannot
+    // attach progress to it.
     for (const p of this.pending.values()) {
-      if (p.progressToken === key) return { requestIdKey: p.clientIdKey, final: false };
+      if (p.upstream === up && p.progressToken === key) {
+        return { requestIdKey: p.clientIdKey, final: false };
+      }
     }
     return undefined;
   }
@@ -1222,11 +1315,14 @@ export class Session {
     const tok = rawGet(m.root, 'params', '_meta', 'progressToken');
     const p: Pending = {
       method: m.method,
-      clientIdText: m.idKey,
+      clientIdText: m.idText,
       clientIdKey: m.idKey,
       upstream: up,
       upstreamIdKey,
-      progressToken: tok === undefined ? undefined : m.text.slice(tok.start, tok.end),
+      progressToken:
+        tok !== undefined && (tok.kind === 'string' || tok.kind === 'number')
+          ? idKeyOf(m.text, tok)
+          : undefined,
       timer: undefined,
       toolCall: undefined,
       cancelled: false,
@@ -1241,6 +1337,7 @@ export class Session {
       p.timer.unref();
     }
     this.pending.set(m.idKey, p);
+    this.admitting.delete(m.idKey);
     if (this.aggregate && upstreamIdKey !== undefined)
       this.byUpstreamId.set(upstreamIdKey, m.idKey);
     return p;
@@ -1294,11 +1391,14 @@ export class Session {
     code: number,
     message: string,
   ): void {
-    this.client.send(errorResponse(m.idKey, code, message), { requestIdKey: m.idKey, final: true });
+    this.client.send(errorResponse(m.idText, code, message), {
+      requestIdKey: m.idKey,
+      final: true,
+    });
   }
 
   private replyResult(m: Extract<Message, { kind: 'request' }>, result: unknown): void {
-    this.client.send(resultResponse(m.idKey, result), { requestIdKey: m.idKey, final: true });
+    this.client.send(resultResponse(m.idText, result), { requestIdKey: m.idKey, final: true });
   }
 
   private async write(event: Event): Promise<void> {
@@ -1376,6 +1476,7 @@ export class Session {
         origin: c.origin,
         content,
         observedAt: this.now(),
+        sessionId: this.id,
       });
     } catch (e) {
       this.log.error('PROVENANCE FAILED: content could not be indexed', {

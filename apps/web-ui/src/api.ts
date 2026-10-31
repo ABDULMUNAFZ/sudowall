@@ -32,6 +32,8 @@ export type FeedItem =
       ruleIds: string[];
       /** Up to two `name: value` pairs from the (redacted) arguments. */
       summary: { name: string; value: string }[];
+      /** How the call ended (`ok`, `tool-error`, `blocked`, ...); null while it is in progress. */
+      result: string | null;
     }
   | {
       seq: number;
@@ -60,6 +62,10 @@ export type VerifyResult =
       unsignedTail: number;
       keyId: string;
       signerChecked: boolean;
+      /** The history reaches the checkpoint recorded in the local anchor (rollback ruled out). */
+      anchored: boolean;
+      /** Entries exist but none are covered by a signed checkpoint yet. */
+      unsigned: boolean;
     }
   | { ok: false; kind: string; message: string; seq?: number; signerChecked: boolean };
 
@@ -87,6 +93,10 @@ export interface Incident {
     approval?: { outcome: string; channel: string };
   };
   path: IncidentStep[];
+  /** Tracing stopped at its depth limit; earlier hops exist but are not shown. */
+  pathTruncated: boolean;
+  /** Ledger entries that could not be read and were left out of the trace. */
+  unreadableEntries: number[];
   ledger: { ok: boolean; message: string; entries: number[]; allSigned: boolean };
 }
 
@@ -165,10 +175,11 @@ export class Api {
 
   constructor(private readonly token: string) {}
 
-  async state(): Promise<State> {
+  async state(signal?: AbortSignal): Promise<State> {
     const r = await fetch('/api/state', {
       headers: { Authorization: `Bearer ${this.token}` },
       cache: 'no-store',
+      ...(signal === undefined ? {} : { signal }),
     });
     if (!r.ok)
       throw new Error(
@@ -213,10 +224,21 @@ export class Api {
     return (await r.json()) as Incident;
   }
 
-  async product(): Promise<Product | null> {
+  /** Older activity, for paging past what `/api/state` carries. */
+  async feed(before: number, limit = 100): Promise<{ items: FeedItem[]; more: boolean }> {
+    const r = await fetch(`/api/feed?before=${String(before)}&limit=${String(limit)}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+      cache: 'no-store',
+    });
+    if (!r.ok) throw new Error(`Could not load older activity (HTTP ${String(r.status)}).`);
+    return (await r.json()) as { items: FeedItem[]; more: boolean };
+  }
+
+  async product(signal?: AbortSignal): Promise<Product | null> {
     const r = await fetch('/api/product', {
       headers: { Authorization: `Bearer ${this.token}` },
       cache: 'no-store',
+      ...(signal === undefined ? {} : { signal }),
     });
     if (!r.ok) throw new Error(`Could not load settings (HTTP ${String(r.status)}).`);
     return (await r.json()) as Product | null;

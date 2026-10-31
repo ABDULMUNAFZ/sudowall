@@ -14,6 +14,8 @@ export interface Normalized {
   /** EVM only: first 4 and last 4 hex digits, compared for `near: address-poisoning`. */
   poison?: string;
   evmChecksum?: 'valid' | 'invalid' | 'none';
+  /** URL only: the host (lowercase, IDNs as punycode), compared for `near: same-host`. */
+  host?: string;
 }
 
 const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -70,7 +72,12 @@ export function normalizeUrl(s: string): Normalized | undefined {
   u.hash = '';
   // WHATWG URL lowercases the host and converts IDNs to punycode; skeletons use the Unicode form.
   const shown = s.replace(/#.*$/, '');
-  return { kind: 'url', value: u.href, skeleton: skeleton(shown.replace(/\/$/, '')) };
+  return {
+    kind: 'url',
+    value: u.href,
+    skeleton: skeleton(shown.replace(/\/$/, '')),
+    ...(u.hostname === '' ? {} : { host: u.hostname }),
+  };
 }
 
 const SYMBOL_UNITS: Record<string, string> = {

@@ -85,23 +85,24 @@ rules:
 ### 5.1 `match` (selectors)
 
 - `{ sink: <sinkId> }`: calls that match that sink. Conditions may use `arg: <name>` with that sink's argument names.
-- `{ server?: glob, tool?: glob, annotations?: { destructiveHint?: bool, readOnlyHint?: bool, openWorldHint?: bool, idempotentHint?: bool } }`: any call. Here conditions use `path: <JsonPointer>` instead of `arg`, with an explicit `kind` where one is needed.
+- `{ server?: glob, tool?: glob, exclude?: [glob, ...], annotations?: { destructiveHint?: bool, readOnlyHint?: bool, openWorldHint?: bool, idempotentHint?: bool } }`: any call. Here conditions use `path: <JsonPointer>` instead of `arg`, with an explicit `kind` where one is needed.
+- `exclude` lists tool-name globs the rule skips even when `tool` matches, for a catch-all such as `tool: '*'` with the read-like tools taken out.
 
 ### 5.2 Conditions (`when`)
 
 Combinators: `all: [..]`, `any: [..]`, `not: {..}`. A leaf condition has one value reference (`arg: <name>` or `path: <ptr>`, omitted for session-level conditions) and exactly one test:
 
-| Test                                                                                | Meaning                                                                                                                                                                   |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `provenance: { label: untrusted }`                                                  | The value matched a source whose label is this label or less trusted. Optional `match: [exact, normalized]` restricts confidence classes (default: `[exact, normalized]`) |
-| `near: [address-poisoning, confusable, zero-width, case, split]`                    | The value near-matched a source using one of these techniques                                                                                                             |
-| `session_tainted: true`                                                             | Untrusted content has entered the session (coarse fallback; no value reference)                                                                                           |
-| `in_list: <listId>`                                                                 | The normalised value is in the list                                                                                                                                       |
-| `equals: <literal>` / `glob: <glob>`                                                | Comparison on the normalised value                                                                                                                                        |
-| `first_seen: true`                                                                  | The value has never been in an **allowed and executed** call for this sink argument. State key: `(policy name, sink id, arg name, normalised value)`                      |
-| `amount_gt: "<decimal>"`                                                            | The amount is greater than the limit (same unit as the sink's unit)                                                                                                       |
-| `window_total_gt: { amount: "<decimal>", window: <duration>, per: [agent?, unit] }` | _Deferred._ Executed total in the trailing window, plus this amount, is greater than the limit                                                                            |
-| `rate_gt: { count: <int>, window: <duration> }`                                     | _Deferred._ Executed calls matching this rule's `match` in the trailing window, plus this one, is greater than `count`                                                    |
+| Test                                                                                | Meaning                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provenance: { label: untrusted }`                                                  | The value matched a source whose label is this label or less trusted. Optional `match: [exact, normalized]` restricts confidence classes (default: `[exact, normalized]`)              |
+| `near: [address-poisoning, confusable, zero-width, case, split, same-host]`         | The value near-matched a source using one of these techniques (`same-host`: a URL on the same host as an untrusted URL, with another path or query; a weaker signal, best used to ask) |
+| `session_tainted: true`                                                             | Untrusted content has entered the session (coarse fallback; no value reference)                                                                                                        |
+| `in_list: <listId>`                                                                 | The normalised value is in the list                                                                                                                                                    |
+| `equals: <literal>` / `glob: <glob>`                                                | Comparison on the normalised value                                                                                                                                                     |
+| `first_seen: true`                                                                  | The value has never been in an **allowed and executed** call for this sink argument. State key: `(policy name, sink id, arg name, normalised value)`                                   |
+| `amount_gt: "<decimal>"`                                                            | The amount is greater than the limit (same unit as the sink's unit)                                                                                                                    |
+| `window_total_gt: { amount: "<decimal>", window: <duration>, per: [agent?, unit] }` | _Deferred._ Executed total in the trailing window, plus this amount, is greater than the limit                                                                                         |
+| `rate_gt: { count: <int>, window: <duration> }`                                     | _Deferred._ Executed calls matching this rule's `match` in the trailing window, plus this one, is greater than `count`                                                                 |
 
 Durations are `<int><s|m|h|d>`. Windows count only calls that were **executed** (allowed, or approved).
 

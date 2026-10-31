@@ -6,15 +6,16 @@ Templates live in `packages/policy/templates/`. Copy one, fill in its lists, and
 
 The default for `sudowall init` and `sudowall protect`, for any MCP setup: GitHub, Slack, email, browser, filesystem, shell. Rules match tool names, the convention MCP servers use. Checked by `packages/policy/test/everyday-template.test.ts`.
 
-| Situation                                                                                                                                                                                                                 | Verdict | Rules                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------- |
-| A `*send*`, `*reply*`, `*forward*`, `post_*`, `share*`, `*invite*`, `*upload*`, `*publish*` or `*webhook*` tool has an argument containing an email, URL or address copied from untrusted content (also inside free text) | block   | `block-*-to-untrusted`  |
-| The same tools with values that did not come from untrusted content                                                                                                                                                       | allow   | none                    |
-| `*delete*`, `*remove*`, `*drop*`, `*destroy*`, `*merge*`, `*push*`, `*deploy*`, `*revoke*`, `*transfer*`, `*refund*`, `pay*`, `*send_funds*`                                                                              | ask     | `ask-*`                 |
-| `*exec*`, `*command*`, `*shell*`, `*terminal*` after untrusted content entered the session                                                                                                                                | ask     | `ask-*-after-untrusted` |
-| Everything else (reads, searches, notes)                                                                                                                                                                                  | allow   | none                    |
+| Situation                                                                                                                                                                                                                                                                                                                           | Verdict | Rules                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------ |
+| A `*send*`, `*reply*`, `*forward*`, `post_*`, `share*`, `*invite*`, `*upload*`, `*publish*` or `*webhook*` tool has an argument containing an email, URL or address copied from untrusted content (also inside free text)                                                                                                           | block   | `block-*-to-untrusted`               |
+| The same tools with values that did not come from untrusted content                                                                                                                                                                                                                                                                 | allow   | none                                 |
+| `*delete*`, `*remove*`, `*drop*`, `*destroy*`, `*merge*`, `*push*`, `*deploy*`, `*revoke*`, `*transfer*`, `*refund*`, `pay*`, `*send_funds*`                                                                                                                                                                                        | ask     | `ask-*`                              |
+| `*exec*`, `*command*`, `*shell*`, `*terminal*` after untrusted content entered the session                                                                                                                                                                                                                                          | ask     | `ask-*-after-untrusted`              |
+| Any other tool that is not read-like (not `get*`, `list*`, `read*`, `search*`, `find*`, `fetch*`, `query*`, `view*`, `describe*`, `show*`, `lookup*`, `browse*`, `navigate*`, `open*`, `count*`, `check*` or a `*_get`-style suffix), when an argument holds a value from untrusted content, or a lookalike or same-host URL of one | ask     | `ask-untrusted-value-in-other-tools` |
+| Everything else (reads, searches, notes; other tools with values that did not come from untrusted content)                                                                                                                                                                                                                          | allow   | none                                 |
 
-Limits: a tool named differently (for example `notify_user` that sends email) needs its own rule; fetching a URL found in untrusted content is allowed (following links is normal), so a leak through a GET query string is not caught by this template.
+Limits: a sending tool named differently (for example `notify_user`) is caught only by the catch-all, so it asks instead of being blocked; a write tool with a read-like name (`fetch_and_post`) is not caught; fetching a URL found in untrusted content is allowed (following links is normal), so a leak through a GET query string is not caught by this template.
 
 ## `money-moving.yaml`
 
@@ -42,3 +43,14 @@ Notes:
 - `trusted-after-lookalike` holds because the lookalike rule excludes allowlisted recipients. A non-allowlisted address that resembles a lookalike seen in content is blocked: the gate cannot tell which of the two is real.
 - "Paid before" means the gateway forwarded a call to that recipient under this policy name (state is per policy name, stored as keyed hashes in the shared state database).
 - Not covered by this template today: per-day spend windows and rate limits (`docs/backlog.md`).
+
+## `dodo-payments.yaml`
+
+For the official Dodo Payments MCP server, whose `execute` tool runs agent-written TypeScript against the Dodo SDK. Checked by `packages/policy/test/dodo-template.test.ts`; setup in [integrations/dodo-payments.md](integrations/dodo-payments.md).
+
+| Situation                                                                                                                                                     | Verdict | Rule                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------- |
+| Any `execute` call                                                                                                                                            | ask     | `ask-dodo-execute`                    |
+| `execute` code holds a value from untrusted content and calls a write method (`*.create*`, `*.update*`, ...) or uses dynamic code (`[`, `eval`, `fetch`, ...) | block   | `block-untrusted-value-in-dodo-write` |
+
+Code-text patterns only make a decision stricter. Code cannot be proven read-only by its text, so no `execute` call runs without asking.

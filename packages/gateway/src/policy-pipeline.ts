@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   SCHEMA_VERSION,
   globMatch,
+  mostRestrictive,
   type Event,
   type ToolCallEvent,
   type ToolResultEvent,
@@ -32,7 +33,12 @@ export interface PolicyPipelineDeps {
   state: () => PolicyStateStore;
   /** Config `failure.onPolicyErrorNonSink`. */
   onErrorNonSink: 'allow' | 'block';
+  /** Config `provenance.windowSeconds`: how long missed content could still have been matched. */
+  windowSeconds?: number;
 }
+
+/** Rule id recorded when a call is paused because earlier content could not be indexed. */
+export const PROVENANCE_GAP_RULE = 'provenance-gap';
 
 /**
  * The policy engine on the decision path: provenance analysis, then policy evaluation. The config
@@ -42,6 +48,12 @@ export interface PolicyPipelineDeps {
 export class PolicyPipeline implements DecisionPipeline {
   private readonly references: Reference[];
   private readonly listNames: (sourceId: string) => string | undefined;
+  /**
+   * When content last failed to be indexed. Until it is older than the provenance window, a value
+   * copied from it would look like a clean, unknown-origin value, so every call is checked by a
+   * person (`ask`) instead of trusting the missing evidence.
+   */
+  private gapAt: Date | undefined;
 
   constructor(
     readonly policy: CompiledPolicy,
@@ -53,11 +65,34 @@ export class PolicyPipeline implements DecisionPipeline {
   }
 
   onToolResult(event: ToolResultEvent): Source | null {
-    return observeResult(this.deps.provenance(), event);
+    try {
+      return observeResult(this.deps.provenance(), event);
+    } catch (e) {
+      this.noteGap(new Date(event.ts));
+      throw e;
+    }
   }
 
   onContent(c: ObservedContent): void {
-    this.deps.provenance().observe({ eventId: null, ...c });
+    try {
+      this.deps.provenance().observe({ eventId: null, ...c });
+    } catch (e) {
+      this.noteGap(c.observedAt);
+      throw e;
+    }
+  }
+
+  /** Records that some content could not be indexed (also callable by the session). */
+  noteGap(at: Date): void {
+    if (this.gapAt === undefined || at > this.gapAt) this.gapAt = at;
+  }
+
+  /** The time of the last indexing failure still inside the provenance window, if any. */
+  provenanceGap(now: Date): Date | undefined {
+    const windowMs = (this.deps.windowSeconds ?? 86400) * 1000;
+    return this.gapAt !== undefined && now.getTime() - this.gapAt.getTime() < windowMs
+      ? this.gapAt
+      : undefined;
   }
 
   onExecuted(call: ToolCallEvent): void {
@@ -110,6 +145,7 @@ export class PolicyPipeline implements DecisionPipeline {
         now: ctx.now,
         amountHints: amountHints(this.policy, call),
         references: this.references,
+        sessionId: ctx.sessionId,
       });
       const ev = evaluatePolicy(this.policy, call, {
         report,
@@ -139,6 +175,15 @@ export class PolicyPipeline implements DecisionPipeline {
         policySha256: this.policy.sha256,
         provenance: null,
         policyError: { code: 'PIPELINE_ERROR', message },
+      };
+    }
+    const gap = this.provenanceGap(ctx.now);
+    if (gap !== undefined && result.verdict !== 'block') {
+      result = {
+        ...result,
+        verdict: mostRestrictive([result.verdict, 'ask']),
+        matchedRules: [...result.matchedRules, { ruleId: PROVENANCE_GAP_RULE, action: 'ask' }],
+        reason: `${result.reason} Content returned at ${gap.toISOString()} could not be recorded for provenance, so values copied from it cannot be traced; check this call.`,
       };
     }
     if (deny.length === 0) return result;

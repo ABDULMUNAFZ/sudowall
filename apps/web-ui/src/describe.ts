@@ -37,14 +37,50 @@ export function sentence(f: Call): string {
 
 export type Tone = 'allow' | 'ask' | 'block';
 
-/** What happened to the call, in words a person uses. */
+/** How an allowed (or approved) call actually ended, from its `tool.result`. */
+function ran(result: string | null): string {
+  switch (result) {
+    case null:
+      return 'still running';
+    case 'ok':
+      return 'it ran';
+    case 'tool-error':
+      return 'it ran but the tool reported an error';
+    case 'protocol-error':
+      return 'it failed (the server returned an error)';
+    case 'timeout':
+      return 'it timed out';
+    case 'cancelled':
+      return 'it was cancelled';
+    case 'denied':
+      return 'you denied it';
+    default:
+      return 'it did not run';
+  }
+}
+
+/**
+ * What happened to the call, in words a person uses: the policy's verdict and, for calls that
+ * were let through, whether they actually ran (a verdict is not an execution).
+ */
 export function outcome(f: Call): { label: string; tone: Tone } {
   const watching = f.mode === 'observe';
+  const result = f.result ?? null;
   if (f.verdict === 'block')
-    return { label: watching ? 'Would block (watching only)' : 'Blocked', tone: 'block' };
-  if (f.verdict === 'ask')
-    return { label: watching ? 'Would ask you (watching only)' : 'Paused for you', tone: 'ask' };
-  return { label: 'Allowed', tone: 'allow' };
+    return {
+      label: watching ? `Would block (watching only; ${ran(result)})` : 'Blocked',
+      tone: 'block',
+    };
+  if (f.verdict === 'ask') {
+    if (watching) return { label: `Would ask you (watching only; ${ran(result)})`, tone: 'ask' };
+    if (result === null) return { label: 'Paused for you', tone: 'ask' };
+    return { label: `Paused for you; ${ran(result)}`, tone: 'ask' };
+  }
+  return {
+    label: result === 'ok' ? 'Allowed' : `Allowed; ${ran(result)}`,
+    // Tone follows the policy verdict (the Activity filters use it); the label says how it ran.
+    tone: 'allow',
+  };
 }
 
 /** The policy's reason without rule ids ("ask-first-seen: First payment..." -> "First payment..."). */

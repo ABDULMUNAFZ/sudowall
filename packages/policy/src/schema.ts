@@ -70,7 +70,12 @@ const RuleSchema = z.strictObject({
   description: z.string().optional(),
   match: z.union([
     z.strictObject({ sink: IdSchema }),
-    z.strictObject({ server: GlobSchema.default('*'), tool: GlobSchema.default('*') }),
+    z.strictObject({
+      server: GlobSchema.default('*'),
+      tool: GlobSchema.default('*'),
+      /** Tool-name globs this rule does not select, even if `tool` matches. */
+      exclude: z.array(GlobSchema).min(1).optional(),
+    }),
   ]),
   when: ConditionSchema.optional(),
   action: z.enum(['allow', 'ask', 'block']),

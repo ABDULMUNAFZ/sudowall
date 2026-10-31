@@ -49,10 +49,13 @@ function PendingList({ api, state, refresh }: Pick<PageProps, 'api' | 'state' | 
 export function Overview({ api, state, product, refresh, go }: PageProps) {
   const recent = calls(state);
   const act = product?.activity;
+  // The window can span both modes, so enforced and watch-only counts are labelled separately
+  // rather than by whichever mode is on now.
+  const blocked = act?.enforce.blocked ?? 0;
+  const asked = act?.enforce.asked ?? 0;
+  const wouldBlock = act?.observe.wouldBlock ?? 0;
+  const wouldAsk = act?.observe.wouldAsk ?? 0;
   const watching = product?.config.mode !== 'enforce';
-  const blocked =
-    act === null || act === undefined ? 0 : act.observe.wouldBlock + act.enforce.blocked;
-  const asked = act === null || act === undefined ? 0 : act.observe.wouldAsk + act.enforce.asked;
   const total = act?.calls ?? recent.length;
   const highlights = recent.filter((f) => f.verdict !== 'allow').slice(0, 5);
   return (
@@ -70,9 +73,19 @@ export function Overview({ api, state, product, refresh, go }: PageProps) {
         <h2 id="stats-h">Last {act?.days ?? 7} days</h2>
         <div className="stats">
           <Stat n={total} label="actions checked" />
-          <Stat n={blocked} label={watching ? 'would have been blocked' : 'blocked'} tone="block" />
-          <Stat n={asked} label={watching ? 'would have asked you' : 'paused for you'} tone="ask" />
-          <Stat n={Math.max(0, total - blocked - asked)} label="allowed" tone="allow" />
+          {(!watching || blocked > 0) && <Stat n={blocked} label="blocked" tone="block" />}
+          {(!watching || asked > 0) && <Stat n={asked} label="paused for you" tone="ask" />}
+          {(watching || wouldBlock > 0) && (
+            <Stat n={wouldBlock} label="would have been blocked (watching)" tone="block" />
+          )}
+          {(watching || wouldAsk > 0) && (
+            <Stat n={wouldAsk} label="would have asked you (watching)" tone="ask" />
+          )}
+          <Stat
+            n={Math.max(0, total - blocked - asked - wouldBlock - wouldAsk)}
+            label="allowed"
+            tone="allow"
+          />
         </div>
       </section>
 
@@ -133,9 +146,38 @@ export function Overview({ api, state, product, refresh, go }: PageProps) {
   );
 }
 
-export function Activity({ state, go }: PageProps) {
+export function Activity({ api, state, go }: PageProps) {
   const [filter, setFilter] = useState<'all' | 'block' | 'ask' | 'allow'>('all');
-  const items = (state?.feed ?? []).filter((f) =>
+  // Pages loaded with "Show older", appended below the live feed from /api/state.
+  const [older, setOlder] = useState<FeedItem[]>([]);
+  const [more, setMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [olderError, setOlderError] = useState<string | null>(null);
+  const live = state?.feed ?? [];
+  const liveMin = live.reduce((m, f) => Math.min(m, f.seq), Number.POSITIVE_INFINITY);
+  const all = [...live, ...older.filter((f) => f.seq < liveMin)];
+  const oldest = all.reduce((m, f) => Math.min(m, f.seq), Number.POSITIVE_INFINITY);
+  const loadOlder = (): void => {
+    if (loading || !Number.isFinite(oldest)) return;
+    setLoading(true);
+    setOlderError(null);
+    api
+      .feed(oldest)
+      .then((r) => {
+        setOlder((prev) => {
+          const have = new Set(prev.map((f) => f.seq));
+          return [...prev, ...r.items.filter((f) => !have.has(f.seq))];
+        });
+        setMore(r.more);
+      })
+      .catch((e: unknown) => {
+        setOlderError((e as Error).message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+  const items = all.filter((f) =>
     filter === 'all'
       ? true
       : f.type === 'tool.call'
@@ -184,6 +226,12 @@ export function Activity({ state, go }: PageProps) {
           }}
         />
       </div>
+      {olderError !== null && <p className="error">{olderError}</p>}
+      {all.length > 0 && more && (
+        <button type="button" onClick={loadOlder} disabled={loading} data-testid="load-older">
+          {loading ? 'Loading…' : 'Show older'}
+        </button>
+      )}
     </>
   );
 }
@@ -438,6 +486,10 @@ export function Ledger({ api, state }: PageProps) {
           {verify.ok
             ? `Verified: ${count(verify.entries, 'entry', 'entries')}, ${count(verify.checkpoints, 'checkpoint', 'checkpoints')}, ${String(verify.unsignedTail)} not yet signed. Key ${verify.keyId}.`
             : `FAILED${verify.seq !== undefined ? ` at entry ${String(verify.seq)}` : ''}: ${verify.kind}: ${verify.message}`}
+          {verify.ok && verify.unsigned && ' Nothing is signed yet, so this proves little so far.'}
+          {verify.ok &&
+            !verify.anchored &&
+            ' No local anchor: a rollback to an older copy of the record would not be noticed.'}
           {!verify.signerChecked && ' (signer not checked: no local signing key)'}
           {` Checked at ${time(verify.at)}.`}
         </p>

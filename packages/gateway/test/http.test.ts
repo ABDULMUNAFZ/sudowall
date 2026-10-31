@@ -17,13 +17,14 @@ afterEach(async () => {
   gw = undefined;
 });
 
-async function start(): Promise<{ url: string; token: string }> {
+async function start(limits: Record<string, number> = {}): Promise<{ url: string; token: string }> {
   sink = new MemorySink();
   gw = await runGateway({
     config: parseConfig({
       schemaVersion: 1,
       upstreams: [rawUpstream('raw')],
       listen: { transport: 'streamable-http', port: 0 },
+      limits,
     }),
     log: silentLogger,
     sink,
@@ -111,6 +112,46 @@ describe('HTTP frontend security', () => {
     expect((await post(url, { ...auth, 'mcp-session-id': 'nope' }, call)).status).toBe(404);
     const huge = `{"jsonrpc":"2.0","id":3,"method":"ping","params":{"x":"${'a'.repeat(17 * 1024 * 1024)}"}}`;
     expect((await post(url, auth, huge)).status).toBe(413);
+  });
+});
+
+/** An initialized 2025-era session; returns the headers that address it. */
+async function session(url: string, token: string): Promise<Record<string, string>> {
+  const auth = { authorization: `Bearer ${token}` };
+  const r = await post(url, auth);
+  expect(r.status).toBe(200);
+  await r.text();
+  const sid = r.headers.get('mcp-session-id');
+  if (sid === null) throw new Error('no session id');
+  const h = { ...auth, 'mcp-session-id': sid, 'mcp-protocol-version': '2025-11-25' };
+  const n = await post(url, h, '{"jsonrpc":"2.0","method":"notifications/initialized"}');
+  expect(n.status).toBe(202);
+  return h;
+}
+
+describe('HTTP frontend limits (audit)', () => {
+  it('answers 409 for a second request with an id still in flight, and keeps the first', async () => {
+    const { url, token } = await start();
+    const h = await session(url, token);
+    const call = (id: number, ms: number) =>
+      `{"jsonrpc":"2.0","id":${String(id)},"method":"tools/call","params":{"name":"slow","arguments":{"ms":${String(ms)}}}}`;
+    const first = post(url, h, call(5, 400));
+    await new Promise((r) => setTimeout(r, 100));
+    const dup = await post(url, h, call(5, 1));
+    expect(dup.status).toBe(409);
+    expect(((await dup.json()) as { id: number }).id).toBe(5);
+    const r = await first;
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain('done');
+  });
+
+  it('answers 503 with Retry-After once maxSessions sessions are open', async () => {
+    const { url, token } = await start({ maxSessions: 1 });
+    await session(url, token);
+    const r = await post(url, { authorization: `Bearer ${token}` });
+    expect(r.status).toBe(503);
+    expect(r.headers.get('retry-after')).not.toBeNull();
+    await r.text();
   });
 });
 

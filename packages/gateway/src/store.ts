@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Config } from '@sudowall/core';
 import {
+  ANCHOR_FILE,
   Ledger,
   Redactor,
   deriveKey,
@@ -115,6 +116,7 @@ export class GatewayStore {
         checkpointEverySeconds: l.checkpoint.everySeconds,
         durability: l.durability,
         busyTimeoutMs: l.busyTimeoutMs,
+        anchorPath: join(this.keys().dir, ANCHOR_FILE),
         onError: (e) => {
           this.log.error('LEDGER CHECKPOINT FAILED', { error: e.message });
         },
@@ -130,6 +132,7 @@ export class GatewayStore {
       key: deriveKey(this.keys().hmacSecret, 'provenance-index'),
       trusted: this.config.trust.trustedTools,
       windowSeconds: this.config.provenance.windowSeconds,
+      taintScope: this.config.provenance.taintScope,
     });
     return this.provenanceCache;
   }

@@ -48,3 +48,40 @@ export function createLogger(
 }
 
 export const silentLogger: Logger = createLogger({ write: () => undefined });
+
+const SECRET_NAME =
+  '(?:api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|' +
+  'key|token|secret|password|passwd|pwd|pass|auth|authorization|credential|credentials|session|sig|signature|cookie)';
+const REDACTIONS: [RegExp, string][] = [
+  // Credentials in URLs: https://user:pass@host
+  [/\b([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+(?::[^/\s@]*)?@/gi, '$1***@'],
+  // Authorization schemes.
+  [/\b(Bearer|Basic|Token)\s+[A-Za-z0-9._~+/=-]{8,}/g, '$1 ***'],
+  // name=value, name: value and "name":"value" for secret-looking names.
+  [
+    new RegExp(`(["']?\\b[\\w.-]*${SECRET_NAME}[\\w.-]*["']?\\s*[:=]\\s*["']?)[^\\s"'&,;]+`, 'gi'),
+    '$1***',
+  ],
+  // Well-known key formats.
+  [
+    /\b(?:sk|pk|rk)[-_](?:live|test)?[-_]?[A-Za-z0-9]{16,}|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|(?:AKIA|ASIA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|npm_[A-Za-z0-9]{36})\b/g,
+    '***',
+  ],
+  // JSON Web Tokens.
+  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g, '***'],
+];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Masks credential-shaped text in a free-form line (upstream stderr): URL user info, auth
+ * headers, secret-named parameters, well-known key formats, JWTs and long random strings.
+ * Best effort: it lowers the chance a server's diagnostics put a secret in the log, it cannot
+ * recognise every secret.
+ */
+export function redactSecrets(line: string): string {
+  let out = line;
+  for (const [re, by] of REDACTIONS) out = out.replace(re, by);
+  return out.replace(/[A-Za-z0-9_+/=-]{40,}/g, (m) =>
+    /\d/.test(m) && /[A-Za-z]/.test(m) && !UUID.test(m) ? '***' : m,
+  );
+}

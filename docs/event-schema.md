@@ -65,14 +65,15 @@ ArgumentValue: `{argPath, valueKind, origin: "matched" | "unknown-origin", evmCh
 
 ArgumentMatch:
 
-| Field         | Type                                                                                                                                               | Notes                                                          |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `argPath`     | JsonPointer                                                                                                                                        | Into the tool-call arguments                                   |
-| `valueKind`   | `evm-address` \| `solana-address` \| `bitcoin-address` \| `email` \| `url` \| `amount` \| `phone` \| `iban` \| `file-path` \| `command` \| `token` |                                                                |
-| `matchType`   | `exact` \| `normalized` \| `near`                                                                                                                  | Confidence class                                               |
-| `nearKind`    | `confusable` \| `zero-width` \| `case` \| `split` \| `address-poisoning`                                                                           | Present only when `matchType = near`                           |
-| `sourceLabel` | `user` \| `trusted-tool` \| `untrusted`                                                                                                            | Least trusted label among the matched sources                  |
-| `evidence[]`  | `{sourceId, start, end}` (min 1)                                                                                                                   | UTF-16 offsets into the source's canonical text; `end > start` |
+| Field         | Type                                                                                                                                               | Notes                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `argPath`     | JsonPointer                                                                                                                                        | Into the tool-call arguments                                                                                                    |
+| `valueKind`   | `evm-address` \| `solana-address` \| `bitcoin-address` \| `email` \| `url` \| `amount` \| `phone` \| `iban` \| `file-path` \| `command` \| `token` |                                                                                                                                 |
+| `matchType`   | `exact` \| `normalized` \| `near`                                                                                                                  | Confidence class                                                                                                                |
+| `nearKind`    | `confusable` \| `zero-width` \| `case` \| `split` \| `address-poisoning` \| `same-host`                                                            | Present only when `matchType = near`                                                                                            |
+| `sourceLabel` | `user` \| `trusted-tool` \| `untrusted`                                                                                                            | Least trusted label among the matched sources                                                                                   |
+| `valueRef`    | 16 lowercase hex digits (optional)                                                                                                                 | Keyed hash prefix of the matched value, so two different values in one argument stay apart in the graph. Never the value itself |
+| `evidence[]`  | `{sourceId, start, end}` (min 1)                                                                                                                   | UTF-16 offsets into the source's canonical text; `end > start`                                                                  |
 
 ### Decision
 

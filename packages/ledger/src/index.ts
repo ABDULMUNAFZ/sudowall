@@ -5,3 +5,4 @@ export * from './ledger.js';
 export * from './verify.js';
 export * from './export.js';
 export * from './redact.js';
+export * from './anchor.js';

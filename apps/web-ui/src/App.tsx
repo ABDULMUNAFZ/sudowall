@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Api, takeToken, type Product, type State } from './api.js';
 import {
   Activity,
@@ -39,7 +39,12 @@ export function App() {
   const [state, setState] = useState<State | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [productError, setProductError] = useState<string | null>(null);
   const [route, setRoute] = useState(routeFromHash);
+  // Polls never overlap: a tick is skipped while the previous request is in flight, and an answer
+  // older than one already shown (a manual refresh raced a tick) is dropped.
+  const poll = useRef({ seq: 0, shown: 0, busy: false, abort: new AbortController() });
+  const productPoll = useRef({ seq: 0, shown: 0, busy: false });
 
   useEffect(() => {
     const on = () => {
@@ -52,30 +57,61 @@ export function App() {
     };
   }, []);
 
-  const refresh = useCallback(() => {
-    if (api === null) return;
-    api
-      .state()
-      .then((s) => {
-        setState(s);
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        setError((e as Error).message);
-      });
-  }, [api]);
+  const refresh = useCallback(
+    (force = false) => {
+      if (api === null) return;
+      const pl = poll.current;
+      if (pl.busy && !force) return;
+      pl.busy = true;
+      const seq = ++pl.seq;
+      api
+        .state(pl.abort.signal)
+        .then((s) => {
+          if (seq < pl.shown) return;
+          pl.shown = seq;
+          setState(s);
+          setError(null);
+        })
+        .catch((e: unknown) => {
+          if ((e as Error).name === 'AbortError' || seq < pl.shown) return;
+          setError((e as Error).message);
+        })
+        .finally(() => {
+          if (seq === pl.seq) pl.busy = false;
+        });
+    },
+    [api],
+  );
 
-  const refreshProduct = useCallback(() => {
-    if (api === null) return;
-    api
-      .product()
-      .then(setProduct)
-      .catch(() => {
-        // The pages still work from decisions and approvals alone.
-      });
-  }, [api]);
+  const refreshProduct = useCallback(
+    (force = false) => {
+      if (api === null) return;
+      const pl = productPoll.current;
+      if (pl.busy && !force) return;
+      pl.busy = true;
+      const seq = ++pl.seq;
+      api
+        .product(poll.current.abort.signal)
+        .then((p) => {
+          if (seq < pl.shown) return;
+          pl.shown = seq;
+          setProduct(p);
+          setProductError(null);
+        })
+        .catch((e: unknown) => {
+          if ((e as Error).name === 'AbortError' || seq < pl.shown) return;
+          // The pages still work from decisions and approvals; say the settings may be stale.
+          setProductError((e as Error).message);
+        })
+        .finally(() => {
+          if (seq === pl.seq) pl.busy = false;
+        });
+    },
+    [api],
+  );
 
   useEffect(() => {
+    const pl = poll.current;
     refresh();
     refreshProduct();
     const t = setInterval(refresh, POLL_MS);
@@ -83,6 +119,8 @@ export function App() {
     return () => {
       clearInterval(t);
       clearInterval(p);
+      pl.abort.abort();
+      pl.abort = new AbortController();
     };
   }, [refresh, refreshProduct]);
 
@@ -110,8 +148,8 @@ export function App() {
     state,
     product,
     refresh: () => {
-      refresh();
-      refreshProduct();
+      refresh(true);
+      refreshProduct(true);
     },
     go,
   };
@@ -182,6 +220,11 @@ export function App() {
       </nav>
       <main>
         {error !== null && <p className="error banner">{error}</p>}
+        {productError !== null && product !== null && (
+          <p className="error banner">
+            Settings could not be refreshed ({productError}); what is shown may be out of date.
+          </p>
+        )}
         {pending > 0 && top !== 'approvals' && top !== '' && (
           <button
             type="button"

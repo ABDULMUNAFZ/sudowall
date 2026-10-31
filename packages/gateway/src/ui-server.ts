@@ -4,11 +4,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, sep } from 'node:path';
 import {
+  ANCHOR_FILE,
   SIGNING_KEY_FILE,
   openStateDb,
   rawPublicKey,
+  readAnchor,
   verifyDatabase,
   type StateDb,
+  type VerifyOptions,
 } from '@sudowall/ledger';
 import { IncidentNotFound, incidentReport, sha256ValueId } from '@sudowall/graph';
 import { ApprovalStore } from './approvals.js';
@@ -88,6 +91,23 @@ function installationPublicKey(keyDir: string): Buffer | undefined {
   return rawPublicKey(createPrivateKey(readFileSync(path, 'utf8')));
 }
 
+/** What Verify checks against: the installation key and the newest anchored checkpoint. */
+function verifyOptions(keyDir: string): VerifyOptions & { anchorError?: string } {
+  const expected = installationPublicKey(keyDir);
+  let anchor;
+  let anchorError: string | undefined;
+  try {
+    anchor = readAnchor(join(keyDir, ANCHOR_FILE));
+  } catch (e) {
+    anchorError = (e as Error).message;
+  }
+  return {
+    ...(expected === undefined ? {} : { expectedPublicKey: expected }),
+    ...(anchor === undefined ? {} : { expectedCheckpoint: anchor }),
+    ...(anchorError === undefined ? {} : { anchorError }),
+  };
+}
+
 function hasTable(db: StateDb, name: string): boolean {
   return (
     db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !==
@@ -134,16 +154,44 @@ interface FeedItem {
   [k: string]: unknown;
 }
 
-/** Recent decisions from the ledger (already redacted before storage). */
-function feed(db: StateDb, limit: number): FeedItem[] {
+const parseEvent = (json: string): Record<string, unknown> | undefined => {
+  try {
+    const v = JSON.parse(json) as unknown;
+    return v !== null && typeof v === 'object' && !Array.isArray(v)
+      ? (v as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined; // a damaged entry; Verify reports it
+  }
+};
+
+/** Most feed items one request returns. */
+export const MAX_FEED_PAGE = 500;
+
+/**
+ * Decisions from the ledger (already redacted before storage), newest first, older than
+ * `before` when given. Each call carries the outcome of its execution (`result`), so the UI never
+ * presents a verdict as if the call had run.
+ */
+function feed(db: StateDb, limit: number, before?: number): FeedItem[] {
   if (!hasTable(db, 'ledger_entries')) return [];
   const rows = db
     .prepare(
-      "SELECT seq, event_json FROM ledger_entries WHERE type IN ('tool.call', 'approval.resolved') ORDER BY seq DESC LIMIT ?",
+      "SELECT seq, event_json FROM ledger_entries WHERE type IN ('tool.call', 'approval.resolved') AND seq < ? ORDER BY seq DESC LIMIT ?",
     )
-    .all(limit) as { seq: number; event_json: string }[];
-  return rows.map(({ seq, event_json }) => {
-    const e = JSON.parse(event_json) as Record<string, unknown>;
+    .all(before ?? Number.MAX_SAFE_INTEGER, limit) as { seq: number; event_json: string }[];
+  const minSeq = rows.at(-1)?.seq ?? 0;
+  const results = new Map<string, string>();
+  for (const r of db
+    .prepare(
+      "SELECT json_extract(event_json, '$.callEventId') AS call, json_extract(event_json, '$.outcome') AS outcome FROM ledger_entries WHERE type = 'tool.result' AND seq > ?",
+    )
+    .iterate(minSeq) as IterableIterator<{ call: unknown; outcome: unknown }>) {
+    if (typeof r.call === 'string' && typeof r.outcome === 'string') results.set(r.call, r.outcome);
+  }
+  return rows.flatMap(({ seq, event_json }) => {
+    const e = parseEvent(event_json);
+    if (e === undefined) return [];
     if (e['type'] === 'tool.call') {
       const d = e['decision'] as Record<string, unknown>;
       return {
@@ -159,6 +207,8 @@ function feed(db: StateDb, limit: number): FeedItem[] {
         reason: d['reason'],
         ruleIds: (d['matchedRules'] as { ruleId: string }[]).map((r) => r.ruleId),
         summary: argSummary(e['arguments']),
+        /** `tool.result` outcome; null while the call is still running (or waiting). */
+        result: results.get(String(e['id'])) ?? null,
       };
     }
     return {
@@ -282,6 +332,21 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       });
       return;
     }
+    if (req.method === 'GET' && path === '/api/feed') {
+      const q = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams;
+      const before = q.get('before');
+      const limit = q.get('limit');
+      if (
+        (before !== null && !/^\d{1,15}$/.test(before)) ||
+        (limit !== null && !/^\d{1,4}$/.test(limit))
+      ) {
+        throw new HttpError(400, 'before and limit must be positive integers');
+      }
+      const n = Math.min(MAX_FEED_PAGE, Math.max(1, Number(limit ?? 100)));
+      const items = feed(db, n, before === null ? undefined : Number(before));
+      send(res, 200, { items, more: items.length === n });
+      return;
+    }
     if (req.method === 'GET' && path === '/api/product') {
       send(res, 200, o.product === undefined ? null : o.product.info());
       return;
@@ -291,15 +356,30 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       // Read-only, like /api/state. The graph is built in memory from the ledger and never leaves
       // this process, so plain value hashes are enough here.
       if (!hasTable(db, 'ledger_entries')) throw new HttpError(404, 'no ledger yet');
-      const expected = installationPublicKey(o.keyDir);
+      const { anchorError, ...vo } = verifyOptions(o.keyDir);
       try {
         const r = await incidentReport({
           db,
           ref: inc[1] ?? '',
           valueId: sha256ValueId,
-          ...(expected === undefined ? {} : { expectedPublicKey: expected }),
+          ...vo,
         });
-        send(res, 200, { call: r.call, path: r.path, ledger: r.ledger });
+        // A damaged anchor means rollback cannot be ruled out: never show the record as verified.
+        const ledger =
+          anchorError === undefined
+            ? r.ledger
+            : {
+                ...r.ledger,
+                ok: false,
+                message: `ROLLBACK: the anchor is damaged: ${anchorError}`,
+              };
+        send(res, 200, {
+          call: r.call,
+          path: r.path,
+          pathTruncated: r.pathTruncated,
+          unreadableEntries: r.unreadableEntries,
+          ledger,
+        });
       } catch (e) {
         if (e instanceof IncidentNotFound) throw new HttpError(404, e.message);
         throw e;
@@ -349,11 +429,18 @@ export async function startUiServer(o: UiServerOptions): Promise<RunningUi> {
       return;
     }
     if (path === '/api/ledger/verify') {
-      const expected = installationPublicKey(o.keyDir);
-      const r = hasTable(db, 'ledger_meta')
-        ? verifyDatabase(db, expected === undefined ? {} : { expectedPublicKey: expected })
-        : ({ ok: false, kind: 'BAD_HEADER', message: 'no ledger yet' } as const);
-      send(res, 200, { ...r, signerChecked: expected !== undefined });
+      const { anchorError, ...vo } = verifyOptions(o.keyDir);
+      const r =
+        anchorError !== undefined
+          ? ({
+              ok: false,
+              kind: 'ROLLBACK',
+              message: `the anchor is damaged: ${anchorError}`,
+            } as const)
+          : hasTable(db, 'ledger_meta')
+            ? verifyDatabase(db, vo)
+            : ({ ok: false, kind: 'BAD_HEADER', message: 'no ledger yet' } as const);
+      send(res, 200, { ...r, signerChecked: vo.expectedPublicKey !== undefined });
       return;
     }
     throw new HttpError(404, 'not found');

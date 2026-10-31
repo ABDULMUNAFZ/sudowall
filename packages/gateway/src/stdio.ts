@@ -3,7 +3,10 @@ import { spawnPlan } from './win-spawn.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Channel, CloseReason } from './channel.js';
 import { LineFramer } from './framing.js';
-import type { Logger } from './log.js';
+import { redactSecrets, type Logger } from './log.js';
+
+/** Default for `limits.maxWriteBufferBytes` when a caller does not pass one. */
+const DEFAULT_MAX_WRITE_BUFFER = 64 * 1024 * 1024;
 
 type Handlers = {
   message: ((text: string) => void)[];
@@ -53,6 +56,7 @@ export class StdioServerChannel extends FramedChannel {
     private readonly input: Readable,
     private readonly output: Writable,
     maxBytes: number,
+    private readonly maxWriteBuffer: number = DEFAULT_MAX_WRITE_BUFFER,
   ) {
     super(maxBytes);
     input.on('data', (chunk: Buffer) => {
@@ -72,6 +76,13 @@ export class StdioServerChannel extends FramedChannel {
   send(text: string): void {
     if (this.closed) return;
     this.output.write(`${text}\n`);
+    if (this.output.writableLength > this.maxWriteBuffer) {
+      // The client stopped reading: disconnect rather than buffer without bound.
+      this.fireClose({
+        kind: 'error',
+        message: `client left more than ${String(this.maxWriteBuffer)} bytes unread`,
+      });
+    }
   }
 
   close(): Promise<void> {
@@ -100,6 +111,7 @@ export class StdioUpstreamChannel extends FramedChannel {
     maxBytes: number,
     private readonly log: Logger,
     private readonly shutdownGraceMs: number,
+    private readonly maxWriteBuffer: number = DEFAULT_MAX_WRITE_BUFFER,
   ) {
     super(maxBytes);
     // On Windows, `npx` and other .cmd launchers need cmd.exe (see win-spawn.ts).
@@ -126,15 +138,19 @@ export class StdioUpstreamChannel extends FramedChannel {
       this.framer.push(chunk);
     });
     let errBuf = '';
+    // Servers print URLs, tokens and call details in diagnostics: mask credentials before logging.
+    const logLine = (line: string) => {
+      this.log.info('upstream stderr', { line: redactSecrets(line.slice(0, 2000)) });
+    };
     this.child.stderr?.on('data', (chunk: Buffer) => {
       errBuf += chunk.toString('utf8');
       let i;
       while ((i = errBuf.indexOf('\n')) >= 0) {
-        this.log.info('upstream stderr', { line: errBuf.slice(0, Math.min(i, 2000)) });
+        logLine(errBuf.slice(0, i));
         errBuf = errBuf.slice(i + 1);
       }
       if (errBuf.length > 8192) {
-        this.log.info('upstream stderr', { line: errBuf.slice(0, 2000) });
+        logLine(errBuf);
         errBuf = '';
       }
     });
@@ -149,7 +165,16 @@ export class StdioUpstreamChannel extends FramedChannel {
 
   send(text: string): void {
     if (this.closed) return;
-    this.child.stdin?.write(`${text}\n`);
+    const stdin = this.child.stdin;
+    if (stdin === null) return;
+    stdin.write(`${text}\n`);
+    if (stdin.writableLength > this.maxWriteBuffer) {
+      // The server stopped reading its input: restart it rather than buffer without bound.
+      this.log.error('upstream is not reading its input; closing it', {
+        unreadBytes: stdin.writableLength,
+      });
+      void this.close();
+    }
   }
 
   /** Closes stdin, then SIGTERM, then SIGKILL after the grace period (MCP stdio shutdown). */

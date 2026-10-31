@@ -6,13 +6,19 @@
 #   issue, a web page, an email) is blocked: that is how a hidden instruction leaks your data.
 # - Actions that are hard to undo ask you first: delete, merge, push, deploy, payments.
 # - Shell and command tools ask you first once untrusted content has entered the session.
+# - Any other tool that is not plainly a read asks you first when an argument carries a value
+#   copied from untrusted content, or a URL on a host that untrusted content named (another path
+#   or query: where a planted link's owner still receives the data). Tools this policy does not
+#   know by name are covered too.
 # - Everything else runs, and every call is recorded in the ledger.
 #
-# Rules match tool names, the convention MCP servers use. Add your own servers' tool names
-# below, or start from `money-moving` (wallets) or `dodo-payments` (Dodo Payments).
+# Rules match tool names, the convention MCP servers use. Name patterns only ever make a decision
+# stricter, except the read-only list in `ask-untrusted-value-in-other-tools`, which only skips
+# asking for tools named like reads. Add your own servers' tool names below, or start from
+# `money-moving` (wallets) or `dodo-payments` (Dodo Payments).
 schema: sudowall/policy@1
 name: everyday
-version: 1
+version: 2
 
 defaults:
   sink: ask
@@ -137,3 +143,40 @@ rules:
     when: { session_tainted: true }
     action: ask
     reason: 'The agent has read untrusted content; check commands before they run.'
+
+  # Coverage for tools not named above: a value from untrusted content, or a lookalike or
+  # same-host URL, reaching any tool that is not named like a read asks first.
+  - id: ask-untrusted-value-in-other-tools
+    match:
+      tool: '*'
+      exclude:
+        - 'get*'
+        - 'list*'
+        - 'read*'
+        - 'search*'
+        - 'find*'
+        - 'fetch*'
+        - 'query*'
+        - 'view*'
+        - 'describe*'
+        - 'show*'
+        - 'lookup*'
+        - 'browse*'
+        - 'navigate*'
+        - 'open*'
+        - 'count*'
+        - 'check*'
+        - '*_get'
+        - '*_list'
+        - '*_read'
+        - '*_search'
+        - '*_query'
+        - '*_view'
+        - '*_describe'
+        - '*_fetch'
+    when:
+      any:
+        - { path: '', provenance: { label: untrusted } }
+        - { path: '', near: [same-host, confusable, zero-width, split] }
+    action: ask
+    reason: 'An argument carries a value copied from untrusted content (or a lookalike of one); check this call before it runs.'

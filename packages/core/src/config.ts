@@ -173,6 +173,23 @@ export const ConfigSchema = z
           .int()
           .min(0)
           .default(10 * 60 * 1000),
+        /** Requests in flight on one session; more are answered with -32004. */
+        maxPendingRequests: z.int().min(1).max(100_000).default(1024),
+        /** Concurrent 2025-era HTTP client sessions; more `initialize` requests get HTTP 503. */
+        maxSessions: z.int().min(1).max(10_000).default(64),
+        /** An HTTP client session with no request and no open stream for this long is closed. */
+        sessionIdleMs: z
+          .int()
+          .min(1000)
+          .default(60 * 60 * 1000),
+        /**
+         * Bytes a peer may leave unread in one outgoing stream (stdio pipe, HTTP response). A peer
+         * that stops reading past this is disconnected instead of growing the gateway's memory.
+         */
+        maxWriteBufferBytes: z
+          .int()
+          .min(64 * 1024)
+          .default(64 * 1024 * 1024),
       })
       .prefault({}),
     upstreamLifecycle: z
@@ -218,6 +235,13 @@ export const ConfigSchema = z
           .min(60)
           .max(90 * 86400)
           .default(86400),
+        /**
+         * Which untrusted content makes `session_tainted` true. `installation`: content any
+         * gateway process sharing the state database observed (an MCP client usually runs one
+         * gateway per server, so this is what links a web read in one server to a shell call in
+         * another). `session`: only content this gateway session observed.
+         */
+        taintScope: z.enum(['installation', 'session']).default('installation'),
       })
       .prefault({}),
     /** Policy engine config (Phase 4). */

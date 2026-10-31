@@ -25,6 +25,8 @@ export const NearKindSchema = z.enum([
   'case',
   'split',
   'address-poisoning',
+  /** A different URL on the same host as a seen URL (path or query changed). */
+  'same-host',
 ]);
 export type NearKind = z.infer<typeof NearKindSchema>;
 
@@ -43,6 +45,14 @@ const MatchBase = {
   valueKind: ValueKindSchema,
   /** Least trusted label among the matched sources. */
   sourceLabel: TrustLabelSchema,
+  /**
+   * Keyed tag (truncated HMAC) of the matched value, never the value itself: tells apart two
+   * values matched in one argument. Absent in events recorded before 0.8.
+   */
+  valueRef: z
+    .string()
+    .regex(/^[0-9a-f]{16}$/)
+    .optional(),
   evidence: z.array(EvidenceSchema).min(1),
 };
 

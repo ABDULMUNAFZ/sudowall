@@ -1,6 +1,16 @@
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 /**
  * `sudowall protect`: finds the MCP client configs on this machine (Claude Code, Claude
@@ -119,12 +129,33 @@ export interface WrapOptions {
 /** The package argument of a wrapped entry; `tortoisegate` is the product's former name. */
 const RUNNER = /^(sudowall|tortoisegate)(@[^\s]+)?$/;
 
-/** True when a server entry already runs through `sudowall wrap`. */
+const launcher = (c: unknown) =>
+  typeof c === 'string'
+    ? basename(c)
+        .replace(/\.(exe|cmd)$/i, '')
+        .toLowerCase()
+    : '';
+
+/**
+ * True when a server entry already runs through `sudowall wrap`: the command is the launcher
+ * `wrapEntry` writes (`npx`, or `cmd /c npx` on Windows) and it starts the runner package with
+ * `wrap ... --`. Arguments that only look like a wrapper, under another command, do not count.
+ */
 export function isWrapped(entry: Json): boolean {
   const args = entry['args'];
   if (!Array.isArray(args)) return false;
+  const cmd = launcher(entry['command']);
+  const viaCmd = cmd === 'cmd' && /^\/c$/i.test(String(args[0])) && launcher(args[1]) === 'npx';
+  if (cmd !== 'npx' && !viaCmd) return false;
   const i = args.findIndex((a) => typeof a === 'string' && RUNNER.test(a));
-  return i !== -1 && args[i + 1] === 'wrap' && args.indexOf('--', i) !== -1;
+  const first = viaCmd ? 3 : 1; // the runner follows `-y` (npx -y sudowall@x)
+  return (
+    i !== -1 &&
+    i <= first &&
+    args.slice(viaCmd ? 2 : 0, i).every((a) => a === '-y') &&
+    args[i + 1] === 'wrap' &&
+    args.indexOf('--', i) !== -1
+  );
 }
 
 /** A remote server: the client connects to a URL (Streamable HTTP or SSE). */
@@ -169,8 +200,12 @@ function wrapRemote(entry: Json, o: WrapOptions): Json {
   const headerArgs: string[] = [];
   const headerVars: Record<string, string> = {};
   if (isObj(headers)) {
-    Object.entries(headers).forEach(([name, value], i) => {
-      const v = `SUDOWALL_HEADER_${String(i + 1)}`;
+    let n = 0;
+    Object.entries(headers).forEach(([name, value]) => {
+      // Never overwrite a variable the entry already sets.
+      let v: string;
+      do v = `SUDOWALL_HEADER_${String(++n)}`;
+      while (Object.hasOwn(env, v));
       env[v] = String(value);
       headerVars[name] = v;
       headerArgs.push('--header', `${name}:\${${v}}`);
@@ -241,7 +276,8 @@ function unwrapRemote(entry: Json, flag: string): Json {
     url: info.url,
     ...(info.transport === undefined ? {} : { transport: info.transport }),
     ...(info.headers === undefined ? {} : { headers }),
-    ...(info.hadEnv ? { env: left } : {}),
+    // Keep variables added after protecting, even if the entry had no env before.
+    ...(info.hadEnv || Object.keys(left).length > 0 ? { env: left } : {}),
   };
 }
 
@@ -297,11 +333,18 @@ export function redactArgs(parts: readonly string[]): string[] {
  * services, viaSocket for one, put the credential in the path) are masked.
  */
 export function redactUrl(url: string): string {
-  return url
-    .replace(/([?&][^=]*(key|token|secret|auth)[^=]*=)[^&]+/gi, '$1***')
-    .replace(/\/([A-Za-z0-9_-]{20,})(?=[/?#]|$)/g, (m, seg: string) =>
-      /\d/.test(seg) && /[A-Za-z]/.test(seg) ? '/***' : m,
-    );
+  return (
+    url
+      // user:password@ (or a token as the user name)
+      .replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, '$1***@')
+      .replace(
+        /([?&;#][^=&#]*(key|token|secret|auth|sig|signature|pass|pwd|session|code|credential|jwt|bearer)[^=&#]*=)[^&#]+/gi,
+        '$1***',
+      )
+      .replace(/\/([A-Za-z0-9_-]{20,})(?=[/?#]|$)/g, (m, seg: string) =>
+        /\d/.test(seg) && /[A-Za-z]/.test(seg) ? '/***' : m,
+      )
+  );
 }
 
 const describe = (e: Json): string => {
@@ -397,21 +440,60 @@ export function planAll(
  * Writes a planned file: backs up the original next to it, then replaces the file atomically.
  * Refuses if the file changed since it was planned (a running client may have rewritten it).
  */
-export function applyPlan(plan: FilePlan, now = new Date()): string | undefined {
-  if (plan.next === undefined) return undefined;
-  const current = readFileSync(plan.file, 'utf8');
-  if (current !== plan.original) {
-    throw new Error(
-      `${plan.file} changed while planning; nothing was written. Run the command again.`,
-    );
+/** A lock older than this was left by a crashed run and is taken over. */
+const STALE_LOCK_MS = 30_000;
+
+/**
+ * Holds `<file>.sudowall-lock` (created exclusively) while `fn` runs, so two SudoWall runs never
+ * check and replace the same file at once.
+ */
+function withFileLock<T>(file: string, fn: () => T): T {
+  const lock = `${file}.sudowall-lock`;
+  let fd: number;
+  try {
+    fd = openSync(lock, 'wx', 0o600);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    if (Date.now() - statSync(lock).mtimeMs < STALE_LOCK_MS) {
+      throw new Error(
+        `${file} is being changed by another SudoWall run (${lock} exists); try again shortly.`,
+        { cause: e },
+      );
+    }
+    unlinkSync(lock);
+    fd = openSync(lock, 'wx', 0o600);
   }
-  const mode = statSync(plan.file).mode & 0o777;
-  const stamp = now.toISOString().replace(/[:.]/g, '-');
-  const backup = `${plan.file}.sudowall-backup-${stamp}`;
-  writeFileSync(backup, plan.original, { mode: 0o600 });
-  const tmp = join(dirname(plan.file), `.${String(process.pid)}.sudowall.tmp`);
-  writeFileSync(tmp, plan.next, { mode });
-  chmodSync(tmp, mode);
-  renameSync(tmp, plan.file);
-  return backup;
+  try {
+    return fn();
+  } finally {
+    closeSync(fd);
+    try {
+      unlinkSync(lock);
+    } catch {
+      // already gone
+    }
+  }
+}
+
+export function applyPlan(plan: FilePlan, now = new Date()): string | undefined {
+  const next = plan.next;
+  if (next === undefined) return undefined;
+  return withFileLock(plan.file, () => {
+    // Re-checked under the lock: the file is replaced only if it is exactly what was planned.
+    const current = readFileSync(plan.file, 'utf8');
+    if (current !== plan.original) {
+      throw new Error(
+        `${plan.file} changed while planning; nothing was written. Run the command again.`,
+      );
+    }
+    const mode = statSync(plan.file).mode & 0o777;
+    const stamp = now.toISOString().replace(/[:.]/g, '-');
+    const backup = `${plan.file}.sudowall-backup-${stamp}`;
+    writeFileSync(backup, plan.original, { mode: 0o600 });
+    const tmp = join(dirname(plan.file), `.${String(process.pid)}.sudowall.tmp`);
+    writeFileSync(tmp, next, { mode });
+    chmodSync(tmp, mode);
+    renameSync(tmp, plan.file);
+    return backup;
+  });
 }

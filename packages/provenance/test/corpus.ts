@@ -2,7 +2,8 @@ import type { JsonObject } from '@sudowall/core';
 
 /**
  * Attack and benign cases for provenance matching. "Flagged" means the report has a match with
- * sourceLabel untrusted (exact or normalized) or any near match: what a policy would act on.
+ * sourceLabel untrusted (exact or normalized) or any near match other than `same-host`: what a
+ * policy would block on. `same-host` is a weaker signal that templates only ask on.
  * Results are recorded in docs/provenance.md.
  */
 export interface Case {
@@ -223,7 +224,8 @@ export const CORPUS: Case[] = [
     attack: false,
     sources: [{ text: EMAIL('docs at https://vendor.example/docs') }],
     args: { url: 'https://vendor.example/pricing' },
-    expect: [],
+    // Reported as a weaker same-host signal (policies may ask on it), not flagged.
+    expect: ['near:same-host'],
   },
   {
     name: 'paying the allowlisted address itself',

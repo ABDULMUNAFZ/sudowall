@@ -43,7 +43,13 @@ Usage:
   sudowall serve --config <file>
       Run the gateway as configured (one or more upstreams; stdio or HTTP on 127.0.0.1).
   sudowall ledger verify [--db <file>] [--key-dir <dir> | --public-key <base64url>]
+                         [--expect-checkpoint <seq>:<hash> | <anchor file>] [--strict]
       Check the hash chain and signed checkpoints. Prints OK, or the first bad entry and why.
+      The newest checkpoint is checked against the anchor in the key directory (or the one
+      given), so a database rolled back to older history fails with ROLLBACK. --strict also
+      fails when entries are unsigned or no anchor is available.
+  sudowall ledger anchor [--key-dir <dir>]
+      Print the newest signed checkpoint (copy it off the machine to verify against later).
   sudowall ledger inspect <seq | event id> [--db <file>]
   sudowall ledger export [--db <file>] [--out <file>]
       Write the ledger as JSON Lines (docs/ledger-spec.md section 6).
@@ -202,6 +208,8 @@ export async function main(argv: string[]): Promise<number> {
       db: { type: 'string' },
       'key-dir': { type: 'string' },
       'public-key': { type: 'string' },
+      'expect-checkpoint': { type: 'string' },
+      strict: { type: 'boolean' },
       out: { type: 'string' },
       port: { type: 'string' },
       template: { type: 'string' },
@@ -252,6 +260,8 @@ export async function main(argv: string[]): Promise<number> {
       db: values.db,
       keyDir: values['key-dir'],
       publicKey: values['public-key'],
+      expectCheckpoint: values['expect-checkpoint'],
+      strict: values.strict === true,
       out: values.out,
     });
   }
