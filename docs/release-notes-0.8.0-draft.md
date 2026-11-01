@@ -264,7 +264,6 @@ Each row is a clean checkout running `pnpm turbo run build typecheck test --forc
 
 - **The interactive demo (without `--ci`)**, and the app's pages by eye. The browser was covered only by the Playwright suite (`apps/web-ui/e2e/approvals.spec.ts`), run at `3c7a1d8` with `pnpm test:e2e`: 4 passed.
 - **`protect --apply` and `unprotect --apply`** against real client configs. Running them would change this machine's configs.
-- **A proven Dodo read actually running.** The v3 template was run on 2026-11-01 against the real `dodopayments-mcp` 2.59.0 with a placeholder key (see `docs/integrations/dodo-payments.md`). SudoWall allowed and forwarded the `list`, but the server answered "Deno is required for code execution but was not found", so no code ran. Refunds asked and timed out (denied); the email and webhook changes were blocked. No real Dodo account was used.
 - **0.7.0 reading 0.8.0 data** still reports `BAD_EVENT`, exit 4. That is the shipped behaviour and cannot change; only 0.7.1 (prepared) reports it as newer.
 - **The demo's state directory on Windows** (`LOCALAPPDATA` for the gateway child). It is set in code and not run on Windows.
 - **macOS and Windows.** Everything here ran on Linux.
