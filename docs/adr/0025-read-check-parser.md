@@ -168,4 +168,12 @@ The same new cases against the earlier TypeScript implementation: it would have 
 
 - An install is about 22 MB smaller, and the first Dodo `execute` check is about 170 ms faster.
 - A third parser now reads the code: Babel here, TypeScript in Dodo's pre-check, Deno when it runs. The check stays sound only while it refuses everything outside its narrow shape. The parser-differential cases cover the known gaps; any new gap must be a new not-proven case first.
-- `@babel/parser` is MIT. It publishes often (8.0.7 to 8.0.10 in three weeks); upgrades must rerun the full case list.
+- `@babel/parser` is MIT. It publishes often (8.0.7 to 8.0.10 in three weeks); see [Upgrading the parser](#upgrading-the-parser).
+
+## Upgrading the parser
+
+Added 2026-11-01.
+
+- `@babel/parser` stays pinned to one exact version (`"8.0.7"`, no `^` or `~`) in `packages/policy/package.json`, and so in the published package's `dependencies`, which `scripts/build-package.mjs` copies from the declared versions. Its run-time code loads no other package: `@babel/types`, its only dependency (`^8.0.6`), is used by its type definitions only. So an install of SudoWall always parses with the same code.
+- **Before any upgrade of `@babel/parser`, even a patch release, the full adversarial suite must pass with the new version:** `packages/policy/test/sdk-read-only.test.ts` with every case in `sdk-read-only.cases.ts` (proven, not proven, and the parser-differential and error-recovery cases), `sdk-read-only-precedence.test.ts` and `dodo-template.test.ts`. A failing case blocks the upgrade; it is never edited to pass. Any new parser behaviour found during the upgrade becomes a new not-proven case first.
+- `packages/policy/test/parser-pin.test.ts` fails when the declared or installed version differs from the version it names, or when the parser starts loading another package at run time. Change its version only together with a passing run of the suite above, and record the new version and the date here.
