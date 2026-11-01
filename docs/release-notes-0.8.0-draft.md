@@ -2,7 +2,7 @@
 
 Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). The package version is still 0.7.0, nothing is published to npm, and `main` is unchanged. The live demo and www.sudowall.tech still run 0.7.0.
 
-Updated on 2026-11-01 for the five commits after `4afaeba`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published.
+Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
 
 This page lists what the branch changes compared with 0.7.0. For each change it says what 0.7.0 does, what the branch does, and which claims in the demo guide, the README, `docs/` and the website it makes false. The design decisions are in [ADR 0023](adr/0023-audit-recheck-fixes.md), and the full list is in the CHANGELOG under "Unreleased".
 
@@ -234,7 +234,7 @@ None of these is visible in the demo flow, and none makes a documented claim fal
 
 | Source                                   | Claim                 | Branch                                                      |
 | ---------------------------------------- | --------------------- | ----------------------------------------------------------- |
-| www.sudowall.tech `index.html:93` (live) | "406 tests"           | **false for the branch:** 580 pass at `f6ea3c3` (1 skipped) |
+| www.sudowall.tech `index.html:93` (live) | "406 tests"           | **false for the branch:** 697 pass at `30e7045` (1 skipped) |
 | `docs/pitch.md:27`                       | "406 automated tests" | **false for the branch:** same                              |
 
 406 is correct for 0.7.0: at the base commit, 406 tests pass and 1 is skipped (the TigerGraph parity test, which needs a server). The count across the branch commits:
@@ -255,18 +255,24 @@ None of these is visible in the demo flow, and none makes a documented claim fal
 | `9b6bc24` | proven Dodo reads, by parsing the code                    | 573    |
 | `f3fa210` | web UI vitest: poll ordering (6 tests)                    | 579    |
 | `f6ea3c3` | demo indentation, sorted incident lines                   | 580    |
+| `31fe55b` | provenance tests remove their temp databases              | 580    |
+| `78c7093` | read check parses with `@babel/parser`                    | 580    |
+| `c8009eb` | parser-differential cases fail closed                     | 678    |
+| `1bbc7b5` | a matching block beats an `sdk_read_only` allow           | 689    |
+| `1e53fc0` | `session.ended` before the ledger closes; incident text   | 697    |
+| `48cb184` | real Dodo run (docs and script only)                      | 697    |
+| `30e7045` | package smoke: the demo leaves no state in user folders   | 697    |
 
-The `release/0.7.x` branch (0.7.1, prepared) passes 418 at `da0c57a`.
+The `release/0.7.x` branch (0.7.1, prepared) passes 418 at `da0c57a` and 421 at `4e64126`.
 
-Each row is a clean checkout running `pnpm turbo run build typecheck test --force` and `pnpm lint`. Every row passed with exit 0.
+Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo run build typecheck test --force` and `pnpm lint`. The other rows from `31fe55b` on ran in the working tree with `pnpm build`, `pnpm typecheck`, `pnpm lint` and `pnpm test`. Every row passed with exit 0. The package smoke test (`pnpm smoke:package`) is not in the count.
 
 ## Not verified
 
 - **The interactive demo (without `--ci`)**, and the app's pages by eye. The browser was covered only by the Playwright suite (`apps/web-ui/e2e/approvals.spec.ts`), run at `3c7a1d8` with `pnpm test:e2e`: 4 passed.
 - **`protect --apply` and `unprotect --apply`** against real client configs. Running them would change this machine's configs.
 - **0.7.0 reading 0.8.0 data** still reports `BAD_EVENT`, exit 4. That is the shipped behaviour and cannot change; only 0.7.1 (prepared) reports it as newer.
-- **The demo's state directory on Windows** (`LOCALAPPDATA` for the gateway child). It is set in code and not run on Windows.
-- **macOS and Windows.** Everything here ran on Linux.
+- **macOS and Windows, by hand.** Everything in this page ran on Linux. On macOS and Windows only CI ran: the full package smoke test, which since `30e7045` also checks that `demo --ci` leaves nothing in `%LOCALAPPDATA%`, `~/Library/Application Support` or `$XDG_STATE_HOME` (runs 41295615920 for the PR and 41295706535 for `release/0.7.x`: passed on all three systems).
 - **TigerGraph parity.** It was not rerun.
 - **A rollback end to end through the CLI** (restore an older database, run `ledger verify`). It is covered by `packages/ledger/test/anchor.test.ts`.
 
@@ -278,22 +284,30 @@ Each row is a clean checkout running `pnpm turbo run build typecheck test --forc
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
 5. **The read check's parser:** decided ([ADR 0025](adr/0025-read-check-parser.md)). `@babel/parser` 8.0.7 replaced TypeScript after passing all 100 cases: about 2 MB installed instead of 24 MB, about 22 ms for the first check instead of 190 ms. It requires Node.js 24.11.0 or later, so `engines` moved from 24.0.0.
 6. **At gateway shutdown,** the log showed `EVENT SINK FAILED … session.ended … the ledger is closed`: fixed. `Session.close()` returned at once to a second caller while the first was still stopping upstreams, so the gateway closed the ledger before `session.ended` was written. Every caller now waits for the same close. `packages/gateway/test/shutdown.test.ts` checks the client-closed path, `stop()`, and both at once: `session.ended` is the last ledger entry and nothing is logged at warn or error.
+7. **Dependency audit:** the CI job `dependency audit and licences` fails on both branches with two moderate advisories: `minimatch` <11.0.1 (GHSA-g3hv-75wg-m249) through `eslint`, development only, and `glob` 9 to 14.0.1 (GHSA-3g3m-2fjr-6pw4) through `@modelcontextprotocol/server-filesystem`, which the package ships. Not fixed on the branch: to decide before a release (for example pnpm overrides to patched versions, then the full suite and the package smoke test).
 
 ## Since 4afaeba (2026-11-01)
 
-| Commit    | Change                                                                                                                                                                                                                                                                        |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `4271334` | The demo passes its state directory to the gateway child (`XDG_STATE_HOME`, and `LOCALAPPDATA` on Windows), so `names.json` no longer lands in the default directory. The test sets a fixture `HOME` and checks that nothing is written there.                                |
-| `bfd98ff` | Event schema 2 and state database writer version. A newer event, ledger spec or database version is `NEWER_VERSION`: `CANNOT VERIFY: … written by a newer SudoWall (vX) …`, exit 5, never `BAD_EVENT` or exit 4. The ledger spec says downgrades are not supported. ADR 0024. |
-| `9b6bc24` | Dodo template v3 and the `sdk_read_only` condition: a TypeScript parse proves the code is only `client.<resource>.list` / `.retrieve` calls with literal arguments. 88 adversarial tests. ADR 0023 update.                                                                    |
-| `f3fa210` | `apps/web-ui` gets vitest. The poll logic moved into `src/poll.ts`, with a test that a slow older response cannot overwrite a newer one.                                                                                                                                      |
-| `f6ea3c3` | The demo's `Anchored:` line is indented. Incident value lines are sorted by argument path.                                                                                                                                                                                    |
+| Commit    | Change                                                                                                                                                                                                                                                                                                                     |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `4271334` | The demo passes its state directory to the gateway child (`XDG_STATE_HOME`, and `LOCALAPPDATA` on Windows), so `names.json` no longer lands in the default directory. The test sets a fixture `HOME` and checks that nothing is written there.                                                                             |
+| `bfd98ff` | Event schema 2 and state database writer version. A newer event, ledger spec or database version is `NEWER_VERSION`: `CANNOT VERIFY: … written by a newer SudoWall (vX) …`, exit 5, never `BAD_EVENT` or exit 4. The ledger spec says downgrades are not supported. ADR 0024.                                              |
+| `9b6bc24` | Dodo template v3 and the `sdk_read_only` condition: a TypeScript parse proves the code is only `client.<resource>.list` / `.retrieve` calls with literal arguments. 88 adversarial tests. ADR 0023 update.                                                                                                                 |
+| `f3fa210` | `apps/web-ui` gets vitest. The poll logic moved into `src/poll.ts`, with a test that a slow older response cannot overwrite a newer one.                                                                                                                                                                                   |
+| `f6ea3c3` | The demo's `Anchored:` line is indented. Incident value lines are sorted by argument path.                                                                                                                                                                                                                                 |
+| `31fe55b` | Provenance tests delete their temporary databases (they had filled `/tmp` with 5 GB).                                                                                                                                                                                                                                      |
+| `78c7093` | The read check parses with `@babel/parser` 8.0.7 instead of TypeScript: same 100 cases pass, 2 MB instead of 24 MB, 22 ms instead of 190 ms for the first check. `engines` is now Node.js `>=24.11.0`. ADR 0025.                                                                                                           |
+| `c8009eb` | Code that parsers may read differently is never proven: HTML-like comments, a hashbang, `using`, decorators, import attributes, unusual whitespace and line terminators, non-ASCII outside strings and comments, duplicate keys, very long or deeply nested input, and anything the parser only recovers from with errors. |
+| `1bbc7b5` | Tests that a matching block beats an `sdk_read_only` allow in every rule order (the evaluator already enforced it).                                                                                                                                                                                                        |
+| `1e53fc0` | `session.ended` is written before the ledger closes, with a test that shutdown logs nothing at warn or error. An incident for a ledger from a newer SudoWall says this version cannot verify it, not "not all signed yet".                                                                                                 |
+| `48cb184` | `docs/integrations/dodo-payments-run/`: a real `dodopayments-mcp` 2.59.0 run where the proven reads execute in Deno and reach Dodo's test API (401 with a placeholder key).                                                                                                                                                |
+| `30e7045` | The package smoke test runs the demo with every home and app-data variable pointing at a fresh folder, and fails if SudoWall state appears there.                                                                                                                                                                          |
 
-On `release/0.7.x` (from tag `v0.7.0`, pushed, **not published**): `0972a9f` adds `NEWER_VERSION`, exit 5 and the newer-database message to 0.7.0, and `da0c57a` sets the version to 0.7.1. The `names.json` fix is not on that branch.
+On `release/0.7.x` (from tag `v0.7.0`, pushed, **not published**): `0972a9f` adds `NEWER_VERSION`, exit 5 and the newer-database message to 0.7.0, and `da0c57a` sets the version to 0.7.1. `95be9c7` backports the `names.json` fix (`4271334`), `5c106e7` the shutdown fix (from `1e53fc0`, without the incident wording), `bdc9d7f` adds both to the 0.7.1 CHANGELOG, and `4e64126` the smoke check (`30e7045`).
 
 ## Release-day copy checklist
 
-Do not apply these before 0.8.0 is published. Two of them are on the live site. Use the test count from the release commit's own clean run; 580 is the count at `f6ea3c3`.
+Do not apply these before 0.8.0 is published. Two of them are on the live site. Use the test count from the release commit's own clean run; 697 is the count at `30e7045`.
 
 - [ ] `README.md:72`. Replace
       `writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: reads run, refunds and other changes ask you first, and a change using an email or URL copied from a support ticket or email is blocked.`
@@ -306,7 +320,146 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
       The rest of the paragraph stays.
 - [ ] `apps/site/index.html:93` (live). Replace both numbers in
       `<span data-count="406">406</span> tests`
-      with the release count, for example `<span data-count="580">580</span> tests`.
-- [ ] `docs/pitch.md:27`. Replace `406 automated tests` with the release count, for example `580 automated tests`.
-- [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. Mention the 0.7.1 section only if 0.7.1 is published.
+      with the release count, for example `<span data-count="697">697</span> tests`.
+- [ ] `docs/pitch.md:27`. Replace `406 automated tests` with the release count, for example `697 automated tests`.
+- [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. If 0.7.1 is published, copy its section from `release/0.7.x` (with its date) below 0.8.0, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
 - [ ] Bump `packages/cli/package.json` and `GATEWAY_VERSION` in `packages/gateway/src/upstream.ts` to 0.8.0, so newer-version messages from 0.7.1 name `v0.8.0`.
+- [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version; `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A lower 24.x was not tested. Replace "Node.js 24" with "Node.js 24.11 or later" in `README.md:20`, `README.md:156`, `docs/demo.md:24`, and on the live site in `apps/site/get-started.html:53` and `apps/site/index.html:99`, `:311` and `:328` (the `node -v` check). `packages/cli/README.md:9` already says 24.11.
+- [ ] `packages/cli/README.md:9` (the npm page) says "on macOS or Linux". `README.md:20` and the site say macOS, Linux or Windows, and CI smoke-tests Windows. Decide which is meant and make them agree.
+- [ ] `docs/integrations/dodo-payments.md`: keep the note that `dodopayments-mcp` 2.59.0 needs Deno 2.8 or earlier, unless a newer Dodo release has fixed it by then.
+
+## Release plan
+
+Not run: nothing here has been published. Every command is for the owner to run, in this order. npm publishing is by hand because npm asks for the owner's 2FA code (`.github/workflows/publish-github-packages.yml`); a published GitHub release also publishes `@abdulmunafz/sudowall` to GitHub Packages through that workflow.
+
+The npm rules these steps rely on (npm docs, checked 2026-11-01):
+
+- `npm publish` moves the `latest` dist-tag to the new version unless `--tag` is given. `npx sudowall` installs `latest`.
+- A version can be unpublished in its first 72 hours if no other package depends on it; after that, only with no dependents, fewer than 300 downloads in the last week and a single owner. **A version number can never be reused**, even after unpublishing. npm recommends deprecating instead.
+- `npm deprecate sudowall@<version> "<message>"` keeps the version installable and prints the message on install; `npm deprecate sudowall@<version> ""` undoes it.
+- GitHub Packages can delete a version of a public package only while it has 5,000 downloads or fewer.
+
+### Before either release
+
+- [ ] CI is green on the commit to be released, including `dependency audit and licences`. It is red on both branches now because of two moderate advisories (`minimatch` <11.0.1 through `eslint`, development only; `glob` 9 to 14.0.1 through `@modelcontextprotocol/server-filesystem`, which ships). Decide how to handle them first.
+- [ ] `npm whoami` prints the owner's npm account, and `gh auth status` shows a login that can create releases.
+- [ ] Node.js is 24.11 or later (`node -v`). `release/0.7.x` works on any 24.x; the 0.8.0 build needs 24.11.
+
+### 1. Publish 0.7.1 (branch `release/0.7.x`)
+
+First date the release in its CHANGELOG, then build, test, tag and publish from that exact commit.
+
+```sh
+git fetch origin
+git switch release/0.7.x
+git merge --ff-only origin/release/0.7.x
+git status --short                                           # must print nothing
+grep '"version"' packages/cli/package.json                   # "version": "0.7.1",
+grep "GATEWAY_VERSION =" packages/gateway/src/upstream.ts    # export const GATEWAY_VERSION = '0.7.1';
+
+# Date the release: "## 0.7.1 (prepared, not published)" becomes "## 0.7.1 (YYYY-MM-DD)".
+sed -i 's/^## 0.7.1 (prepared, not published)$/## 0.7.1 (YYYY-MM-DD)/' CHANGELOG.md
+git commit -am "docs(changelog): 0.7.1 release date"
+git push origin release/0.7.x                                # wait for CI to pass on this commit
+
+# Build and test from scratch.
+pnpm install --frozen-lockfile
+pnpm turbo run build typecheck test --force
+pnpm lint
+pnpm run package                                             # writes release/sudowall
+pnpm smoke:package
+(cd release/sudowall && npm pack --dry-run)                  # sudowall@0.7.1, dist/, assets/, LICENSE, README.md
+
+# Tag, publish, release.
+git tag -a v0.7.1 -m "SudoWall 0.7.1"
+git push origin v0.7.1
+(cd release/sudowall && npm publish)                         # asks for the 2FA code
+awk '/^## 0.7.1 /{f=1;next} /^## /{f=0} f' CHANGELOG.md > release/notes-0.7.1.md
+gh release create v0.7.1 --verify-tag --title "SudoWall 0.7.1: newer data is not tampering" --notes-file release/notes-0.7.1.md
+```
+
+Check it (an empty npm cache, so the registry copy is what runs):
+
+```sh
+npm view sudowall dist-tags                                  # latest: '0.7.1'
+npm view sudowall@0.7.1 version engines
+d="$(mktemp -d)" && cd "$d" && npm_config_cache="$d/cache" npx -y sudowall@0.7.1 --version   # 0.7.1
+npm_config_cache="$d/cache" npx -y sudowall@0.7.1 demo --ci                                 # four ok lines
+gh run list --workflow publish-github-packages.yml --limit 1                                 # success
+```
+
+### 2. The gap
+
+Proposed: **at least 72 hours** between 0.7.1 and 0.8.0. 0.7.1 is the version that reports 0.8.0 data as "written by a newer SudoWall" (exit 5) instead of tampering (exit 4), so it should be the version people have before 0.8.0 data exists. 72 hours is also npm's unpublish window for 0.7.1, so if 0.7.1 is pulled it is pulled before 0.8.0 depends on its being there. During the gap, run the `npx` checks above on macOS and Windows as well, and watch the issue tracker.
+
+### 3. Publish 0.8.0 (from `main`)
+
+The owner merges PR #1 first (it does not touch `apps/site`, so it does not deploy the site). Then the release commit, on a branch with its own PR:
+
+```sh
+git fetch origin
+git switch main
+git merge --ff-only origin/main
+git switch -c release/0.8.0
+(cd packages/cli && npm pkg set version=0.8.0)
+sed -i "s/GATEWAY_VERSION = '0.7.0'/GATEWAY_VERSION = '0.8.0'/" packages/gateway/src/upstream.ts
+# Apply every checklist item above EXCEPT the apps/site ones: a push to main that changes
+# apps/site deploys www.sudowall.tech, and the site must not describe 0.8.0 before it is on npm.
+pnpm install --frozen-lockfile
+pnpm turbo run build typecheck test --force                  # use this count in README, pitch and site
+pnpm lint
+git commit -am "chore: release 0.8.0"
+git push origin release/0.8.0                                # open a PR; the owner merges it when CI is green
+```
+
+After the merge, from the merged commit on `main`:
+
+```sh
+git switch main
+git merge --ff-only origin/main
+git status --short                                           # must print nothing
+pnpm install --frozen-lockfile
+pnpm turbo run build typecheck test --force
+pnpm lint
+pnpm run package
+pnpm smoke:package
+(cd release/sudowall && npm pack --dry-run)                  # sudowall@0.8.0, dist/, assets/, LICENSE, README.md
+git tag -a v0.8.0 -m "SudoWall 0.8.0"
+git push origin v0.8.0
+(cd release/sudowall && npm publish)                         # asks for the 2FA code
+awk '/^## 0.8.0 /{f=1;next} /^## /{f=0} f' CHANGELOG.md > release/notes-0.8.0.md
+gh release create v0.8.0 --verify-tag --title "SudoWall 0.8.0" --notes-file release/notes-0.8.0.md
+```
+
+Check it the same way as 0.7.1 (`latest` is `0.8.0`, `npx -y sudowall@0.8.0 demo --ci` from an empty cache). Then make the `apps/site` checklist changes in one commit and push it to `main`; Vercel deploys it. Check www.sudowall.tech and www.sudowall.tech/get-started.
+
+A later 0.7.x patch, after 0.8.0 is out, must be published with `npm publish --tag release-0.7` and `gh release create … --latest=false`, so that `latest` stays on 0.8.x.
+
+### Roll back 0.7.1
+
+0.7.1 adds no migration and no event field (the `0972a9f` diff only reads versions), so going back to 0.7.0 needs no change to anyone's data. This was read from the diff, not tested end to end.
+
+```sh
+npm dist-tag add sudowall@0.7.0 latest                       # npx sudowall gets 0.7.0 again
+npm deprecate sudowall@0.7.1 "0.7.1 is withdrawn: <reason>. Use 0.7.0."
+gh release edit v0.7.1 --prerelease --latest=false           # keep the tag: it records what was published
+```
+
+- Within 72 hours, `npm unpublish sudowall@0.7.1` is possible, but 0.7.1 can then never be used again; deprecating is preferred, and the fix ships as 0.7.2.
+- GitHub Packages: delete `@abdulmunafz/sudowall` 0.7.1 in the package's settings, or with `gh api -X DELETE /users/ABDULMUNAFZ/packages/npm/sudowall/versions/<version id>` (the token needs the `delete:packages` scope).
+- Do not start 0.8.0 until 0.7.2 is out: without it, 0.7.0 reports 0.8.0 ledgers as tampering.
+
+### Roll back 0.8.0
+
+Moving `latest` back protects new installs only. **Data 0.8.0 has written cannot be read by an older version:** 0.8.0 migrates the state database's provenance tables to version 3 and writes event schema 2, so 0.7.1 refuses that state with "written by a newer SudoWall" and exit 5, and 0.7.0 reports `BAD_EVENT` (ADR 0024: downgrades are not supported). The normal rollback is therefore a fix forward as 0.8.1.
+
+```sh
+npm dist-tag add sudowall@0.7.1 latest                       # new installs and npx get 0.7.1
+npm deprecate sudowall@0.8.0 "0.8.0 is withdrawn: <reason>. Use 0.8.1 when it is out, or 0.7.1 with a fresh state folder."
+gh release edit v0.8.0 --prerelease --latest=false
+gh release edit v0.7.1 --latest
+git revert <the apps/site release commit> && git push origin main   # or Vercel's Instant Rollback to the previous deployment
+```
+
+- GitHub Packages and `npm unpublish`: as for 0.7.1.
+- A user who must go back to 0.7.1 has to move 0.8.0's state folder aside first (`~/.local/state/sudowall` on Linux, `~/Library/Application Support/sudowall` on macOS, `%LOCALAPPDATA%\sudowall` on Windows) and start with an empty one. The old ledger stays verifiable with 0.8.x. Say this in the deprecation notice and the release text.
