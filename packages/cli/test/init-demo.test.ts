@@ -82,6 +82,9 @@ describe('demo --ci', () => {
       /Gate: allowed\. Sent 0\.005 ETH\. Transaction 0x[0-9a-f]{64} success/,
     );
     expect(r.stdout).toMatch(/OK: \d+ entries/);
+    // Every line of the ledger step is indented like the other steps.
+    expect(r.stdout).toMatch(/\n {3}OK: \d+ entries/);
+    expect(r.stdout).toContain('\n   Anchored: reaches checkpoint 1 as recorded.\n');
     expect(r.stdout).toMatch(/FAILED at entry \d+: HASH_MISMATCH/);
     expect(r.stdout).toContain('ok    ledger verify, then after an edit: OK, then caught');
     expect(r.stdout).not.toContain('FAIL ');

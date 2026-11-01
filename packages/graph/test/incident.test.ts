@@ -4,7 +4,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Ledger, loadOrCreateKeys, openStateDb } from '@sudowall/ledger';
-import { incidentReport, sha256ValueId, type LedgerEvent } from '../src/index.js';
+import {
+  LocalGraph,
+  buildGraph,
+  incidentReport,
+  sha256ValueId,
+  type LedgerEvent,
+} from '../src/index.js';
 
 const EVENTS: LedgerEvent[] = readFileSync(
   fileURLToPath(new URL('./fixtures/demo-events.jsonl', import.meta.url)),
@@ -70,5 +76,40 @@ describe('incident report (audit)', () => {
     } finally {
       db.close();
     }
+  });
+
+  it('orders path steps by argument path, whatever order the backend returns edges in', async () => {
+    /** A backend that returns every subgraph's edges in reverse order. */
+    class Reversed extends LocalGraph {
+      override async causalPath(callId: string, maxDepth?: number) {
+        const g = await super.causalPath(callId, maxDepth);
+        return { ...g, edges: [...g.edges].reverse() };
+      }
+    }
+    const report = async (backend?: LocalGraph) => {
+      const db = openStateDb(demoLedger());
+      try {
+        if (backend !== undefined) {
+          const events = EVENTS.map((e, i) => ({ ...e, seq: i + 1 }));
+          await buildGraph(events, backend, sha256ValueId);
+        }
+        return await incidentReport({
+          db,
+          ref: pausedCall().event['id'] as string,
+          valueId: sha256ValueId,
+          ...(backend === undefined ? {} : { backend }),
+        });
+      } finally {
+        db.close();
+      }
+    };
+    const plain = await report();
+    const reversed = await report(new Reversed());
+    const key = (r: typeof plain) =>
+      r.path.map((p) => `${String(p.depth)} ${p.argPath} ${p.source.id}`);
+    expect(key(reversed)).toEqual(key(plain));
+    const top = plain.path.filter((p) => p.depth === 0).map((p) => p.argPath);
+    expect(top).toEqual([...top].sort());
+    expect(new Set(top)).toEqual(new Set(['/amount', '/to']));
   });
 });

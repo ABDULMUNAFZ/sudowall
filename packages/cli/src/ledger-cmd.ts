@@ -29,6 +29,8 @@ export interface LedgerFlags {
   expectCheckpoint?: string | undefined;
   /** Fail on unsigned entries or a missing anchor, not only on tampering. */
   strict?: boolean;
+  /** Printed before every line `verify` writes (the demo indents its steps). */
+  linePrefix?: string;
   out: string | undefined;
 }
 
@@ -80,6 +82,9 @@ export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise
   const [sub, arg, extra] = args;
   switch (sub) {
     case 'verify': {
+      const say = (line: string) => {
+        out(`${flags.linePrefix ?? ''}${line}`);
+      };
       const expected =
         flags.publicKey !== undefined
           ? Buffer.from(flags.publicKey, 'base64url')
@@ -92,37 +97,37 @@ export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise
         }),
       );
       if (r.ok) {
-        out(
+        say(
           `OK: ${r.entries} entries, ${r.checkpoints} checkpoints, last signed entry ${r.lastSignedSeq}, ` +
             `${r.unsignedTail} unsigned (newer than the last checkpoint). Ledger ${r.ledgerId}, key ${r.keyId}.`,
         );
         if (r.unsigned) {
-          out(
+          say(
             'WARNING: no entry is signed yet. The history is hash-chained only; anyone who can write the file can rewrite it.',
           );
         }
         if (anchor === undefined) {
-          out(
+          say(
             'Note: no anchor was available, so an older copy of this history would also pass. Keep `sudowall ledger anchor` output off the machine.',
           );
         } else {
-          out(`Anchored: reaches checkpoint ${String(anchor.checkpointSeq)} as recorded.`);
+          say(`Anchored: reaches checkpoint ${String(anchor.checkpointSeq)} as recorded.`);
         }
         if (expected === undefined) {
-          out('Note: no expected public key was available, so the signer was not checked.');
+          say('Note: no expected public key was available, so the signer was not checked.');
         }
         if (flags.strict === true && (r.unsignedTail > 0 || anchor === undefined)) {
-          out('FAILED (--strict): unsigned entries or no anchor.');
+          say('FAILED (--strict): unsigned entries or no anchor.');
           return EXIT.verifyFailed;
         }
         return EXIT.ok;
       }
       if (r.kind === 'NEWER_VERSION') {
-        out(`CANNOT VERIFY: ${r.message}`);
+        say(`CANNOT VERIFY: ${r.message}`);
         return EXIT.newerVersion;
       }
       const where = r.seq !== undefined ? `entry ${r.seq}` : `checkpoint ${r.checkpointSeq ?? '?'}`;
-      out(`FAILED at ${where}: ${r.kind}: ${r.message}`);
+      say(`FAILED at ${where}: ${r.kind}: ${r.message}`);
       return EXIT.verifyFailed;
     }
     case 'inspect': {

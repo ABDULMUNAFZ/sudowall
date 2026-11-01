@@ -251,8 +251,8 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       keyDir: files.keyDir,
       publicKey: undefined,
       out: undefined,
+      linePrefix: '   ',
     });
-    process.stdout.write('   ');
     const verified = await ledgerCommand(['verify'], flagsFor(files.dbPath));
     const tampered = join(stateDir, 'tampered.db');
     copyLedger(files.dbPath, tampered);
@@ -260,7 +260,6 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     out(
       `   Now someone edits entry ${seq} in a copy of the ledger (the amount of the blocked payment):`,
     );
-    process.stdout.write('   ');
     const caught = await ledgerCommand(['verify'], flagsFor(tampered));
     outcomes.push({
       step: 'ledger verify, then after an edit',

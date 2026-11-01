@@ -169,11 +169,12 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
     }
 
     const path: PathStep[] = [];
+    const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
     const seen = new Set<string>();
     const visit = (call: string, depth: number) => {
       if (seen.has(call)) return;
       seen.add(call);
-      const producers: string[] = [];
+      const steps: PathStep[] = [];
       for (const used of graph.edges.filter((e) => e.type === 'used_in' && e.to.id === call)) {
         for (const c of graph.edges.filter(
           (e) => e.type === 'contained' && e.to.id === used.from.id,
@@ -206,12 +207,21 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
               ts: attr('ToolCall', prod.from.id, 'ts'),
               verdict: attr('ToolCall', prod.from.id, 'verdict'),
             };
-            producers.push(prod.from.id);
           }
-          path.push(step);
+          steps.push(step);
         }
       }
-      for (const p of producers) visit(p, depth + 1);
+      // Sorted by argument path, then source, so the report does not depend on the order the
+      // graph backend returns edges in (it changed between versions).
+      steps.sort(
+        (a, b) =>
+          cmp(a.argPath, b.argPath) ||
+          cmp(a.source.observedAt, b.source.observedAt) ||
+          cmp(a.source.id, b.source.id) ||
+          cmp(a.match.type, b.match.type),
+      );
+      path.push(...steps);
+      for (const p of steps) if (p.producedBy !== undefined) visit(p.producedBy.eventId, depth + 1);
     };
     visit(callId, 0);
     // A call on the path whose own event has provenance matches but whose values are missing
