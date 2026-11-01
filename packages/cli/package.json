@@ -40,7 +40,7 @@
     "@sudowall/web-ui": "workspace:*"
   },
   "bin": {
-    "sudowall": "./dist/main.js"
+    "sudowall": "./dist/bin.js"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Builds the publishable `sudowall` npm package into release/sudowall/.
 //
-// Our own workspace code (@sudowall/* and the demo payments server) is bundled into two
-// files; every third-party library stays an ordinary, exactly pinned dependency, so the package
+// Our own workspace code (@sudowall/* and the demo payments server) is bundled into three
+// files (the command's entry point with its Node.js version check, the CLI, the payments server); every third-party library stays an ordinary, exactly pinned dependency, so the package
 // ships no vendored third-party code. Run `pnpm build` first: the bundle reads the built
 // workspace packages and the built web UI.
 import { build } from 'esbuild';
@@ -66,7 +66,16 @@ const ownCodeOnly = {
   },
 };
 
-async function bundle(entry, outfile) {
+// The bin entry checks the Node.js version and only then loads dist/main.js, so main.js stays a
+// separate file instead of being bundled into it.
+const mainStaysSeparate = {
+  name: 'main-stays-separate',
+  setup(b) {
+    b.onResolve({ filter: /^\.\/main\.js$/ }, () => ({ path: './main.js', external: true }));
+  },
+};
+
+async function bundle(entry, outfile, extraPlugins = []) {
   const result = await build({
     entryPoints: [join(ROOT, entry)],
     outfile: join(OUT, outfile),
@@ -78,7 +87,7 @@ async function bundle(entry, outfile) {
     legalComments: 'none',
     metafile: true,
     logLevel: 'warning',
-    plugins: [ownCodeOnly],
+    plugins: [...extraPlugins, ownCodeOnly],
   });
   // Belt and braces: nothing from node_modules may end up inside the bundle.
   const vendored = Object.keys(result.metafile.inputs).filter((p) => p.includes('node_modules/'));
@@ -93,6 +102,7 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
 await bundle('packages/cli/dist/main.js', 'dist/main.js');
+await bundle('packages/cli/dist/bin.js', 'dist/bin.js', [mainStaysSeparate]);
 await bundle('examples/evm-mcp/dist/index.js', 'dist/evm-mcp.js');
 
 cpSync(join(ROOT, 'apps', 'web-ui', 'dist'), join(OUT, 'dist', 'web-ui'), { recursive: true });
@@ -124,7 +134,7 @@ const pkg = {
   license: 'Apache-2.0',
   type: 'module',
   // npm normalises bin paths on publish and warns about a leading ./, so write the normal form.
-  bin: { sudowall: 'dist/main.js' },
+  bin: { sudowall: 'dist/bin.js' },
   files: ['dist', 'assets', 'LICENSE', 'README.md'],
   engines: { node: '>=24.11.0' },
   os: ['darwin', 'linux', 'win32'],

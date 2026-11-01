@@ -436,13 +436,18 @@ function isEntryPoint(): boolean {
   }
 }
 
-if (isEntryPoint()) {
+/**
+ * Runs the command line and sets the exit code. Called by bin.ts (the `sudowall` command, after
+ * its Node.js version check), or below when this file is started directly, as `demo` starts
+ * `serve`.
+ */
+export function run(argv: string[]): void {
   // `sudowall ... | head` closes stdout early; stop quietly instead of crashing with EPIPE.
   process.stdout.on('error', (e: NodeJS.ErrnoException) => {
     if (e.code === 'EPIPE') process.exit(0);
     throw e;
   });
-  main(process.argv.slice(2)).then(
+  main(argv).then(
     (code) => {
       process.exitCode = code;
     },
@@ -451,5 +456,7 @@ if (isEntryPoint()) {
     },
   );
 }
+
+if (isEntryPoint()) run(process.argv.slice(2));
 
 export { fail };

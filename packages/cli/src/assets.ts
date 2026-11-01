@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * Locates the files the CLI needs at run time, in both layouts it runs from:
  *
- * - published package (scripts/build-package.mjs): everything is bundled into `dist/main.js`,
- *   with `dist/web-ui/`, `dist/evm-mcp.js` and `assets/` next to it;
+ * - published package (scripts/build-package.mjs): everything is bundled into `dist/main.js`
+ *   (started through `dist/bin.js`, which checks the Node.js version first), with `dist/web-ui/`, `dist/evm-mcp.js` and `assets/` next to it;
  * - workspace: `packages/cli/dist/*.js`, with the assets in their source locations in the repo.
  */
 const HERE = dirname(fileURLToPath(import.meta.url));

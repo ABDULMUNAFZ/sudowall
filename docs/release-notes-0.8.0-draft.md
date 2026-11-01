@@ -324,7 +324,18 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
 - [ ] `docs/pitch.md:27`. Replace `406 automated tests` with the release count, for example `697 automated tests`.
 - [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. If 0.7.1 is published, copy its section from `release/0.7.x` (with its date) below 0.8.0, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
 - [ ] Bump `packages/cli/package.json` and `GATEWAY_VERSION` in `packages/gateway/src/upstream.ts` to 0.8.0, so newer-version messages from 0.7.1 name `v0.8.0`.
-- [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version; `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A lower 24.x was not tested. Replace "Node.js 24" with "Node.js 24.11 or later" in `README.md:20`, `README.md:156`, `docs/demo.md:24`, and on the live site in `apps/site/get-started.html:53` and `apps/site/index.html:99`, `:311` and `:328` (the `node -v` check). `packages/cli/README.md:9` already says 24.11.
+- [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version, so the `sudowall` command now checks first, before it loads anything else, and exits 1 with `SudoWall needs Node.js 24.11 or newer (you have v24.10.0). Update Node and run it again.` (`packages/cli/src/bin.ts`, tested with a faked `process.version` in `packages/cli/test/node-version.test.ts`). `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A real Node.js below 24.11 was not run. Every place that says Node.js 24:
+  - `README.md:20` `See it work in two minutes (Node.js 24; macOS, Linux or Windows):`: replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `README.md:156` `Requirements: Node.js 24, pnpm 12, ...` (building from source): replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `docs/demo.md:24` `Requirements: Node.js 24, pnpm 12, Claude Code.`: replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `packages/cli/README.md:9` (the npm page): already says `Node.js 24.11 or later`. Make it `Node.js 24.11 or newer`, the wording of the startup message.
+  - `apps/site/get-started.html:53` (live) `Node.js 24 on macOS, Linux or Windows`: replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `apps/site/index.html:99` (live) `Nothing to install: Node.js 24 is enough`: replace with `Nothing to install: Node.js 24.11 or newer is enough`.
+  - `apps/site/index.html:311` (live) `Node.js 24 or newer`: replace with `Node.js 24.11 or newer`.
+  - `apps/site/index.html:328` (live) `Check Node.js 24 or newer:`: replace with `Check Node.js 24.11 or newer:`.
+  - `apps/site/index.html:349` (live), the typing terminal's `node -v` output `v24.x`: replace with `v24.11.0` (any 24.x is no longer enough).
+  - `docs/pitch.md`: no Node.js version is mentioned; nothing to change.
+  - Not user copy, leave as is: `CLAUDE.md:33` (`Node.js 24 LTS`, the development stack), the measured versions in `docs/architecture.md:9`, `docs/compatibility.md:3`, `docs/performance.md:7`, `docs/real-world-test.md:5` and `docs/integrations/dodo-payments-run/README.md:5` (all 24.22), and the issue template placeholder `Node 24.22`.
 - [ ] `packages/cli/README.md:9` (the npm page) says "on macOS or Linux". `README.md:20` and the site say macOS, Linux or Windows, and CI smoke-tests Windows. Decide which is meant and make them agree.
 - [ ] `docs/integrations/dodo-payments.md`: keep the note that `dodopayments-mcp` 2.59.0 needs Deno 2.8 or earlier, unless a newer Dodo release has fixed it by then.
 

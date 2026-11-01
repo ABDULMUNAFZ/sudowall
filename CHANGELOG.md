@@ -27,7 +27,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 
 ### Requirements
 
-- **Node.js 24.11.0 or later** (was 24.0.0), because `@babel/parser` 8 requires it ([ADR 0025](docs/adr/0025-read-check-parser.md)).
+- **Node.js 24.11.0 or later** (was 24.0.0), because `@babel/parser` 8 requires it ([ADR 0025](docs/adr/0025-read-check-parser.md)). On an older Node.js the `sudowall` command stops before it loads anything else and prints `SudoWall needs Node.js 24.11 or newer (you have <version>). Update Node and run it again.`, with exit code 1. npm itself only warns.
 
 ### Fixed
 
