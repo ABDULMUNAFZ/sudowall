@@ -154,12 +154,19 @@ function query(e: Expr, c: Ctx): void {
     return;
   }
   if (e.type !== 'ObjectExpression') return no('the list query is not an object literal');
+  const keys = new Set<string>();
   for (const p of e.properties) {
     if (p.type !== 'ObjectProperty') return no(`query member is a ${p.type}`);
     if (p.shorthand) no('a shorthand query member');
-    key(p, c);
+    unique(keys, key(p, c));
     scalar(p.value as B.Expression, c);
   }
+}
+
+/** Duplicate keys are valid JavaScript (the last wins), but TypeScript reports them; refuse. */
+function unique(keys: Set<string>, k: string): void {
+  if (keys.has(k)) no(`the key "${k}" appears twice`);
+  keys.add(k);
 }
 
 /** `<object>.<name>` with a plain identifier name: no brackets, `?.` or parentheses. */
@@ -239,15 +246,17 @@ function returned(e: Expr, c: Ctx): void {
     return;
   }
   if (e.type === 'ObjectExpression') {
+    const keys = new Set<string>();
     for (const p of e.properties) {
       if (p.type !== 'ObjectProperty') return no(`returned object member is a ${p.type}`);
       if (p.shorthand) {
         // `{ a = 1 }` is a pattern, not an object; the parser rejects it here, but be explicit.
         if (p.value.type !== 'Identifier') no('shorthand initializer');
+        unique(keys, name(p.value, c));
         returned(p.value as B.Identifier, c);
         continue;
       }
-      key(p, c);
+      unique(keys, key(p, c));
       returned(p.value as B.Expression, c);
     }
     return;
@@ -306,6 +315,88 @@ function statement(s: B.Statement, c: Ctx): void {
   no(`statement ${s.type}`);
 }
 
+/**
+ * Characters that some parser or engine may read as whitespace or a line terminator, or that
+ * are invisible: controls other than tab, LF and CRLF (a lone CR too), C1 controls (NEL),
+ * Unicode spaces, U+180E (whitespace before Unicode 6.3), zero-width and bidi controls, line
+ * and paragraph separators, byte order marks, invisible fillers, tag characters and unpaired
+ * surrogates. Deno parses the code again, so any of them anywhere means "not proven".
+ */
+function oddCharacter(code: string): string | undefined {
+  for (let i = 0; i < code.length; i++) {
+    const u = code.charCodeAt(i);
+    if (u >= 0x20 && u <= 0x7e) continue;
+    if (u === 0x09 || u === 0x0a) continue;
+    if (u === 0x0d && code.charCodeAt(i + 1) === 0x0a) continue;
+    if (u >= 0xd800 && u <= 0xdbff) {
+      const next = code.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return `U+${hex(u)}`;
+      const cp = code.codePointAt(i) as number;
+      if (cp >= 0xe0000 && cp <= 0xe0fff) return `U+${hex(cp)}`;
+      i++;
+      continue;
+    }
+    if (
+      u < 0x20 ||
+      (u >= 0x7f && u <= 0xa0) ||
+      u === 0xad ||
+      u === 0x034f ||
+      u === 0x115f ||
+      u === 0x1160 ||
+      u === 0x1680 ||
+      u === 0x180e ||
+      (u >= 0x2000 && u <= 0x200f) ||
+      (u >= 0x2028 && u <= 0x202f) ||
+      (u >= 0x205f && u <= 0x206f) ||
+      u === 0x3000 ||
+      u === 0x3164 ||
+      (u >= 0xdc00 && u <= 0xdfff) ||
+      u === 0xfeff ||
+      u === 0xffa0 ||
+      (u >= 0xfff0 && u <= 0xfffb)
+    ) {
+      return `U+${hex(u)}`;
+    }
+  }
+  return undefined;
+}
+
+const hex = (n: number): string => n.toString(16).toUpperCase().padStart(4, '0');
+
+/**
+ * Other non-ASCII characters may appear only inside string literals and comments. In names and
+ * between tokens, parsers built on different Unicode versions may disagree about them.
+ */
+function nonAsciiOutsideStrings(file: B.File, text: string): void {
+  const allowed = new Uint8Array(text.length);
+  const mark = (n: { start?: number | null; end?: number | null }) => {
+    allowed.fill(1, n.start ?? 0, n.end ?? 0);
+  };
+  for (const comment of file.comments ?? []) mark(comment);
+  // Iterative walk: the tree may be deep, and only its StringLiteral nodes matter here.
+  const stack: unknown[] = [file.program];
+  while (stack.length > 0) {
+    const v = stack.pop();
+    if (Array.isArray(v)) {
+      for (const x of v) stack.push(x);
+      continue;
+    }
+    if (v === null || typeof v !== 'object') continue;
+    const node = v as Record<string, unknown> & { type?: unknown };
+    if (typeof node.type !== 'string') continue;
+    if (node.type === 'StringLiteral') mark(node as unknown as B.StringLiteral);
+    for (const [k, x] of Object.entries(node)) {
+      if (k === 'loc' || k === 'extra' || k.endsWith('Comments')) continue;
+      if (typeof x === 'object' && x !== null) stack.push(x);
+    }
+  }
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) > 0x7e && allowed[i] !== 1) {
+      no(`a non-ASCII character outside a string or comment (U+${hex(text.charCodeAt(i))})`);
+    }
+  }
+}
+
 /** Parse exactly what dodopayments-mcp evaluates: a TypeScript module. Throws on any error. */
 function parse(text: string): B.File {
   try {
@@ -325,8 +416,14 @@ function parse(text: string): B.File {
 export function checkSdkReadOnly(code: string, profile: SdkReadOnlyProfile): SdkReadOnlyResult {
   try {
     if (code.length > MAX_CODE_LENGTH) no(`code longer than ${String(MAX_CODE_LENGTH)} characters`);
+    const odd = oddCharacter(code);
+    if (odd !== undefined)
+      no(`an unusual whitespace, line terminator or invisible character (${odd})`);
     const text = `${code}\nexport default run;`;
-    const program = parse(text).program;
+    const file = parse(text);
+    nonAsciiOutsideStrings(file, text);
+    const program = file.program;
+    if (program.interpreter != null) no('a hashbang line');
     if (program.directives.length > 0) no('a directive');
     const [fn, exp, ...rest] = program.body;
     if (rest.length > 0 || fn === undefined || exp === undefined) {

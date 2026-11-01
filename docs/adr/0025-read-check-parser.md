@@ -150,6 +150,20 @@ Per case:
 - `@babel/parser` 8 declares `engines: ^22.18.0 || >=24.11.0`. SudoWall's `engines` become `>=24.11.0` (root: `>=24.11.0 <25`). Node 24.0 to 24.10 are no longer supported.
 - TypeScript stays a dev dependency of the repository (ADR 0011).
 
+## Parser differentials (added 2026-11-01)
+
+Deno parses the code again, so input that parsers may read differently is never proven. 86 must-not-prove cases were added (174 in all, plus 4 more that must be proven: 16), written before the checks:
+
+- **Refused before parsing, anywhere in the code (strings and comments included):** controls other than tab, LF and CRLF (so a lone CR, vertical tab, form feed and NEL), C1 controls, Unicode spaces (U+00A0, U+1680, U+2000 to U+200A, U+202F, U+205F, U+3000), U+180E, zero-width characters and bidi controls (U+200B to U+200F, U+202A to U+202E, U+2060 to U+206F), U+2028 and U+2029, byte order marks (U+FEFF, also at the start), invisible fillers (U+00AD, U+034F, U+115F, U+1160, U+3164, U+FFA0), U+FFF0 to U+FFFB, tag characters (U+E0000 to U+E0FFF) and unpaired surrogates.
+- **Other non-ASCII characters** are allowed only inside string literals and comments. In names and between tokens, parsers built on different Unicode versions can disagree.
+- **A hashbang line** is refused (`program.interpreter`).
+- **Duplicate keys** in a query or returned object are refused: valid JavaScript, but TypeScript reports them.
+- **HTML-like comments** (`<!--`, `-->`), **decorators** and **import assertions** do not parse as a module; **`using`**, **`await using`** and **import attributes** parse but are not the accepted shape. Each has a case.
+- **Errors a parser could recover from** (a redeclared constant, legacy octal escapes and numbers, `with`, `delete name`, an import assertion): the check parses with `errorRecovery: false`, and a test parses every case with recovery on and requires each one that comes back with errors to be not proven (7 cases).
+- **Size and depth:** exactly 16,384 characters can be proven; 16,385 cannot. 5,000 nested parentheses, blocks or arrays overflow the parser's stack on this machine; the throw is caught and the code is not proven. Where a parser gets through, the shape check refuses them anyway.
+
+The same new cases against the earlier TypeScript implementation: it would have proven 52 of the 86, including a zero-width space and a NEL between tokens, which the TypeScript scanner reads as whitespace and the language does not.
+
 ## Consequences
 
 - An install is about 22 MB smaller, and the first Dodo `execute` check is about 170 ms faster.

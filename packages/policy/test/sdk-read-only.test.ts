@@ -1,3 +1,4 @@
+import { parse } from '@babel/parser';
 import { describe, expect, it } from 'vitest';
 import { checkSdkReadOnly } from '../src/sdk-read-only.js';
 import { NOT_PROVEN, PROVEN, RESOURCES, run } from './sdk-read-only.cases.js';
@@ -25,5 +26,30 @@ describe('reasons', () => {
   it('names why a call is not proven', () => {
     const r = checkSdkReadOnly(run('return client.refunds.create({});'), { resources: RESOURCES });
     expect(r).toEqual({ ok: false, reason: expect.stringContaining('refunds.create') as unknown });
+  });
+});
+
+describe('errors the parser could recover from', () => {
+  // With error recovery on, the parser returns a tree for some invalid code and lists the errors.
+  // The check parses without recovery, so each of these must come back not proven.
+  const recoverable = [...PROVEN, ...NOT_PROVEN].filter(([, code]) => {
+    try {
+      const file = parse(`${code}\nexport default run;`, {
+        sourceType: 'module',
+        plugins: ['typescript'],
+        errorRecovery: true,
+      });
+      return file.errors.length > 0;
+    } catch {
+      return false;
+    }
+  });
+
+  it('covers enough cases to mean something', () => {
+    expect(recoverable.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it.each(recoverable)('%s', (_, code) => {
+    expect(proven(code)).toBe(false);
   });
 });
