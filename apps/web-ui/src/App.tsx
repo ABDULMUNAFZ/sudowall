@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Api, takeToken, type Product, type State } from './api.js';
+import { createPoller } from './poll.js';
 import {
   Activity,
   Agents,
@@ -41,10 +42,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [productError, setProductError] = useState<string | null>(null);
   const [route, setRoute] = useState(routeFromHash);
-  // Polls never overlap: a tick is skipped while the previous request is in flight, and an answer
-  // older than one already shown (a manual refresh raced a tick) is dropped.
-  const poll = useRef({ seq: 0, shown: 0, busy: false, abort: new AbortController() });
-  const productPoll = useRef({ seq: 0, shown: 0, busy: false });
+  // Polls never overlap, and an answer older than one already shown (a manual refresh raced a
+  // tick) is dropped; see poll.ts and its tests.
+  const abort = useRef(new AbortController());
 
   useEffect(() => {
     const on = () => {
@@ -57,61 +57,54 @@ export function App() {
     };
   }, []);
 
-  const refresh = useCallback(
-    (force = false) => {
-      if (api === null) return;
-      const pl = poll.current;
-      if (pl.busy && !force) return;
-      pl.busy = true;
-      const seq = ++pl.seq;
-      api
-        .state(pl.abort.signal)
-        .then((s) => {
-          if (seq < pl.shown) return;
-          pl.shown = seq;
-          setState(s);
-          setError(null);
-        })
-        .catch((e: unknown) => {
-          if ((e as Error).name === 'AbortError' || seq < pl.shown) return;
-          setError((e as Error).message);
-        })
-        .finally(() => {
-          if (seq === pl.seq) pl.busy = false;
-        });
-    },
+  const statePoller = useMemo(
+    () =>
+      api === null
+        ? null
+        : createPoller({
+            fetch: () => api.state(abort.current.signal),
+            onValue: (s: State) => {
+              setState(s);
+              setError(null);
+            },
+            onError: (e) => {
+              setError(e.message);
+            },
+          }),
     [api],
   );
-
+  const productPoller = useMemo(
+    () =>
+      api === null
+        ? null
+        : createPoller({
+            fetch: () => api.product(abort.current.signal),
+            onValue: (p: Product | null) => {
+              setProduct(p);
+              setProductError(null);
+            },
+            onError: (e) => {
+              // The pages still work from decisions and approvals; say the settings may be stale.
+              setProductError(e.message);
+            },
+          }),
+    [api],
+  );
+  const refresh = useCallback(
+    (force = false) => {
+      statePoller?.tick(force);
+    },
+    [statePoller],
+  );
   const refreshProduct = useCallback(
     (force = false) => {
-      if (api === null) return;
-      const pl = productPoll.current;
-      if (pl.busy && !force) return;
-      pl.busy = true;
-      const seq = ++pl.seq;
-      api
-        .product(poll.current.abort.signal)
-        .then((p) => {
-          if (seq < pl.shown) return;
-          pl.shown = seq;
-          setProduct(p);
-          setProductError(null);
-        })
-        .catch((e: unknown) => {
-          if ((e as Error).name === 'AbortError' || seq < pl.shown) return;
-          // The pages still work from decisions and approvals; say the settings may be stale.
-          setProductError((e as Error).message);
-        })
-        .finally(() => {
-          if (seq === pl.seq) pl.busy = false;
-        });
+      productPoller?.tick(force);
     },
-    [api],
+    [productPoller],
   );
 
   useEffect(() => {
-    const pl = poll.current;
+    const controller = abort;
     refresh();
     refreshProduct();
     const t = setInterval(refresh, POLL_MS);
@@ -119,8 +112,8 @@ export function App() {
     return () => {
       clearInterval(t);
       clearInterval(p);
-      pl.abort.abort();
-      pl.abort = new AbortController();
+      controller.current.abort();
+      controller.current = new AbortController();
     };
   }, [refresh, refreshProduct]);
 
