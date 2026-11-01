@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +18,9 @@ function cli(args: string[], timeout = 20_000) {
     encoding: 'utf8',
     env: {
       PATH: process.env['PATH'] ?? '',
-      ...(process.env['FOUNDRY_DIR'] ? { FOUNDRY_DIR: process.env['FOUNDRY_DIR'] } : {}),
+      // HOME is the temp dir too: without it, children fall back to the real home directory.
+      HOME: home,
+      FOUNDRY_DIR: process.env['FOUNDRY_DIR'] ?? join(homedir(), '.foundry'),
       XDG_STATE_HOME: home,
       XDG_CONFIG_HOME: home,
     },
@@ -85,6 +87,9 @@ describe('demo --ci', () => {
     expect(r.stdout).not.toContain('FAIL ');
     // The demo keeps its state in a temp dir and never touches the user's real state.
     expect(existsSync(join(r.home, 'sudowall', 'ledger.db'))).toBe(false);
+    // Regression: its gateway wrote names.json to the user's default state directory.
+    expect(existsSync(join(r.home, 'sudowall', 'names.json'))).toBe(false);
+    expect(existsSync(join(r.home, '.local', 'state', 'sudowall', 'names.json'))).toBe(false);
   });
 
   it('keeps its ledger with --keep, and incident explains the paused payment from it', () => {
@@ -92,6 +97,7 @@ describe('demo --ci', () => {
     expect(r.code, `${r.stdout}\n${r.stderr}`).toBe(0);
     const dir = /Demo state kept in (.+)$/m.exec(r.stdout)?.[1];
     expect(dir).toBeDefined();
+    expect(existsSync(join(String(dir), 'sudowall', 'names.json'))).toBe(true);
     const flags = ['--db', join(String(dir), 'ledger.db'), '--key-dir', join(String(dir), 'keys')];
     const text = cli(['incident', '5', ...flags]);
     expect(text.code, text.stderr).toBe(0);
