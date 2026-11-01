@@ -319,10 +319,20 @@ function matchText(p: PathStep): string {
     : `${p.match.type} match with`;
 }
 
+/** True when the ledger failed verification for a reason other than newer data: damage or tampering. */
+const verifyFailed = (r: IncidentReport): boolean => !r.ledger.ok && !r.ledger.newerVersion;
+
 /** Plain-text rendering for the terminal. */
 export function renderText(r: IncidentReport): string {
   const c = r.call;
   const lines = [
+    // A report built on a ledger that does not verify must say so before anything else.
+    ...(verifyFailed(r)
+      ? [
+          `Verification failed: ${r.ledger.message}. Do not rely on this report until \`sudowall ledger verify\` passes.`,
+          '',
+        ]
+      : []),
     `Incident: ${c.serverId}/${c.tool} at ${c.ts} (ledger entry ${String(c.seq)}, event ${c.eventId})`,
     `Decision: ${c.verdict}${c.effective !== c.verdict ? ` (effective: ${c.effective}, ${c.mode} mode)` : ''}${c.approval ? `; human ${c.approval.outcome} it in the ${c.approval.channel}` : ''}; outcome: ${c.outcome || 'pending'}`,
     `Rules: ${c.rules.join(', ') || 'none (default stance)'}`,
@@ -351,9 +361,11 @@ export function renderText(r: IncidentReport): string {
     `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${
       r.ledger.newerVersion
         ? 'this version cannot verify them (the ledger was written by a newer SudoWall)'
-        : r.ledger.allSigned
-          ? 'all covered by a signed checkpoint'
-          : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'
+        : !r.ledger.ok
+          ? 'none of them can be trusted until the ledger verifies'
+          : r.ledger.allSigned
+            ? 'all covered by a signed checkpoint'
+            : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'
     }.`,
   );
   return `${lines.join('\n')}\n`;
@@ -363,6 +375,12 @@ export function renderText(r: IncidentReport): string {
 export function renderMarkdown(r: IncidentReport): string {
   const c = r.call;
   const lines = [
+    ...(verifyFailed(r)
+      ? [
+          `> **Verification failed:** ${r.ledger.message}. Do not rely on this report until \`sudowall ledger verify\` passes.`,
+          '',
+        ]
+      : []),
     `## Incident: \`${c.serverId}/${c.tool}\``,
     '',
     `| | |`,
@@ -393,9 +411,11 @@ export function renderMarkdown(r: IncidentReport): string {
     `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${
       r.ledger.newerVersion
         ? ', which this version cannot verify.'
-        : r.ledger.allSigned
-          ? ', all signed.'
-          : ', not all signed yet.'
+        : !r.ledger.ok
+          ? ', none of which can be trusted until the ledger verifies.'
+          : r.ledger.allSigned
+            ? ', all signed.'
+            : ', not all signed yet.'
     }`,
   );
   return `${lines.join('\n')}\n`;

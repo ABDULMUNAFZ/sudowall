@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { incidentLedgerText } from './text.js';
+import { incidentFailureText, incidentLedgerText } from './text.js';
 
 describe('incident ledger line', () => {
   const base = { message: 'm', entries: [4, 5] };
@@ -20,9 +20,24 @@ describe('incident ledger line', () => {
     );
     expect(t).not.toContain('signed yet');
   });
-  it('failed verification', () => {
-    expect(incidentLedgerText({ ...base, ok: false, allSigned: false })).toBe(
-      'Ledger verification FAILED: m. Entries 4, 5, not all signed yet.',
+  it('failed verification: never "not all signed yet"', () => {
+    const t = incidentLedgerText({ ...base, ok: false, allSigned: false });
+    expect(t).toBe(
+      'Ledger verification FAILED: m. Entries 4, 5, none of which can be trusted until the ledger verifies.',
     );
+    expect(t).not.toContain('signed yet');
+  });
+});
+
+describe('incident lead line', () => {
+  const base = { message: 'BAD_HASH at entry 1: hash does not match' };
+  it('leads with "Verification failed" when the ledger fails', () => {
+    expect(incidentFailureText({ ...base, ok: false })).toBe(
+      'Verification failed: BAD_HASH at entry 1: hash does not match. Do not rely on this report until the ledger verifies.',
+    );
+  });
+  it('is absent for a verified ledger and for one from a newer SudoWall', () => {
+    expect(incidentFailureText({ ...base, ok: true })).toBeUndefined();
+    expect(incidentFailureText({ ...base, ok: false, newerVersion: true })).toBeUndefined();
   });
 });

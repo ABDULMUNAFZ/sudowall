@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Api, Approval, FeedItem, Incident, Product } from './api.js';
 import { approvalWords, outcome, plainReason, sentence } from './describe.js';
-import { incidentLedgerText, visible, visibleJson } from './text.js';
+import { incidentFailureText, incidentLedgerText, visible, visibleJson } from './text.js';
 
 export const time = (ts: string | number) => new Date(ts).toLocaleTimeString();
 
@@ -124,8 +124,14 @@ function sourceName(s: Incident['path'][number]['source']): string {
 /** Why a call was decided as it was, and where each of its values came from. */
 export function IncidentView({ i }: { i: Incident }) {
   const c = i.call;
+  const failed = incidentFailureText(i.ledger);
   return (
     <section className="card incident" aria-labelledby="incident-h" data-testid="incident">
+      {failed !== undefined && (
+        <p className="error" role="alert" data-testid="incident-verify-failed">
+          {failed}
+        </p>
+      )}
       <h3 id="incident-h">
         Why {c.serverId}/{c.tool} was{' '}
         <span className={`badge ${c.effective}`}>

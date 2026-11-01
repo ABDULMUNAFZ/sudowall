@@ -78,6 +78,71 @@ describe('incident report (audit)', () => {
     }
   });
 
+  it('a ledger that fails verification: the report leads with it, never "not all signed yet"', async () => {
+    const path = demoLedger();
+    const edit = openStateDb(path);
+    try {
+      // Someone edits entry 1 after the fact (its timestamp), as the demo does to a payment.
+      edit.exec('DROP TRIGGER IF EXISTS ledger_entries_no_update');
+      const row = edit.prepare('SELECT event_json FROM ledger_entries WHERE seq = 1').get() as {
+        event_json: string;
+      };
+      edit
+        .prepare('UPDATE ledger_entries SET event_json = ? WHERE seq = 1')
+        .run(row.event_json.replace('"2026-10-29T18:42:41.007Z"', '"2026-10-29T18:42:41.008Z"'));
+    } finally {
+      edit.close();
+    }
+    const db = openStateDb(path);
+    try {
+      const r = await incidentReport({
+        db,
+        ref: pausedCall().event['id'] as string,
+        valueId: sha256ValueId,
+      });
+      expect(r.ledger.ok).toBe(false);
+      expect(r.ledger.newerVersion).toBe(false);
+      expect(r.ledger.message).toMatch(/at entry 1: /);
+
+      const text = renderText(r);
+      const first = text.split('\n')[0];
+      expect(first).toMatch(/^Verification failed: \S+ at entry 1: /);
+      expect(first).toContain('Do not rely on this report');
+      expect(text).toContain(`Ledger: FAILED, ${r.ledger.message}.`);
+      expect(text).toContain(
+        `Entries this report rests on: ${r.ledger.entries.join(', ')}; none of them can be trusted until the ledger verifies.`,
+      );
+      expect(text).not.toMatch(/signed yet|all covered by a signed checkpoint/);
+
+      const md = renderMarkdown(r);
+      expect(md.split('\n')[0]).toMatch(/^> \*\*Verification failed:\*\* \S+ at entry 1: /);
+      expect(md).toContain(
+        `Entries used: ${r.ledger.entries.join(', ')}, none of which can be trusted until the ledger verifies.`,
+      );
+      expect(md).not.toMatch(/signed yet|all signed/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a verified ledger: the report does not mention a failure', async () => {
+    const db = openStateDb(demoLedger());
+    try {
+      const r = await incidentReport({
+        db,
+        ref: pausedCall().event['id'] as string,
+        valueId: sha256ValueId,
+      });
+      expect(r.ledger.ok).toBe(true);
+      expect(renderText(r)).toMatch(/^Incident: /);
+      expect(renderText(r)).not.toMatch(/fail/i);
+      expect(renderMarkdown(r)).toMatch(/^## Incident: /);
+      expect(renderMarkdown(r)).not.toMatch(/fail/i);
+    } finally {
+      db.close();
+    }
+  });
+
   it('a full path is not marked truncated and labels each source by its own trust', async () => {
     const db = openStateDb(demoLedger());
     try {
