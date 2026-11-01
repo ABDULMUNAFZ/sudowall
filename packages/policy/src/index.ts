@@ -4,3 +4,4 @@ export * from './load.js';
 export * from './evaluate.js';
 export * from './state.js';
 export * from './references.js';
+export * from './code-tools.js';

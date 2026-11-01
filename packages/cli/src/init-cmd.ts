@@ -30,6 +30,9 @@ export function writeStarterConfig(
     // observe records every decision but blocks nothing; switch to enforce once the policy fits.
     mode: 'observe',
     policy: { path: 'policy.yaml' },
+    // Dodo's execute tool runs code and is not a sink, so a policy error on it falls to this
+    // setting. block is the default; it is written out so it is not changed by accident.
+    ...(template === 'dodo-payments' ? { failure: { onPolicyErrorNonSink: 'block' } } : {}),
   };
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
   return { configPath, policyPath };

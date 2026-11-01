@@ -13,6 +13,10 @@
 #
 # Also give the server a restricted API key and keep it in test mode while you try it
 # (DODO_PAYMENTS_ENVIRONMENT=test_mode).
+#
+# `execute` is not a sink, so if this policy cannot be evaluated for a call (for example `code` is
+# missing), the verdict comes from `failure.onPolicyErrorNonSink` in config.json. `sudowall init
+# --template dodo-payments` sets it to `block`; with `allow`, SudoWall warns when it starts.
 schema: sudowall/policy@1
 name: dodo-payments
 version: 3

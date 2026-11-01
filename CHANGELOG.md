@@ -16,6 +16,7 @@ Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](
 - Upstream stderr is redacted for credentials before it is logged.
 - A slow sink can no longer let a timed-out or cancelled call be forwarded afterwards.
 - Client notifications that carry a request method are dropped instead of forwarded.
+- **`failure.onPolicyErrorNonSink` and code-running tools:** `init --template dodo-payments` writes `"failure": { "onPolicyErrorNonSink": "block" }` (the default) explicitly. When it is `allow` and the policy covers a tool that runs code (any rule on it uses `sdk_read_only`, such as Dodo's `execute`), the gateway logs a warning at start: a policy error on such a call would let the code run unchecked.
 
 ### Versioning and downgrades
 
