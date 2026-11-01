@@ -6,7 +6,7 @@ Status: accepted, 2026-11-01
 
 The CI job `dependency audit and licences` (`pnpm audit --audit-level moderate`) failed on `fix/audit-recheck-split` and `release/0.7.x` with two moderate advisories:
 
-- **minimatch below 11.0.1**, GHSA-g3hv-75wg-m249 (denial of service through glob-part amplification). The workspace had one copy, 10.2.6. It reaches us through `eslint` (development only) and also through `@modelcontextprotocol/server-filesystem`, which the published `sudowall` package lists as a dependency for the demo's reference filesystem server. The release notes said "through `eslint`, development only"; `pnpm audit` lists the `server-filesystem` paths too.
+- **minimatch below 11.0.1**, GHSA-g3hv-75wg-m249 (denial of service through glob-part amplification). The workspace had one copy, 10.2.6. It reaches us through `eslint` (development only) and also through `@modelcontextprotocol/server-filesystem`, which the published `sudowall` package lists as a dependency for the demo's reference filesystem server. `pnpm audit` lists the `server-filesystem` paths as well as the `eslint` one.
 - **glob 9.0.0 to 14.0.1**, GHSA-3g3m-2fjr-6pw4 (an aborted walk keeps reading directories). The workspace had 13.0.6, only through `@modelcontextprotocol/server-filesystem`.
 
 Checked on 2026-11-01:
@@ -33,7 +33,7 @@ overrides:
 
 ## Consequences
 
-- `pnpm audit --audit-level moderate` reports no known vulnerabilities in the workspace, and the CI job can pass.
+- `pnpm audit --audit-level moderate` reports no known vulnerabilities in the workspace, and the CI job can pass. The same two overrides are on `release/0.7.x` (0.7.1) and on the 0.8.0 branch.
 - **The overrides do not reach people who install the published package.** pnpm overrides change only this repository's lockfile. npm reads `overrides` only from the root project, and `npx sudowall` installs `sudowall` as a dependency, so a user's install still resolves `server-filesystem`'s own ranges: minimatch 10.2.6 and glob 13.0.6. In practice:
   - glob is never imported by `server-filesystem` 2.1.0, so the glob advisory is not reachable from SudoWall's demo.
   - minimatch is reached only by the demo's filesystem server, through patterns in `search_files` arguments. The demo starts that server with one allowed directory, the demo inbox shipped in the package (`assets/inbox`), and SudoWall does not call minimatch itself. The effect is the advisory's denial of service of that server process.

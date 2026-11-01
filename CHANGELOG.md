@@ -45,6 +45,19 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 - Incident reports show when a path was cut at the depth limit and which ledger entries could not be read, and label sources by their own trust.
 - The app: polls no longer race, settings errors are shown, the Overview labels watching-only counts separately, Activity shows how each call ended and pages back with "Show older", and Record shows signing and anchor status.
 
+## 0.7.1 (prepared, not published)
+
+### Fixed
+
+- **Data from a newer SudoWall is no longer reported as tampering.** `sudowall ledger verify` on a ledger with entries written by a newer SudoWall used to fail with `BAD_EVENT` and exit code 4, the tamper result. It now prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; event schema <n>, this build reads up to <m>), upgrade to verify it.` and exits with the new code `5`. The hash chain, the signatures and the entries this build understands are still checked, and any failure there is still reported as tampering. `incident` shows `Ledger: CANNOT VERIFY` and exits 5.
+- A state database that a newer SudoWall migrated is refused with the same kind of message (`upgrade to open it`) and exit code 5. `wrap` and `serve` check this before they start, instead of failing each call. Downgrades are not supported; upgrading is.
+- **`sudowall demo` no longer writes to your own state directory.** Its gateway process did not get the demo's state directory and wrote `names.json` to the default one (`~/.local/state/sudowall` on Linux). It now gets `XDG_STATE_HOME`, and `LOCALAPPDATA` on Windows, set to the demo's temporary directory, like everything else the demo writes.
+- **Shutdown:** `session.ended` is written before the ledger closes. The gateway no longer logs `EVENT SINK FAILED … session.ended … the ledger is closed` when the client disconnects, and the ledger now records the end of the session.
+
+### Security
+
+- **Dependency advisories in the build:** this repository's lockfile now uses minimatch 11.0.3 (GHSA-g3hv-75wg-m249) and glob 14.0.3 (GHSA-3g3m-2fjr-6pw4) through pnpm overrides ([ADR 0026](docs/adr/0026-dependency-audit-overrides.md)). The published package still depends on `@modelcontextprotocol/server-filesystem` 2.1.0, the newest release, whose own ranges give an npm install minimatch 10.2.6 and glob 13.0.6. That server never imports glob; the demo uses it with only the demo inbox allowed.
+
 ## 0.7.0 (2026-10-30)
 
 ### Changed
