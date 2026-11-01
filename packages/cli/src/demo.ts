@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
 import {
   ApprovalStore,
   GATEWAY_VERSION,
@@ -114,6 +114,12 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [cliEntry(), 'serve', '--config', files.configPath, '--log-level', 'error'],
+      // The gateway's state directory (names.json) is the demo's too, never the user's own.
+      env: {
+        ...getDefaultEnvironment(),
+        XDG_STATE_HOME: stateDir,
+        ...(process.platform === 'win32' ? { LOCALAPPDATA: stateDir } : {}),
+      },
       stderr: 'pipe',
     });
     let gatewayErr = '';
