@@ -1,6 +1,6 @@
 # Upstream: minimatch and glob in `@modelcontextprotocol/server-filesystem`
 
-Status: **draft, not sent.** Nothing here has been opened on GitHub. The owner reviews it first.
+Status: **issue opened** on 2026-11-01 as [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420), from the draft issue below (the form fields as headings, then the body). The pull request below was not opened.
 
 Why: the published `sudowall` package depends on `@modelcontextprotocol/server-filesystem` 2.1.0 for the demo's filesystem server. Its ranges (`minimatch ^10.0.1`, `glob ^13.0.6`) keep a user's npm install on minimatch 10.2.6 (GHSA-g3hv-75wg-m249) and glob 13.0.6 (GHSA-3g3m-2fjr-6pw4). Our workspace overrides both ([ADR 0026](../adr/0026-dependency-audit-overrides.md)), but overrides do not reach users. The gap closes only when an upstream release has fixed ranges.
 

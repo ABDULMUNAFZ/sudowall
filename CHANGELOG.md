@@ -49,7 +49,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 
 - **`npm audit` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) in a project that installs `sudowall`.** Both come from `@modelcontextprotocol/server-filesystem` 2.1.0, the filesystem MCP server that `sudowall demo` runs. No release of it allows the fixed versions yet, and the overrides in this repository do not reach your install. SudoWall does not import either package, and only `sudowall demo` starts that server.
   - glob: `server-filesystem` 2.1.0 never imports it, so this advisory cannot be reached. Upstream has removed the dependency; the change ships in its next release.
-  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet.
+  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet; the issue is [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420).
 
 ## 0.7.1 (prepared, not published)
 
@@ -68,7 +68,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 
 - **`npm audit` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) in a project that installs `sudowall`.** Both come from `@modelcontextprotocol/server-filesystem` 2.1.0, the filesystem MCP server that `sudowall demo` runs. No release of it allows the fixed versions yet, and the overrides in this repository do not reach your install. SudoWall does not import either package, and only `sudowall demo` starts that server.
   - glob: `server-filesystem` 2.1.0 never imports it, so this advisory cannot be reached. Upstream has removed the dependency; the change ships in its next release.
-  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet.
+  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet; the issue is [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420).
 
 ## 0.7.0 (2026-10-30)
 
