@@ -2,7 +2,7 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
-## 0.7.1 (prepared, not published)
+## 0.7.1 (2026-11-01)
 
 ### Fixed
 
