@@ -2,6 +2,13 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## Unreleased (0.7.x)
+
+### Fixed
+
+- **Data from a newer SudoWall is no longer reported as tampering.** `sudowall ledger verify` on a ledger with entries written by a newer SudoWall used to fail with `BAD_EVENT` and exit code 4, the tamper result. It now prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; event schema <n>, this build reads up to <m>), upgrade to verify it.` and exits with the new code `5`. The hash chain, the signatures and the entries this build understands are still checked, and any failure there is still reported as tampering. `incident` shows `Ledger: CANNOT VERIFY` and exits 5.
+- A state database that a newer SudoWall migrated is refused with the same kind of message (`upgrade to open it`) and exit code 5. `wrap` and `serve` check this before they start, instead of failing each call. Downgrades are not supported; upgrading is.
+
 ## 0.7.0 (2026-10-30)
 
 ### Changed

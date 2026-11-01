@@ -9,7 +9,7 @@ import { ledgerCommand } from './ledger-cmd.js';
 import { uiCommand } from './ui-cmd.js';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { SudoWallError, parseConfig } from '@sudowall/core';
+import { NewerVersionError, SudoWallError, parseConfig } from '@sudowall/core';
 import {
   GATEWAY_VERSION,
   MissingEnvError,
@@ -18,7 +18,18 @@ import {
   type LogLevel,
 } from '@sudowall/gateway';
 
-export const EXIT = { ok: 0, runtime: 1, usage: 2, config: 3, verifyFailed: 4 } as const;
+/**
+ * Exit codes. `newerVersion` (5) means data written by a newer SudoWall: this build cannot read
+ * or verify it, which is not damage or tampering (that is `verifyFailed`, 4).
+ */
+export const EXIT = {
+  ok: 0,
+  runtime: 1,
+  usage: 2,
+  config: 3,
+  verifyFailed: 4,
+  newerVersion: 5,
+} as const;
 
 const USAGE = `SudoWall ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
@@ -387,6 +398,10 @@ function fail(e: unknown): number {
   if (e instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
     process.stderr.write(`sudowall: ${(e as Error).message}\n\n${USAGE}`);
     return EXIT.usage;
+  }
+  if (e instanceof NewerVersionError) {
+    process.stderr.write(`sudowall: ${e.message}\n`);
+    return EXIT.newerVersion;
   }
   if (e instanceof SudoWallError || e instanceof MissingEnvError) {
     process.stderr.write(`sudowall: ${e.message}\n`);

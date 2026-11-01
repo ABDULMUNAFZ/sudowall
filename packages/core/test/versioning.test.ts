@@ -16,8 +16,9 @@ describe('schema versioning', () => {
   it('rejects documents from a newer schema version', () => {
     fc.assert(
       fc.property(fc.integer({ min: 2, max: 1_000_000 }), (v) => {
-        expect(codeOf(() => parseEvent({ schemaVersion: v }))).toBe('UNSUPPORTED_SCHEMA_VERSION');
-        expect(codeOf(() => parseConfig({ schemaVersion: v }))).toBe('UNSUPPORTED_SCHEMA_VERSION');
+        // A distinct code: newer data is not invalid data.
+        expect(codeOf(() => parseEvent({ schemaVersion: v }))).toBe('NEWER_VERSION');
+        expect(codeOf(() => parseConfig({ schemaVersion: v }))).toBe('NEWER_VERSION');
       }),
       { numRuns: 50 },
     );

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ConfigSchema, type Config } from './config.js';
-import { SudoWallError, type ErrorCode } from './errors.js';
+import { NewerVersionError, SudoWallError, type ErrorCode } from './errors.js';
 import { EventSchema, type Event } from './events.js';
 import { SCHEMA_VERSION } from './primitives.js';
 
@@ -18,7 +18,8 @@ const VersionedSchema = z.looseObject({ schemaVersion: z.int().positive() });
 
 /**
  * Brings a raw document up to `targetVersion` by applying migrations in order.
- * Rejects documents from a newer version: they may carry meaning this build cannot honour.
+ * Rejects documents from a newer version (`NewerVersionError`): they may carry meaning this build
+ * cannot honour.
  */
 export function migrate(
   raw: unknown,
@@ -35,10 +36,11 @@ export function migrate(
   let doc: Record<string, unknown> = head.data;
   let version = head.data.schemaVersion;
   if (version > targetVersion) {
-    throw new SudoWallError(
-      'UNSUPPORTED_SCHEMA_VERSION',
-      `schemaVersion ${version} is newer than this build supports (${targetVersion}); upgrade SudoWall`,
-    );
+    throw new NewerVersionError({
+      what: 'schemaVersion',
+      found: version,
+      supported: targetVersion,
+    });
   }
   while (version < targetVersion) {
     const step = migrations.get(version);
