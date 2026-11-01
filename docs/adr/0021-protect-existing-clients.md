@@ -20,3 +20,7 @@ Putting the gate in front of a server by hand means rewriting each server entry 
 - Testing a protected `npx` server with Claude Code exposed a bug in `wrap` itself: npx's per-run environment variables leaked into the server's own `npx`, which then ran the wrong package. `buildEnv` now drops exactly those variables when the gate was started by `npx` (`docs/compatibility.md`, ADR 0010 environment rules unchanged otherwise).
 - Clients must be restarted to pick up the change; the command says so.
 - Windows paths for Claude Desktop are included but untested; the package itself declares macOS and Linux.
+
+## Update 2026-11-01: Windows
+
+Windows is supported and tested in CI. The published package declares `os: darwin, linux, win32`. The package smoke test runs on `windows-latest` (`protect --apply`, `status` and `unprotect` of a Cursor config on a fake home, with `cmd /c npx` entries). `packages/cli/test/protect.test.ts` plans a dry run against a fake Windows profile: Claude Code `%USERPROFILE%\.claude.json` and a project's `.mcp.json`, Claude Desktop `%APPDATA%\Claude\claude_desktop_config.json` (as in the MCP documentation, with `%USERPROFILE%\AppData\Roaming` when `APPDATA` is not set), and Cursor `%USERPROFILE%\.cursor\mcp.json` and a project's `.cursor\mcp.json`. The line above saying Windows is untested no longer holds. A real Windows machine has not been tried by hand.
