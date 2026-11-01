@@ -1,7 +1,14 @@
 import { verify as edVerify } from 'node:crypto';
-import { EventSchema, parseLossless, tgjson } from '@sudowall/core';
+import {
+  EventSchema,
+  EVENT_SCHEMA_VERSION,
+  newerVersionMessage,
+  parseLossless,
+  tgjson,
+  type NewerVersionInfo,
+} from '@sudowall/core';
 import { z } from 'zod';
-import type { StateDb } from './db.js';
+import { readWriterVersion, type StateDb } from './db.js';
 import {
   SPEC,
   ZERO_HASH,
@@ -28,7 +35,12 @@ export type VerifyFailureKind =
   | 'CHECKPOINT_CHAIN_BREAK'
   | 'CHECKPOINT_MISMATCH'
   | 'TRUNCATED'
-  | 'ROLLBACK';
+  | 'ROLLBACK'
+  /**
+   * Not tampering: part of the ledger was written by a newer SudoWall, so this build cannot
+   * check it. Reported only when nothing this build can check failed first.
+   */
+  | 'NEWER_VERSION';
 
 export type VerifyResult =
   | {
@@ -56,6 +68,8 @@ export type VerifyResult =
       seq?: number;
       checkpointSeq?: number;
       message: string;
+      /** Set for `NEWER_VERSION`: what was newer. */
+      newer?: NewerVersionInfo;
     };
 
 export interface VerifyHeader {
@@ -103,6 +117,51 @@ const CheckpointBodySchema = z.strictObject({
   keyId: z.string().regex(/^[0-9a-f]{32}$/),
 });
 
+/** `tg-ledger/<n>`: the format version in a ledger spec string, or undefined if it is not one. */
+function specVersion(spec: string): number | undefined {
+  const m = /^tg-ledger\/([1-9]\d{0,8})$/.exec(spec);
+  return m === null ? undefined : Number(m[1]);
+}
+const SUPPORTED_SPEC = specVersion(SPEC) ?? 1;
+
+function newerSpec(spec: unknown): NewerVersionInfo | undefined {
+  const v = typeof spec === 'string' ? specVersion(spec) : undefined;
+  return v !== undefined && v > SUPPORTED_SPEC
+    ? { what: 'ledger spec', found: v, supported: SUPPORTED_SPEC }
+    : undefined;
+}
+
+/** The event's `schemaVersion` when it is newer than this build reads, else undefined. */
+function newerEventVersion(event: unknown): number | undefined {
+  if (typeof event !== 'object' || event === null) return undefined;
+  const v = (event as { schemaVersion?: unknown }).schemaVersion;
+  return typeof v === 'number' && Number.isSafeInteger(v) && v > EVENT_SCHEMA_VERSION
+    ? v
+    : undefined;
+}
+
+const INTACT = ' The hash chain and the checkpoint signatures check out.';
+
+function newerFailure(
+  info: NewerVersionInfo,
+  at: { seq?: number; checkpointSeq?: number },
+  intact: boolean,
+): VerifyResult {
+  const where =
+    at.seq !== undefined
+      ? `entry ${String(at.seq)} was `
+      : at.checkpointSeq !== undefined
+        ? `checkpoint ${String(at.checkpointSeq)} was `
+        : 'this ledger was ';
+  return {
+    ok: false,
+    kind: 'NEWER_VERSION',
+    message: `${where}${newerVersionMessage(info, 'verify it')}.${intact ? INTACT : ''}`,
+    newer: info,
+    ...at,
+  };
+}
+
 const fail = (
   kind: VerifyFailureKind,
   message: string,
@@ -116,6 +175,8 @@ export function verifyLedger(
   checkpoints: Iterable<VerifyCheckpoint>,
   opts: VerifyOptions = {},
 ): VerifyResult {
+  const newerHeader = newerSpec(header.spec);
+  if (newerHeader !== undefined) return newerFailure(newerHeader, {}, false);
   if (header.spec !== SPEC) return fail('BAD_HEADER', `unsupported spec "${header.spec}"`);
   if (header.publicKey.length !== 32) return fail('BAD_HEADER', 'public key is not 32 bytes');
   if (header.keyId !== keyIdFor(header.publicKey)) {
@@ -130,6 +191,8 @@ export function verifyLedger(
   const idBytes = uuidBytes(header.ledgerId);
   const hashes: string[] = [ZERO_HASH]; // hashes[seq]
   let expected = 1;
+  /** First entry written under a newer event schema, and that schema version. */
+  let firstNewer: { seq: number; version: number } | undefined;
   for (const e of entries) {
     if (e.seq < expected) return fail('SEQ_DUPLICATE', `entry ${e.seq} repeats`, { seq: e.seq });
     if (e.seq > expected) {
@@ -140,6 +203,21 @@ export function verifyLedger(
       event = parseLossless(e.eventJson);
     } catch {
       return fail('BAD_EVENT', 'event is not valid JSON', { seq: e.seq });
+    }
+    const newer = newerEventVersion(event);
+    if (newer !== undefined) {
+      // Written by a newer SudoWall: its fields are unknown here, so only the hash chain over
+      // the stored text is checked. Any edit still breaks the chain or a signature.
+      firstNewer ??= { seq: e.seq, version: newer };
+      const prev = hashes[e.seq - 1] ?? ZERO_HASH;
+      if (e.prevHash !== prev) {
+        return fail('CHAIN_BREAK', 'prevHash does not match the previous entry', { seq: e.seq });
+      }
+      const h = entryHash(idBytes, e.seq, prev, e.eventJson);
+      if (h !== e.hash) return fail('HASH_MISMATCH', 'entry hash does not match', { seq: e.seq });
+      hashes.push(h);
+      expected++;
+      continue;
     }
     if (!EventSchema.safeParse(event).success) {
       return fail('BAD_EVENT', 'event does not match the event schema', { seq: e.seq });
@@ -189,6 +267,8 @@ export function verifyLedger(
   let n = 0;
   for (const cp of checkpoints) {
     n++;
+    const newerCp = newerSpec((cp.body as { spec?: unknown } | null)?.spec);
+    if (newerCp !== undefined) return newerFailure(newerCp, { checkpointSeq: n }, false);
     const parsed = CheckpointBodySchema.safeParse(cp.body);
     if (!parsed.success) {
       return fail('CHECKPOINT_SEQUENCE', 'checkpoint body is malformed', { checkpointSeq: n });
@@ -263,6 +343,13 @@ export function verifyLedger(
       );
     }
   }
+  if (firstNewer !== undefined) {
+    return newerFailure(
+      { what: 'event schema', found: firstNewer.version, supported: EVENT_SCHEMA_VERSION },
+      { seq: firstNewer.seq },
+      true,
+    );
+  }
   return {
     ok: true,
     ledgerId: header.ledgerId,
@@ -306,8 +393,7 @@ function* dbCheckpoints(db: StateDb): Generator<VerifyCheckpoint> {
   }
 }
 
-/** Verifies the ledger stored in a state database. */
-export function verifyDatabase(db: StateDb, opts: VerifyOptions = {}): VerifyResult {
+function verifyDatabaseOnly(db: StateDb, opts: VerifyOptions = {}): VerifyResult {
   // One read transaction: entries and checkpoints come from the same snapshot, even while
   // other gateway processes append.
   return db.transaction(() => {
@@ -320,4 +406,18 @@ export function verifyDatabase(db: StateDb, opts: VerifyOptions = {}): VerifyRes
       opts,
     );
   })();
+}
+
+/** Verifies the ledger stored in a state database. */
+export function verifyDatabase(db: StateDb, opts: VerifyOptions = {}): VerifyResult {
+  const r = verifyDatabaseOnly(db, opts);
+  // Name the newer product version when the database recorded who wrote it.
+  if (r.ok || r.kind !== 'NEWER_VERSION' || r.newer === undefined) return r;
+  const writtenBy = readWriterVersion(db);
+  if (writtenBy === undefined) return r;
+  const at = {
+    ...(r.seq === undefined ? {} : { seq: r.seq }),
+    ...(r.checkpointSeq === undefined ? {} : { checkpointSeq: r.checkpointSeq }),
+  };
+  return newerFailure({ ...r.newer, writtenBy }, at, r.message.endsWith(INTACT));
 }

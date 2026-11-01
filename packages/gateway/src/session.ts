@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION,
   canonicalSha256,
   rawGet,
   type ClientInfo,
@@ -889,7 +889,7 @@ export class Session {
       policyError,
     };
     const event: ToolCallEvent = {
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: EVENT_SCHEMA_VERSION,
       id: randomUUID(),
       ts: now.toISOString(),
       sessionId: this.id,
@@ -1034,7 +1034,7 @@ export class Session {
   ): Promise<boolean> {
     try {
       await this.opts.sink.write({
-        schemaVersion: SCHEMA_VERSION,
+        schemaVersion: EVENT_SCHEMA_VERSION,
         id: randomUUID(),
         ts: this.now().toISOString(),
         sessionId: this.id,
@@ -1424,7 +1424,7 @@ export class Session {
     if (call === undefined) return Promise.resolve();
     p.toolCall = undefined; // exactly one result event per call
     const event: ToolResultEvent = {
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: EVENT_SCHEMA_VERSION,
       id: randomUUID(),
       ts: this.now().toISOString(),
       sessionId: this.id,
@@ -1490,7 +1490,7 @@ export class Session {
     if (this.startedEmitted) return;
     this.startedEmitted = true;
     void this.write({
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: EVENT_SCHEMA_VERSION,
       id: randomUUID(),
       ts: this.now().toISOString(),
       sessionId: this.id,
@@ -1531,7 +1531,7 @@ export class Session {
     }
     await Promise.all(this.upstreams.map((u) => u.stop()));
     await this.write({
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: EVENT_SCHEMA_VERSION,
       id: randomUUID(),
       ts: this.now().toISOString(),
       sessionId: this.id,

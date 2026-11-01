@@ -117,6 +117,10 @@ export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise
         }
         return EXIT.ok;
       }
+      if (r.kind === 'NEWER_VERSION') {
+        out(`CANNOT VERIFY: ${r.message}`);
+        return EXIT.newerVersion;
+      }
       const where = r.seq !== undefined ? `entry ${r.seq}` : `checkpoint ${r.checkpointSeq ?? '?'}`;
       out(`FAILED at ${where}: ${r.kind}: ${r.message}`);
       return EXIT.verifyFailed;

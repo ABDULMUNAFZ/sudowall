@@ -25,6 +25,9 @@ const MIGRATIONS = [
   `,
 ];
 
+/** Newest version of the approvals tables this build reads and writes. */
+export const APPROVALS_SCHEMA_VERSION = MIGRATIONS.length;
+
 export type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'timed-out' | 'cancelled';
 
 /** What the approval UI shows. Arguments are redacted like the ledger copy. */

@@ -1,7 +1,13 @@
 import { randomUUID, sign } from 'node:crypto';
 import { EventSchema, tgjson, type Event } from '@sudowall/core';
 import { z } from 'zod';
-import { migrateComponent, openStateDb, type OpenStateDbOptions, type StateDb } from './db.js';
+import {
+  migrateComponent,
+  openStateDb,
+  recordWriter,
+  type OpenStateDbOptions,
+  type StateDb,
+} from './db.js';
 import {
   SPEC,
   ZERO_HASH,
@@ -59,6 +65,9 @@ const MIGRATIONS = [
   `,
 ];
 
+/** Newest version of the ledger tables this build reads and writes. */
+export const LEDGER_SCHEMA_VERSION = MIGRATIONS.length;
+
 export class LedgerError extends Error {
   constructor(
     readonly code: 'KEY_MISMATCH' | 'INVALID_EVENT' | 'NOT_A_LEDGER',
@@ -84,6 +93,8 @@ export interface LedgerOptions extends OpenStateDbOptions {
    * through `onError` and never fails the append.
    */
   anchorPath?: string;
+  /** Product version recorded in `tg_writer` when the ledger opens (see `recordWriter`). */
+  writerVersion?: string;
 }
 
 export interface EntryRow {
@@ -220,6 +231,7 @@ export class Ledger {
     const db = openStateDb(opts.path, opts);
     try {
       migrateComponent(db, 'ledger', MIGRATIONS);
+      if (opts.writerVersion !== undefined) recordWriter(db, opts.writerVersion);
       return new Ledger(db, opts);
     } catch (e) {
       db.close();

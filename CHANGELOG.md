@@ -17,6 +17,14 @@ Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](
 - A slow sink can no longer let a timed-out or cancelled call be forwarded afterwards.
 - Client notifications that carry a request method are dropped instead of forwarded.
 
+### Versioning and downgrades
+
+See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not supported; upgrading is.
+
+- **Event schema 2.** New events are written with `schemaVersion: 2` (they may carry `valueRef` and the `same-host` near kind). Version 1 events stay valid, so ledgers that continue across the upgrade verify in full. The config file stays at `schemaVersion: 1`.
+- **Data from a newer SudoWall is not reported as tampering.** `ledger verify` prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; …), upgrade to verify it.` and exits with the new code `5`; tampering stays `4`. A state database from a newer build is refused the same way, and `wrap` and `serve` check before they start. The same handling is prepared for 0.7.x as 0.7.1 (branch `release/0.7.x`, not published).
+- The ledger records the product version that writes it (`tg_writer`), so older builds can name it.
+
 ### Fixed
 
 - Request ids are compared in canonical form (`1` and `1.0`, `"a"` and `"\u0061"` are the same id), replies keep the id as the client spelled it, and duplicate ids are refused while the first is still being admitted.

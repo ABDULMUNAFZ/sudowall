@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ModeSchema } from './decision.js';
-import { JsonPointerSchema, SCHEMA_VERSION, ServerIdSchema } from './primitives.js';
+import { CONFIG_SCHEMA_VERSION, JsonPointerSchema, ServerIdSchema } from './primitives.js';
 
 /**
  * A config value: either a literal or a reference to an environment variable.
@@ -132,7 +132,7 @@ export const UiConfigSchema = z
 
 export const ConfigSchema = z
   .strictObject({
-    schemaVersion: z.literal(SCHEMA_VERSION),
+    schemaVersion: z.literal(CONFIG_SCHEMA_VERSION),
     /** Observe by default: log what would happen, block nothing, until the user opts in. */
     mode: ModeSchema.default('observe'),
     upstreams: z.array(UpstreamSchema).min(1),

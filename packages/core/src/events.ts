@@ -5,7 +5,6 @@ import {
   JsonObjectSchema,
   JsonPointerSchema,
   JsonValueSchema,
-  SCHEMA_VERSION,
   ServerIdSchema,
   Sha256HexSchema,
   TimestampSchema,
@@ -15,7 +14,8 @@ import { ProvenanceReportSchema } from './provenance.js';
 import { SourceSchema } from './trust.js';
 
 const Envelope = {
-  schemaVersion: z.literal(SCHEMA_VERSION),
+  /** 1 (before 0.8.0) or 2. A newer version is never parsed here (see `migrate`). */
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   id: IdSchema,
   ts: TimestampSchema,
   sessionId: IdSchema,
@@ -135,14 +135,25 @@ export const PolicyLoadedEventSchema = z.strictObject({
   policyVersion: z.int().positive(),
 });
 
-export const EventSchema = z.discriminatedUnion('type', [
-  SessionStartedEventSchema,
-  SessionEndedEventSchema,
-  ToolCallEventSchema,
-  ToolResultEventSchema,
-  ApprovalResolvedEventSchema,
-  PolicyLoadedEventSchema,
-]);
+/** True when a tool call uses a field that event schema 2 added. */
+function usesSchema2(e: { type: string; provenance?: unknown }): boolean {
+  if (e.type !== 'tool.call') return false;
+  const p = e.provenance as { matches: { valueRef?: string; nearKind?: string }[] } | null;
+  return (p?.matches ?? []).some((m) => m.valueRef !== undefined || m.nearKind === 'same-host');
+}
+
+export const EventSchema = z
+  .discriminatedUnion('type', [
+    SessionStartedEventSchema,
+    SessionEndedEventSchema,
+    ToolCallEventSchema,
+    ToolResultEventSchema,
+    ApprovalResolvedEventSchema,
+    PolicyLoadedEventSchema,
+  ])
+  .refine((e) => e.schemaVersion >= 2 || !usesSchema2(e), {
+    message: 'a schemaVersion 1 event cannot use valueRef or the same-host near kind',
+  });
 export type Event = z.infer<typeof EventSchema>;
 export type EventType = Event['type'];
 export type ToolCallEvent = z.infer<typeof ToolCallEventSchema>;

@@ -89,6 +89,11 @@ export interface IncidentReport {
   graph: Subgraph;
   ledger: {
     ok: boolean;
+    /**
+     * True when verification stopped at data written by a newer SudoWall: not tampering, but not
+     * verified either (`ok` is false).
+     */
+    newerVersion: boolean;
     message: string;
     /** Ledger entries this report rests on. */
     entries: number[];
@@ -276,9 +281,12 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
       graph,
       ledger: {
         ok: verified.ok,
+        newerVersion: !verified.ok && verified.kind === 'NEWER_VERSION',
         message: verified.ok
           ? `${String(verified.entries)} entries verified, signed up to entry ${String(verified.lastSignedSeq)}`
-          : `${verified.kind}${verified.seq !== undefined ? ` at entry ${String(verified.seq)}` : ''}: ${verified.message}`,
+          : verified.kind === 'NEWER_VERSION'
+            ? verified.message.replace(/\.$/, '')
+            : `${verified.kind}${verified.seq !== undefined ? ` at entry ${String(verified.seq)}` : ''}: ${verified.message}`,
         entries,
         allSigned: lastSignedSeq !== null && entries.every((x) => x <= lastSignedSeq),
         lastSignedSeq,
@@ -329,7 +337,7 @@ export function renderText(r: IncidentReport): string {
   }
   lines.push(
     '',
-    `Ledger: ${r.ledger.ok ? 'OK' : 'FAILED'}, ${r.ledger.message}.`,
+    `Ledger: ${r.ledger.ok ? 'OK' : r.ledger.newerVersion ? 'CANNOT VERIFY' : 'FAILED'}, ${r.ledger.message}.`,
     `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${r.ledger.allSigned ? 'all covered by a signed checkpoint' : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'}.`,
   );
   return `${lines.join('\n')}\n`;
@@ -366,7 +374,7 @@ export function renderMarkdown(r: IncidentReport): string {
     '',
     '### Ledger',
     '',
-    `${r.ledger.ok ? 'Verified' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${r.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}`,
+    `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${r.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}`,
   );
   return `${lines.join('\n')}\n`;
 }

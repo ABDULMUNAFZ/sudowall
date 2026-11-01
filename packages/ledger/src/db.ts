@@ -1,5 +1,6 @@
-import { closeSync, mkdirSync, openSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { NewerVersionError } from '@sudowall/core';
 import Database from 'better-sqlite3';
 
 export type StateDb = Database.Database;
@@ -67,8 +68,14 @@ export function migrateComponent(db: StateDb, component: string, migrations: rea
       { version: number } | undefined;
     const current = row?.version ?? 0;
     if (current > migrations.length) {
-      throw new Error(
-        `state database ${component} schema is version ${current}, newer than this build supports (${migrations.length}); upgrade SudoWall`,
+      throw new NewerVersionError(
+        {
+          what: `state database ${component} schema`,
+          found: current,
+          supported: migrations.length,
+          writtenBy: readWriterVersion(db),
+        },
+        'open it',
       );
     }
     for (let v = current; v < migrations.length; v++) db.exec(migrations[v] ?? '');
@@ -78,4 +85,77 @@ export function migrateComponent(db: StateDb, component: string, migrations: rea
       ).run(component, migrations.length);
     }
   }).immediate();
+}
+
+/**
+ * The product version that last wrote this database, if a build that records it (0.8.0 and
+ * later, table `tg_writer`) did. Only used to name the newer version in messages.
+ */
+export function readWriterVersion(db: StateDb): string | undefined {
+  try {
+    const t = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tg_writer'")
+      .get();
+    if (t === undefined) return undefined;
+    const row = db.prepare('SELECT version FROM tg_writer WHERE id = 1').get() as
+      { version: unknown } | undefined;
+    const v = row?.version;
+    // A version string only: never echo arbitrary database text into a message.
+    return typeof v === 'string' && /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(v) ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Refuses, before anything is opened for writing, a state database that a newer SudoWall has
+ * migrated past what this build supports. `supported` maps component to its newest version
+ * here; unknown components are left alone. A missing file passes (it is created later).
+ */
+export function assertStateReadable(path: string, supported: Readonly<Record<string, number>>) {
+  if (!existsSync(path)) return;
+  const db = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    db.pragma('busy_timeout = 5000');
+    const t = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tg_schema'")
+      .get();
+    if (t === undefined) return;
+    const rows = db.prepare('SELECT component, version FROM tg_schema').all() as {
+      component: string;
+      version: number;
+    }[];
+    for (const r of rows) {
+      const max = supported[r.component];
+      if (max !== undefined && r.version > max) {
+        throw new NewerVersionError(
+          {
+            what: `state database ${r.component} schema`,
+            found: r.version,
+            supported: max,
+            writtenBy: readWriterVersion(db),
+          },
+          'open it',
+        );
+      }
+    }
+  } finally {
+    db.close();
+  }
+}
+
+/** The `writer` component: which product version last wrote this database. */
+export const WRITER_MIGRATIONS = [
+  'CREATE TABLE tg_writer (id INTEGER PRIMARY KEY CHECK (id = 1), version TEXT NOT NULL, updated_at TEXT NOT NULL)',
+];
+
+/**
+ * Records the product version writing this database, so an older build that refuses it can
+ * say which version did (see `readWriterVersion`). Builds before 0.8.0 ignore the table.
+ */
+export function recordWriter(db: StateDb, version: string, at: Date = new Date()): void {
+  migrateComponent(db, 'writer', WRITER_MIGRATIONS);
+  db.prepare(
+    'INSERT INTO tg_writer (id, version, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at',
+  ).run(version, at.toISOString());
 }

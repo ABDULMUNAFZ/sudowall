@@ -186,8 +186,12 @@ export function IncidentView({ i }: { i: Incident }) {
         </p>
       )}
       <p className={i.ledger.ok ? 'ok' : 'error'} data-testid="incident-ledger">
-        {i.ledger.ok ? 'Ledger verified' : 'Ledger verification FAILED'}: {i.ledger.message}.
-        Entries {i.ledger.entries.join(', ')}
+        {i.ledger.ok
+          ? 'Ledger verified'
+          : i.ledger.newerVersion === true
+            ? 'Ledger cannot be verified by this version'
+            : 'Ledger verification FAILED'}
+        : {i.ledger.message}. Entries {i.ledger.entries.join(', ')}
         {i.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}
       </p>
     </section>

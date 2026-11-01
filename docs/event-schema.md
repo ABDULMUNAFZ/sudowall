@@ -1,4 +1,4 @@
-# Event schema (schemaVersion 1)
+# Event schema (schemaVersion 2)
 
 The source of truth is `packages/core/src/events.ts` (zod). This document describes it. Every event is a strict JSON object: unknown fields are rejected. Events are stored in the ledger after redaction (see `ledger-spec.md` §8).
 
@@ -16,13 +16,13 @@ The source of truth is `packages/core/src/events.ts` (zod). This document descri
 
 ## Envelope (every event)
 
-| Field           | Type      | Notes                                                                                              |
-| --------------- | --------- | -------------------------------------------------------------------------------------------------- |
-| `schemaVersion` | `1`       | Older versions are migrated on read. Newer versions are rejected with `UNSUPPORTED_SCHEMA_VERSION` |
-| `id`            | Id        | Unique per event                                                                                   |
-| `ts`            | Timestamp | Gateway wall clock. Informational only; ledger `seq` orders events                                 |
-| `sessionId`     | Id        | One client connection (or one logical session for stateless 2026-07-28 clients; see architecture)  |
-| `type`          | string    | Discriminator, one of the six types below                                                          |
+| Field           | Type       | Notes                                                                                                                         |
+| --------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion` | `1` or `2` | This build writes `2`. Older versions are migrated on read. Newer versions are rejected with `NEWER_VERSION` (see Versioning) |
+| `id`            | Id         | Unique per event                                                                                                              |
+| `ts`            | Timestamp  | Gateway wall clock. Informational only; ledger `seq` orders events                                                            |
+| `sessionId`     | Id         | One client connection (or one logical session for stateless 2026-07-28 clients; see architecture)                             |
+| `type`          | string     | Discriminator, one of the six types below                                                                                     |
 
 ## `session.started`
 
@@ -136,4 +136,11 @@ ArgumentMatch:
 
 ## Versioning
 
-Stored documents carry `schemaVersion`. Readers call `parseEvent` / `parseConfig`. These apply registered migrations (`vN → vN+1`, pure functions) up to the current version, then validate. A document from a newer version is rejected rather than misread.
+Stored documents carry `schemaVersion`. Readers call `parseEvent` / `parseConfig`. These apply registered migrations (`vN → vN+1`, pure functions) up to the current version, then validate. A document from a newer version is rejected with `NEWER_VERSION` rather than misread; it is never reported as invalid or tampered with.
+
+| Event schema | Written by     | Change                                                                                                                                                                 |
+| ------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`          | 0.1.0 to 0.7.x | First version                                                                                                                                                          |
+| `2`          | 0.8.0 and on   | Provenance matches may carry `valueRef` and `nearKind: same-host`. A version 1 event that uses either is invalid; a valid version 1 event reads as version 2 unchanged |
+
+Events in a ledger are never rewritten: a ledger written by 0.7.x and continued by 0.8.0 holds version 1 entries followed by version 2 entries, and both verify. The config document stays at `schemaVersion: 1`.

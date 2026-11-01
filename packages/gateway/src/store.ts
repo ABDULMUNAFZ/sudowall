@@ -4,16 +4,20 @@ import { join } from 'node:path';
 import type { Config } from '@sudowall/core';
 import {
   ANCHOR_FILE,
+  LEDGER_SCHEMA_VERSION,
   Ledger,
   Redactor,
+  assertStateReadable,
   deriveKey,
   loadOrCreateKeys,
+  WRITER_MIGRATIONS,
   type InstallationKeys,
 } from '@sudowall/ledger';
-import { PolicyStateStore } from '@sudowall/policy';
-import { ProvenanceEngine } from '@sudowall/provenance';
-import { ApprovalStore } from './approvals.js';
+import { POLICY_STATE_SCHEMA_VERSION, PolicyStateStore } from '@sudowall/policy';
+import { PROVENANCE_MIGRATIONS, ProvenanceEngine } from '@sudowall/provenance';
+import { APPROVALS_SCHEMA_VERSION, ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
+import { GATEWAY_VERSION } from './upstream.js';
 
 /** The product's former name. Its directories are still used if they exist and the new ones do not. */
 const LEGACY_NAME = 'tortoisegate';
@@ -91,6 +95,21 @@ export class GatewayStore {
     private readonly log: Logger,
   ) {}
 
+  /**
+   * Throws `NewerVersionError` when a newer SudoWall has migrated the state database past what
+   * this build supports. Read-only; creates nothing. Called at startup so the gateway refuses
+   * to start instead of failing every call.
+   */
+  assertReadable(): void {
+    assertStateReadable(this.paths.dbPath, {
+      ledger: LEDGER_SCHEMA_VERSION,
+      provenance: PROVENANCE_MIGRATIONS.length,
+      policy: POLICY_STATE_SCHEMA_VERSION,
+      approvals: APPROVALS_SCHEMA_VERSION,
+      writer: WRITER_MIGRATIONS.length,
+    });
+  }
+
   keys(): InstallationKeys {
     this.keysCache ??= loadOrCreateKeys(this.paths.keyDir);
     return this.keysCache;
@@ -117,6 +136,7 @@ export class GatewayStore {
         durability: l.durability,
         busyTimeoutMs: l.busyTimeoutMs,
         anchorPath: join(this.keys().dir, ANCHOR_FILE),
+        writerVersion: GATEWAY_VERSION,
         onError: (e) => {
           this.log.error('LEDGER CHECKPOINT FAILED', { error: e.message });
         },

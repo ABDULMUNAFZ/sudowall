@@ -120,6 +120,7 @@ export async function runGateway(
   const env = opts.env ?? process.env;
   const stateDir = opts.stateDir ?? defaultStateDir(env);
   const store = opts.store ?? new GatewayStore(storePaths(config, env, stateDir), config, log);
+  store.assertReadable();
   const inner = opts.sink ?? createSink(config, store);
   // Closing the sink also signs pending ledger entries and closes the state database.
   const sink: EventSink = {

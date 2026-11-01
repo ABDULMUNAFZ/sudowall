@@ -97,7 +97,14 @@ export interface Incident {
   pathTruncated: boolean;
   /** Ledger entries that could not be read and were left out of the trace. */
   unreadableEntries: number[];
-  ledger: { ok: boolean; message: string; entries: number[]; allSigned: boolean };
+  ledger: {
+    ok: boolean;
+    /** Written by a newer SudoWall: not verified, and not tampering either. */
+    newerVersion?: boolean;
+    message: string;
+    entries: number[];
+    allSigned: boolean;
+  };
 }
 
 /** Product context served by `sudowall ui` and the demo (packages/cli/src/product.ts). */

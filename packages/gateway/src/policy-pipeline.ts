@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION,
   globMatch,
   mostRestrictive,
   type Event,
@@ -108,7 +108,7 @@ export class PolicyPipeline implements DecisionPipeline {
   sessionEvents(sessionId: string, now: Date): Event[] {
     return [
       {
-        schemaVersion: SCHEMA_VERSION,
+        schemaVersion: EVENT_SCHEMA_VERSION,
         id: randomUUID(),
         ts: now.toISOString(),
         sessionId,

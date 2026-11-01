@@ -485,7 +485,9 @@ export function Ledger({ api, state }: PageProps) {
         <p className={verify.ok ? 'ok' : 'error'} data-testid="verify-result">
           {verify.ok
             ? `Verified: ${count(verify.entries, 'entry', 'entries')}, ${count(verify.checkpoints, 'checkpoint', 'checkpoints')}, ${String(verify.unsignedTail)} not yet signed. Key ${verify.keyId}.`
-            : `FAILED${verify.seq !== undefined ? ` at entry ${String(verify.seq)}` : ''}: ${verify.kind}: ${verify.message}`}
+            : verify.kind === 'NEWER_VERSION'
+              ? `Cannot verify: ${verify.message}`
+              : `FAILED${verify.seq !== undefined ? ` at entry ${String(verify.seq)}` : ''}: ${verify.kind}: ${verify.message}`}
           {verify.ok && verify.unsigned && ' Nothing is signed yet, so this proves little so far.'}
           {verify.ok &&
             !verify.anchored &&
