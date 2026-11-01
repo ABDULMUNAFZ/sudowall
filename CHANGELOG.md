@@ -31,6 +31,8 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 
 ### Fixed
 
+- **Shutdown:** `session.ended` is written before the ledger closes. The gateway no longer logs `EVENT SINK FAILED … session.ended … the ledger is closed` when the client disconnects.
+- **Incident reports for a ledger from a newer SudoWall** say the entries cannot be verified by this version (terminal, Markdown and the local app), instead of "not all signed yet".
 - Request ids are compared in canonical form (`1` and `1.0`, `"a"` and `"\u0061"` are the same id), replies keep the id as the client spelled it, and duplicate ids are refused while the first is still being admitted.
 - New limits: `maxPendingRequests` (-32004), `maxSessions` (HTTP 503), `sessionIdleMs`, `maxWriteBufferBytes`. SSE events are size-checked before delivery, and multi-line payloads are framed correctly.
 - A second HTTP request with an in-flight id gets 409 and no longer replaces the first one's stream.

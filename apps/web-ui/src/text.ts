@@ -52,3 +52,25 @@ export function ledgerSummary(entries: number, lastCheckpointSeq: number | null)
   }
   return `${recorded} Signed up to entry ${String(lastCheckpointSeq)}.`;
 }
+
+/** The ledger line of an incident. A newer SudoWall's ledger is not called unsigned: it was not checked. */
+export function incidentLedgerText(l: {
+  ok: boolean;
+  newerVersion?: boolean;
+  message: string;
+  entries: number[];
+  allSigned: boolean;
+}): string {
+  const head = l.ok
+    ? 'Ledger verified'
+    : l.newerVersion === true
+      ? 'Ledger cannot be verified by this version'
+      : 'Ledger verification FAILED';
+  const signed =
+    l.newerVersion === true
+      ? ', which this version cannot verify.'
+      : l.allSigned
+        ? ', all signed.'
+        : ', not all signed yet.';
+  return `${head}: ${l.message}. Entries ${l.entries.join(', ')}${signed}`;
+}

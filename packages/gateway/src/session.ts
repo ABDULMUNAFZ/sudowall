@@ -128,6 +128,7 @@ export class Session {
   private clientEra: 'legacy' | 'modern' | undefined;
   private startedEmitted = false;
   private closed = false;
+  private closing: Promise<void> | undefined;
   private initParams: unknown;
   private initializedSeen = false;
   private nextUpId = 1;
@@ -1520,10 +1521,20 @@ export class Session {
     return this.clientProtocol;
   }
 
-  async close(
+  /**
+   * Closes the session: cancels pending calls, stops the upstreams, records `session.ended` and
+   * closes the client. Every call returns the same promise, so a caller that closes the sink
+   * after awaiting it (the gateway does, on client close and on stop) never closes the ledger
+   * before `session.ended` is written. The first caller's reason is recorded.
+   */
+  close(
     reason: 'client-closed' | 'gateway-shutdown' | 'error' = 'gateway-shutdown',
   ): Promise<void> {
-    if (this.closed) return;
+    this.closing ??= this.shutdown(reason);
+    return this.closing;
+  }
+
+  private async shutdown(reason: 'client-closed' | 'gateway-shutdown' | 'error'): Promise<void> {
     this.closed = true;
     for (const p of [...this.pending.values()]) {
       this.finish(p);

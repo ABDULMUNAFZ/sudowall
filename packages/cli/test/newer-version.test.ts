@@ -109,6 +109,10 @@ describe('data from a newer SudoWall (exit 5)', () => {
       'Ledger: CANNOT VERIFY, entry 3 was written by a newer SudoWall (v0.8.0;',
     );
     expect(r.stdout).not.toContain('FAILED');
+    expect(r.stdout).toContain(
+      'Entries this report rests on: 1; this version cannot verify them (the ledger was written by a newer SudoWall).',
+    );
+    expect(r.stdout).not.toContain('signed yet');
   });
 
   it('wrap refuses a state database a newer SudoWall migrated, with exit 5', () => {

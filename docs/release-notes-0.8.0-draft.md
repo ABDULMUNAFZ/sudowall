@@ -278,7 +278,7 @@ Each row is a clean checkout running `pnpm turbo run build typecheck test --forc
 3. **Demo output:** fixed (`f6ea3c3`).
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
 5. **The read check's parser:** decided ([ADR 0025](adr/0025-read-check-parser.md)). `@babel/parser` 8.0.7 replaced TypeScript after passing all 100 cases: about 2 MB installed instead of 24 MB, about 22 ms for the first check instead of 190 ms. It requires Node.js 24.11.0 or later, so `engines` moved from 24.0.0.
-6. **At gateway shutdown,** the log shows `EVENT SINK FAILED … session.ended … the ledger is closed`. It is older than these changes and is not fixed.
+6. **At gateway shutdown,** the log showed `EVENT SINK FAILED … session.ended … the ledger is closed`: fixed. `Session.close()` returned at once to a second caller while the first was still stopping upstreams, so the gateway closed the ledger before `session.ended` was written. Every caller now waits for the same close. `packages/gateway/test/shutdown.test.ts` checks the client-closed path, `stop()`, and both at once: `session.ended` is the last ledger entry and nothing is logged at warn or error.
 
 ## Since 4afaeba (2026-11-01)
 

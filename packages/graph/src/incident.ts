@@ -348,7 +348,13 @@ export function renderText(r: IncidentReport): string {
   lines.push(
     '',
     `Ledger: ${r.ledger.ok ? 'OK' : r.ledger.newerVersion ? 'CANNOT VERIFY' : 'FAILED'}, ${r.ledger.message}.`,
-    `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${r.ledger.allSigned ? 'all covered by a signed checkpoint' : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'}.`,
+    `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${
+      r.ledger.newerVersion
+        ? 'this version cannot verify them (the ledger was written by a newer SudoWall)'
+        : r.ledger.allSigned
+          ? 'all covered by a signed checkpoint'
+          : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'
+    }.`,
   );
   return `${lines.join('\n')}\n`;
 }
@@ -384,7 +390,13 @@ export function renderMarkdown(r: IncidentReport): string {
     '',
     '### Ledger',
     '',
-    `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${r.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}`,
+    `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${
+      r.ledger.newerVersion
+        ? ', which this version cannot verify.'
+        : r.ledger.allSigned
+          ? ', all signed.'
+          : ', not all signed yet.'
+    }`,
   );
   return `${lines.join('\n')}\n`;
 }

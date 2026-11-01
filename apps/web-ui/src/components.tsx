@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Api, Approval, FeedItem, Incident, Product } from './api.js';
 import { approvalWords, outcome, plainReason, sentence } from './describe.js';
-import { visible, visibleJson } from './text.js';
+import { incidentLedgerText, visible, visibleJson } from './text.js';
 
 export const time = (ts: string | number) => new Date(ts).toLocaleTimeString();
 
@@ -186,13 +186,7 @@ export function IncidentView({ i }: { i: Incident }) {
         </p>
       )}
       <p className={i.ledger.ok ? 'ok' : 'error'} data-testid="incident-ledger">
-        {i.ledger.ok
-          ? 'Ledger verified'
-          : i.ledger.newerVersion === true
-            ? 'Ledger cannot be verified by this version'
-            : 'Ledger verification FAILED'}
-        : {i.ledger.message}. Entries {i.ledger.entries.join(', ')}
-        {i.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}
+        {incidentLedgerText(i.ledger)}
       </p>
     </section>
   );

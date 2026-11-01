@@ -8,6 +8,8 @@ import {
   LocalGraph,
   buildGraph,
   incidentReport,
+  renderMarkdown,
+  renderText,
   sha256ValueId,
   type LedgerEvent,
 } from '../src/index.js';
@@ -39,6 +41,43 @@ const pausedCall = () =>
   ) as LedgerEvent;
 
 describe('incident report (audit)', () => {
+  it('a ledger from a newer SudoWall: cannot be verified, never "not all signed yet"', async () => {
+    const db = openStateDb(demoLedger());
+    try {
+      const r = await incidentReport({
+        db,
+        ref: pausedCall().event['id'] as string,
+        valueId: sha256ValueId,
+      });
+      // What incidentReport builds for a NEWER_VERSION verify result (see incident.ts).
+      const newer = {
+        ...r,
+        ledger: {
+          ...r.ledger,
+          ok: false,
+          newerVersion: true,
+          message: 'entry 3 was written by a newer SudoWall (v0.9.0), upgrade to verify it',
+          allSigned: false,
+          lastSignedSeq: null,
+        },
+      };
+      const text = renderText(newer);
+      expect(text).toContain('Ledger: CANNOT VERIFY, entry 3 was written by a newer SudoWall');
+      expect(text).toContain(
+        `Entries this report rests on: ${r.ledger.entries.join(', ')}; this version cannot verify them (the ledger was written by a newer SudoWall).`,
+      );
+      expect(text).not.toContain('signed yet');
+      const md = renderMarkdown(newer);
+      expect(md).toContain('**Cannot verify (newer SudoWall)**');
+      expect(md).toContain(
+        `Entries used: ${r.ledger.entries.join(', ')}, which this version cannot verify.`,
+      );
+      expect(md).not.toContain('signed yet');
+    } finally {
+      db.close();
+    }
+  });
+
   it('a full path is not marked truncated and labels each source by its own trust', async () => {
     const db = openStateDb(demoLedger());
     try {
