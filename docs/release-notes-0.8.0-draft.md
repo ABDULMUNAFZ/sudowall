@@ -1,8 +1,8 @@
 # 0.8.0 draft: behaviour delta against 0.7.0
 
-Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). The package version is still 0.7.0, nothing is published to npm, and `main` is unchanged. The live demo and www.sudowall.tech still run 0.7.0.
+Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). The package version is still 0.7.0 and nothing is published to npm. `main` now also holds `release/0.7.x` (0.7.1, not published), merged through PR #2 on 2026-11-01; this branch has not been merged with it. The live demo and www.sudowall.tech still run 0.7.0.
 
-Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
+Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`, and again for the commits after `26782ba`, up to `cbc4d32`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01) and [Since 26782ba](#since-26782ba-2026-11-01), the release candidates in [Release candidates](#release-candidates-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
 
 This page lists what the branch changes compared with 0.7.0. For each change it says what 0.7.0 does, what the branch does, and which claims in the demo guide, the README, `docs/` and the website it makes false. The design decisions are in [ADR 0023](adr/0023-audit-recheck-fixes.md), and the full list is in the CHANGELOG under "Unreleased".
 
@@ -272,7 +272,7 @@ Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo
 - **The interactive demo (without `--ci`)**, and the app's pages by eye. The browser was covered only by the Playwright suite (`apps/web-ui/e2e/approvals.spec.ts`), run at `3c7a1d8` with `pnpm test:e2e`: 4 passed.
 - **`protect --apply` and `unprotect --apply`** against real client configs. Running them would change this machine's configs.
 - **0.7.0 reading 0.8.0 data** still reports `BAD_EVENT`, exit 4. That is the shipped behaviour and cannot change; only 0.7.1 (prepared) reports it as newer.
-- **macOS and Windows, by hand.** Everything in this page ran on Linux. On macOS and Windows only CI ran: the full package smoke test, which since `30e7045` also checks that `demo --ci` leaves nothing in `%LOCALAPPDATA%`, `~/Library/Application Support` or `$XDG_STATE_HOME` (runs 41295615920 for the PR and 41295706535 for `release/0.7.x`: passed on all three systems).
+- **macOS and Windows, by hand.** Everything in this page ran on Linux. On macOS and Windows only CI ran: the full package smoke test, which since `30e7045` also checks that `demo --ci` leaves nothing in `%LOCALAPPDATA%`, `~/Library/Application Support` or `$XDG_STATE_HOME` (runs 41295615920 for the PR and 41295706535 for `release/0.7.x`: passed on all three systems). The checklist for a Mac is [manual-check-mac.md](manual-check-mac.md); it has not been run yet. Windows has no by-hand checklist.
 - **TigerGraph parity.** It was not rerun.
 - **A rollback end to end through the CLI** (restore an older database, run `ledger verify`). It is covered by `packages/ledger/test/anchor.test.ts`.
 
@@ -305,9 +305,47 @@ Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo
 
 On `release/0.7.x` (from tag `v0.7.0`, pushed, **not published**): `0972a9f` adds `NEWER_VERSION`, exit 5 and the newer-database message to 0.7.0, and `da0c57a` sets the version to 0.7.1. `95be9c7` backports the `names.json` fix (`4271334`), `5c106e7` the shutdown fix (from `1e53fc0`, without the incident wording), `bdc9d7f` adds both to the 0.7.1 CHANGELOG, and `4e64126` the smoke check (`30e7045`).
 
+## Since 26782ba (2026-11-01)
+
+Each commit was checked with `pnpm turbo run build typecheck test --force` and `pnpm lint`; the ones that change the package or the app also with the package smoke test or the web UI end-to-end tests, as noted.
+
+| Commit    | Change                                                                                                                                                                                                                                                                                                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `c06afa9` | `pnpm-workspace.yaml` overrides minimatch to 11.0.3 and server-filesystem's glob to 14.0.3; `pnpm audit` is clean ([ADR 0026](adr/0026-dependency-audit-overrides.md)). No `server-filesystem` release has fixed ranges, and a user's npm install still gets minimatch 10.2.6 and glob 13.0.6 (seen in the release-candidate installs below). Also demo, e2e (4 passed) and smoke. |
+| `6d355cb` | The `sudowall` bin is `dist/bin.js`: on Node.js below 24.11 it prints `SudoWall needs Node.js 24.11 or newer (you have v24.10.0). Update Node and run it again.` and exits 1, before loading anything else (tested with a faked `process.version` and a module-load trace). The checklist lists every "Node.js 24" to change at release. Also smoke.                               |
+| `174b213` | Incident reports on a ledger that fails verification lead with `Verification failed: …` (terminal, Markdown, local app) and say the entries cannot be trusted, never "not all signed yet". Also e2e.                                                                                                                                                                               |
+| `d9a5897` | `init --template dodo-payments` writes `failure.onPolicyErrorNonSink: block`; the gateway warns at start when it is `allow` and a rule on a tool uses `sdk_read_only` (Dodo `execute`).                                                                                                                                                                                            |
+| `7affbe8` | A test holds `@babel/parser` at exactly 8.0.7 and checks it loads no other package at run time. ADR 0025: any parser upgrade needs the full adversarial suite first.                                                                                                                                                                                                               |
+| `cbc4d32` | `protect` dry run against a fake Windows profile (Claude Code, Claude Desktop under `%APPDATA%`, Cursor). READMEs and the npm README say "macOS, Linux and Windows (Windows tested in CI)"; ADR 0021 updated.                                                                                                                                                                      |
+
+On `release/0.7.x`: `4b7312f` (the same overrides, ADR 0026 and a 0.7.1 CHANGELOG note) and `2e7a792` (the Windows test and README wording, with the npm README for 0.7.1). CI passed on both branches: runs [41299430484](https://github.com/ABDULMUNAFZ/sudowall/actions/runs/41299430484) (`cbc4d32`) and [41299428218](https://github.com/ABDULMUNAFZ/sudowall/actions/runs/41299428218) (`2e7a792`), including `dependency audit and licences` and the package smoke test on Ubuntu, macOS and Windows.
+
+## Release candidates (2026-11-01)
+
+Built with `pnpm run package` and `npm pack` on each branch, then renamed so the two cannot be confused. They are in `release/` (not in git) with `SHA256SUMS.txt`:
+
+| File                                   | SHA-256                                                            |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `sudowall-0.7.1-candidate-2e7a792.tgz` | `f1c26660dddba335d5e73892ef9bd3e648519d9eb6212b145859a5982f5df250` |
+| `sudowall-0.8.0-candidate-cbc4d32.tgz` | `fe7adbb91d49f9fd235d26790ce49ffe5ba56e9389eaa024394e678d5a01e992` |
+
+The 0.8.0 candidate prints `0.7.0`: the version is bumped on release day.
+
+Each was installed with `npm install <tarball>` into an empty folder, with an empty npm cache and a fresh `HOME`, `XDG_*` and `TMPDIR`, on Node.js 24.11.0 (npm 11.6.1) and on 26.13.0 (npm 11.20.0), the newest release on 2026-11-01 (27.0.0 is an alpha). Both Node.js builds are the official Linux x64 tarballs, checked against `SHASUMS256.txt` (its GPG signature was not checked). Fedora 44 (x86_64).
+
+| Check                                                                                         | 0.7.1 on 24.11.0 | 0.7.1 on 26.13.0 | 0.8.0 on 24.11.0 | 0.8.0 on 26.13.0 |
+| --------------------------------------------------------------------------------------------- | ---------------- | ---------------- | ---------------- | ---------------- |
+| install                                                                                       | ok               | ok               | ok               | ok               |
+| `demo --ci --keep`: exit 0, four `ok` lines                                                   | ok               | ok               | ok               | ok               |
+| `protect` dry run on three fixture configs: 3 to protect, files unchanged                     | ok               | ok               | ok               | ok               |
+| `ledger verify` on the kept demo state: `OK: 14 entries, 1 checkpoints`                       | ok               | ok               | ok               | ok               |
+| `ui`: start, `GET` the page (HTTP 200, `<title>SudoWall</title>`), stop with SIGTERM (exit 0) | ok               | ok               | ok               | ok               |
+
+For the 0.8.0 candidate on 24.11.0, the page's JavaScript and CSS were also fetched (HTTP 200, 252,703 and 11,176 bytes). The demo now writes 14 ledger entries (`session.ended` is the last one), not 13 as in [check 1](#1-demo---ci-four-ok-lines-13-ledger-entries-entry-5-is-the-attacker-payment). What these runs do not cover (a browser, the Deny click, the pages, a Mac) is in [manual-check-mac.md](manual-check-mac.md).
+
 ## Release-day copy checklist
 
-Do not apply these before 0.8.0 is published. Two of them are on the live site. Use the test count from the release commit's own clean run; 697 is the count at `30e7045`.
+Do not apply these before 0.8.0 is published. Two of them are on the live site. Use the test count from the release commit's own clean run; 697 is the count at `30e7045`, 734 at `cbc4d32` (plus 1 skipped).
 
 - [ ] `README.md:72`. Replace
       `writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: reads run, refunds and other changes ask you first, and a change using an email or URL copied from a support ticket or email is blocked.`
