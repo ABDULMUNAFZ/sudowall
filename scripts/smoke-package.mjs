@@ -18,7 +18,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -198,11 +198,38 @@ await c.close();
     ver.stdout + ver.stderr,
   );
 
-  const d = run(['demo', '--ci']);
+  // The demo keeps all its state in its own temp directory. Run it with a fresh home where
+  // HOME, USERPROFILE, APPDATA, LOCALAPPDATA and XDG_* all point, then check that nothing of
+  // SudoWall's (names.json, ledger.db, keys) landed there: %LOCALAPPDATA% on Windows,
+  // ~/Library/Application Support on macOS, $XDG_STATE_HOME on Linux.
+  const demoHome = join(work, 'demo home');
+  mkdirSync(demoHome);
+  const demoEnv = {
+    HOME: demoHome,
+    USERPROFILE: demoHome,
+    APPDATA: join(demoHome, 'AppData', 'Roaming'),
+    LOCALAPPDATA: join(demoHome, 'AppData', 'Local'),
+    XDG_CONFIG_HOME: join(demoHome, '.config'),
+    XDG_STATE_HOME: join(demoHome, '.local', 'state'),
+    // Anvil is found through FOUNDRY_DIR or PATH; keep the real install visible.
+    FOUNDRY_DIR: process.env.FOUNDRY_DIR ?? join(homedir(), '.foundry'),
+  };
+  const d = run(['demo', '--ci'], demoEnv);
   check(
     'demo --ci: ask/deny, block, allow, verify, tamper caught',
     d.status === 0 && d.stdout.includes('ledger verify, then after an edit: OK, then caught'),
     `${d.stdout}\n${d.stderr}`,
+  );
+  const stray = readdirSync(demoHome, { recursive: true })
+    .map(String)
+    .filter((f) => {
+      const parts = f.split(/[\\/]/);
+      return parts.some((p) => p === 'sudowall' || p === 'tortoisegate' || p === 'names.json');
+    });
+  check(
+    'demo --ci leaves no state in the home, app data or XDG folders',
+    stray.length === 0,
+    stray.join('\n'),
   );
 } finally {
   rmSync(work, { recursive: true, force: true });
