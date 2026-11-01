@@ -8,7 +8,7 @@ Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](
 
 ### Security
 
-- **Dodo Payments template v3:** code is parsed with the TypeScript parser, and only a proven read runs unasked: `async function run(client)` whose every call is `client.<resource>.list(query)` or `.retrieve(id)` on a fixed list of resources, with literal arguments and no value from untrusted content. Everything else asks, and code that writes with a value from untrusted content is still blocked. Read-looking text (comments, strings, `&&`, aliases, bracket access, request options) no longer lets a write run unasked (audit H1). New policy condition `sdk_read_only`. TypeScript is now a runtime dependency, loaded only when a policy uses it.
+- **Dodo Payments template v3:** code is parsed, and only a proven read runs unasked: `async function run(client)` whose every call is `client.<resource>.list(query)` or `.retrieve(id)` on a fixed list of resources, with literal arguments and no value from untrusted content. Everything else asks, and code that writes with a value from untrusted content is still blocked. Read-looking text (comments, strings, `&&`, aliases, bracket access, request options) no longer lets a write run unasked (audit H1). New policy condition `sdk_read_only`. It parses with `@babel/parser` 8.0.7, a new runtime dependency of about 2 MB loaded only when a policy uses it ([ADR 0025](docs/adr/0025-read-check-parser.md)).
 - **Everyday template v2:** a final rule asks when a tool that is not named like a read gets a value from untrusted content, a lookalike of one, or a URL on the same host as an untrusted one. Policy selectors accept `exclude: [glob, ...]`.
 - **New near kind `same-host`** for URLs on the host of an untrusted URL with another path or query.
 - **Provenance failures fail closed:** if a result cannot be recorded, calls that would be allowed ask until the provenance window has passed (`provenance-gap`).
@@ -24,6 +24,10 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 - **Event schema 2.** New events are written with `schemaVersion: 2` (they may carry `valueRef` and the `same-host` near kind). Version 1 events stay valid, so ledgers that continue across the upgrade verify in full. The config file stays at `schemaVersion: 1`.
 - **Data from a newer SudoWall is not reported as tampering.** `ledger verify` prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; …), upgrade to verify it.` and exits with the new code `5`; tampering stays `4`. A state database from a newer build is refused the same way, and `wrap` and `serve` check before they start. The same handling is prepared for 0.7.x as 0.7.1 (branch `release/0.7.x`, not published).
 - The ledger records the product version that writes it (`tg_writer`), so older builds can name it.
+
+### Requirements
+
+- **Node.js 24.11.0 or later** (was 24.0.0), because `@babel/parser` 8 requires it ([ADR 0025](docs/adr/0025-read-check-parser.md)).
 
 ### Fixed
 

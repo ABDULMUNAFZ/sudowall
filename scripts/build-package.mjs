@@ -48,9 +48,9 @@ const packageName = (spec) =>
   spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
 
 // Packages the CLI starts by file path (require.resolve) or loads lazily with require, so the
-// bundler cannot see them: the demo's reference filesystem MCP server, and TypeScript, which
-// @sudowall/policy loads only when a policy uses `sdk_read_only`.
-const externals = new Set(['@modelcontextprotocol/server-filesystem', 'typescript']);
+// bundler cannot see them: the demo's reference filesystem MCP server, and @babel/parser, which
+// @sudowall/policy loads only when a policy uses `sdk_read_only` (ADR 0025).
+const externals = new Set(['@modelcontextprotocol/server-filesystem', '@babel/parser']);
 const ownCodeOnly = {
   name: 'own-code-only',
   setup(b) {
@@ -126,7 +126,7 @@ const pkg = {
   // npm normalises bin paths on publish and warns about a leading ./, so write the normal form.
   bin: { sudowall: 'dist/main.js' },
   files: ['dist', 'assets', 'LICENSE', 'README.md'],
-  engines: { node: '>=24.0.0' },
+  engines: { node: '>=24.11.0' },
   os: ['darwin', 'linux', 'win32'],
   repository: { type: 'git', url: 'git+https://github.com/ABDULMUNAFZ/sudowall.git' },
   homepage: 'https://www.sudowall.tech/',

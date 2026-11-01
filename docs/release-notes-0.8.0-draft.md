@@ -121,7 +121,7 @@ The branch's `policy.yaml` from `init --template dodo-payments` (template versio
 0.7.0's line 5 said `# - simple read-only code (list, retrieve) runs;`. That decision came from text patterns, which a comment or a computed property could fool. Template version 2 (at `4afaeba`) asked for every `execute`. Version 3 has three rules:
 
 - `block-untrusted-value-in-dodo-write`: unchanged; blocks code that holds a value from untrusted content and matches a write or dynamic-code pattern.
-- `allow-proven-dodo-read`: allows code that the new `sdk_read_only` condition proves is a read (it parses the code with the TypeScript compiler; [ADR 0023](adr/0023-audit-recheck-fixes.md), update of 2026-11-01), and that holds no value from untrusted content.
+- `allow-proven-dodo-read`: allows code that the new `sdk_read_only` condition proves is a read (it parses the code with `@babel/parser`; [ADR 0023](adr/0023-audit-recheck-fixes.md), update of 2026-11-01, and [ADR 0025](adr/0025-read-check-parser.md)), and that holds no value from untrusted content.
 - `ask-dodo-execute`: asks for every other `execute` call.
 
 **"Reads run" is true again, but narrower than in 0.7.0.** Reads that use a value from untrusted content (for example a ticket's email in a `list` query) ask. So do reads written in any shape the check does not prove: an alias of `client`, bracket access, a loop, `try`, a second argument (request options can change the HTTP method). Wording that is true now:
@@ -277,7 +277,7 @@ Each row is a clean checkout running `pnpm turbo run build typecheck test --forc
 2. **Copy to change at release:** see the [checklist](#release-day-copy-checklist). The `docs/graph.md` example is fixed on the branch.
 3. **Demo output:** fixed (`f6ea3c3`).
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
-5. **TypeScript is now a runtime dependency** of `@sudowall/policy` (6.0.3, about 24 MB installed), for the read check. It is loaded only when a policy uses `sdk_read_only`: the first check costs about 170 ms, later checks about 0.6 ms. An alternative is a smaller parser such as `@babel/parser`; that needs its own adversarial run.
+5. **The read check's parser:** decided ([ADR 0025](adr/0025-read-check-parser.md)). `@babel/parser` 8.0.7 replaced TypeScript after passing all 100 cases: about 2 MB installed instead of 24 MB, about 22 ms for the first check instead of 190 ms. It requires Node.js 24.11.0 or later, so `engines` moved from 24.0.0.
 6. **At gateway shutdown,** the log shows `EVENT SINK FAILED … session.ended … the ledger is closed`. It is older than these changes and is not fixed.
 
 ## Since 4afaeba (2026-11-01)
