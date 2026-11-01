@@ -21,6 +21,7 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 ## Tooling
 
 - Upgrade to TypeScript 7 together with typescript-eslint once it supports it (ADR 0011).
+- Tests leave their `mkdtemp` directories in the OS temp folder. The provenance helper (about 200 MB each) is fixed; the others are small but add up over many runs: `tg-ledger-`, `tg-test-`, `tg-policy-`, `tg-cli-`, `tg-prov-cli-`, `sw-dodo-`, `tg-gw-home-`, `sw-everyday-` and more (about 7,000 directories on 2026-11-01). Give each a cleanup hook.
 
 ## Ledger
 
