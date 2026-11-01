@@ -10,6 +10,7 @@ import {
 } from '@sudowall/core';
 import type { AmountHint } from '@sudowall/provenance';
 import { AmountError, amountGreater } from './decimal.js';
+import { checkSdkReadOnly } from './sdk-read-only.js';
 import { normalizeKind, type CompiledPolicy } from './load.js';
 import type { Condition, PolicyKind, Rule, Sink } from './schema.js';
 
@@ -166,6 +167,12 @@ function evalCond(c: Condition, ctx: RuleCtx, positive: boolean): boolean {
     return normalized(ref.kind, value, ref.name) === lit;
   }
   if ('glob' in c) return globMatch(c.glob, normalized(ref.kind, value, ref.name));
+  if ('sdk_read_only' in c) {
+    if (typeof value !== 'string') {
+      throw new EvalError('INVALID_ARGUMENT', `argument "${ref.name}" is not a string`);
+    }
+    return checkSdkReadOnly(value, c.sdk_read_only).ok;
+  }
   if ('first_seen' in c) {
     if (ctx.sink === undefined) throw new EvalError('NO_SINK', 'first_seen needs a sink rule');
     const v = normalized(ref.kind, value, ref.name);

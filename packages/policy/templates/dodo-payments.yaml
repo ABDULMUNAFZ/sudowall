@@ -2,18 +2,20 @@
 # `npx mcp-remote https://mcp.dodopayments.com/mcp`). Its `execute` tool runs TypeScript against
 # the Dodo Payments SDK, so this policy reads that code before it runs:
 #
-# - every `execute` call asks you first, read-only or not: code text cannot prove that code is
-#   harmless (a comment can mention `.list(`, a computed property can hide `.create(`), so the
-#   policy never relaxes on what the code appears to do;
+# - a plain read runs without asking, but only when the code is parsed and proven to be one:
+#   `async function run(client)` whose every call is `client.<resource>.list(query)` or
+#   `client.<resource>.retrieve(id)` on the resources listed below, with literal arguments, and
+#   with no value copied from untrusted content;
+# - every other `execute` call asks you first, including code that does not parse or that the
+#   check cannot follow (aliases, bracket access, loops, eval, fetch, ...);
 # - code that would change something using an email, URL or amount copied from untrusted content
 #   (a support ticket, an email, a web page) is blocked.
 #
-# The patterns below only ever make a decision stricter (ask -> block). Code that evades them
-# still asks. Also give the server a restricted API key and keep it in test mode while you try
-# it (DODO_PAYMENTS_ENVIRONMENT=test_mode).
+# Also give the server a restricted API key and keep it in test mode while you try it
+# (DODO_PAYMENTS_ENVIRONMENT=test_mode).
 schema: sudowall/policy@1
 name: dodo-payments
-version: 2
+version: 3
 
 defaults:
   sink: ask
@@ -49,8 +51,56 @@ rules:
     action: block
     reason: 'The code would change payments or customers using an email, URL or amount copied from untrusted content.'
 
-  - id: ask-dodo-execute
-    description: Any code the agent wants to run against the Dodo Payments API
+  - id: allow-proven-dodo-read
+    description: Code that is proven to only list or retrieve, with no untrusted values
     match: { tool: 'execute' }
+    # ask-dodo-execute below has exactly this condition under `not` (a test keeps them equal).
+    when:
+      all:
+        - path: /code
+          sdk_read_only:
+            resources:
+              [
+                payments,
+                subscriptions,
+                customers,
+                refunds,
+                disputes,
+                payouts,
+                products,
+                discounts,
+                addons,
+                brands,
+                meters,
+                usageEvents,
+              ]
+        - not: { path: /code, provenance: { label: untrusted } }
+    action: allow
+    reason: 'The code only lists or retrieves Dodo Payments records (checked by parsing it), with no value from untrusted content.'
+
+  - id: ask-dodo-execute
+    description: Any other code the agent wants to run against the Dodo Payments API
+    match: { tool: 'execute' }
+    when:
+      not:
+        all:
+          - path: /code
+            sdk_read_only:
+              resources:
+                [
+                  payments,
+                  subscriptions,
+                  customers,
+                  refunds,
+                  disputes,
+                  payouts,
+                  products,
+                  discounts,
+                  addons,
+                  brands,
+                  meters,
+                  usageEvents,
+                ]
+          - not: { path: /code, provenance: { label: untrusted } }
     action: ask
     reason: 'This code runs against your Dodo Payments account and can move money or change customers or settings. Check it before it runs.'

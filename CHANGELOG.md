@@ -8,7 +8,7 @@ Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](
 
 ### Security
 
-- **Dodo Payments template v2:** every `execute` call asks; code with a value from untrusted content that writes or uses dynamic code is blocked. Read-looking code is no longer allowed unasked.
+- **Dodo Payments template v3:** code is parsed with the TypeScript parser, and only a proven read runs unasked: `async function run(client)` whose every call is `client.<resource>.list(query)` or `.retrieve(id)` on a fixed list of resources, with literal arguments and no value from untrusted content. Everything else asks, and code that writes with a value from untrusted content is still blocked. Read-looking text (comments, strings, `&&`, aliases, bracket access, request options) no longer lets a write run unasked (audit H1). New policy condition `sdk_read_only`. TypeScript is now a runtime dependency, loaded only when a policy uses it.
 - **Everyday template v2:** a final rule asks when a tool that is not named like a read gets a value from untrusted content, a lookalike of one, or a URL on the same host as an untrusted one. Policy selectors accept `exclude: [glob, ...]`.
 - **New near kind `same-host`** for URLs on the host of an untrusted URL with another path or query.
 - **Provenance failures fail closed:** if a result cannot be recorded, calls that would be allowed ask until the provenance window has passed (`provenance-gap`).

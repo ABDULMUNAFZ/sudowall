@@ -47,9 +47,10 @@ function declaredVersions() {
 const packageName = (spec) =>
   spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
 
-// Packages the CLI starts by file path (require.resolve) rather than importing, so the bundler
-// cannot see them: the demo's reference filesystem MCP server.
-const externals = new Set(['@modelcontextprotocol/server-filesystem']);
+// Packages the CLI starts by file path (require.resolve) or loads lazily with require, so the
+// bundler cannot see them: the demo's reference filesystem MCP server, and TypeScript, which
+// @sudowall/policy loads only when a policy uses `sdk_read_only`.
+const externals = new Set(['@modelcontextprotocol/server-filesystem', 'typescript']);
 const ownCodeOnly = {
   name: 'own-code-only',
   setup(b) {
