@@ -284,7 +284,7 @@ Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
 5. **The read check's parser:** decided ([ADR 0025](adr/0025-read-check-parser.md)). `@babel/parser` 8.0.7 replaced TypeScript after passing all 100 cases: about 2 MB installed instead of 24 MB, about 22 ms for the first check instead of 190 ms. It requires Node.js 24.11.0 or later, so `engines` moved from 24.0.0.
 6. **At gateway shutdown,** the log showed `EVENT SINK FAILED … session.ended … the ledger is closed`: fixed. `Session.close()` returned at once to a second caller while the first was still stopping upstreams, so the gateway closed the ledger before `session.ended` was written. Every caller now waits for the same close. `packages/gateway/test/shutdown.test.ts` checks the client-closed path, `stop()`, and both at once: `session.ended` is the last ledger entry and nothing is logged at warn or error.
-7. **Dependency audit:** the CI job `dependency audit and licences` fails on both branches with two moderate advisories: `minimatch` <11.0.1 (GHSA-g3hv-75wg-m249) through `eslint`, development only, and `glob` 9 to 14.0.1 (GHSA-3g3m-2fjr-6pw4) through `@modelcontextprotocol/server-filesystem`, which the package ships. Not fixed on the branch: to decide before a release (for example pnpm overrides to patched versions, then the full suite and the package smoke test).
+7. **Dependency audit:** decided ([ADR 0026](adr/0026-dependency-audit-overrides.md)). `minimatch` <11.0.1 (GHSA-g3hv-75wg-m249) reaches the workspace through `eslint` and also through `@modelcontextprotocol/server-filesystem`, which ships; `glob` 9 to 14.0.1 (GHSA-3g3m-2fjr-6pw4) only through `server-filesystem`. No `server-filesystem` release depends on fixed versions (2.1.0 is the newest), so `pnpm-workspace.yaml` overrides them to minimatch 11.0.3 and glob 14.0.3 on both branches. **The overrides fix the workspace only.** A user's `npx sudowall` still gets minimatch 10.2.6 and glob 13.0.6 through `server-filesystem`'s own ranges. `server-filesystem` 2.1.0 never imports glob; it calls minimatch for `search_files` patterns in the demo's filesystem server. Say this in the release text.
 
 ## Since 4afaeba (2026-11-01)
 
@@ -341,7 +341,7 @@ The npm rules these steps rely on (npm docs, checked 2026-11-01):
 
 ### Before either release
 
-- [ ] CI is green on the commit to be released, including `dependency audit and licences`. It is red on both branches now because of two moderate advisories (`minimatch` <11.0.1 through `eslint`, development only; `glob` 9 to 14.0.1 through `@modelcontextprotocol/server-filesystem`, which ships). Decide how to handle them first.
+- [ ] CI is green on the commit to be released, including `dependency audit and licences` (fixed in the workspace by the overrides in [ADR 0026](adr/0026-dependency-audit-overrides.md); the published package still resolves the old minimatch and glob, see known risk 7).
 - [ ] `npm whoami` prints the owner's npm account, and `gh auth status` shows a login that can create releases.
 - [ ] Node.js is 24.11 or later (`node -v`). `release/0.7.x` works on any 24.x; the 0.8.0 build needs 24.11.
 
