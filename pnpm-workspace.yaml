@@ -8,3 +8,10 @@ minimumReleaseAgeExclude:
   - '@modelcontextprotocol/server-everything@2.1.0'
   - '@modelcontextprotocol/server-filesystem@2.1.0'
   - '@modelcontextprotocol/server-memory@2.0.1'
+# Patched versions for two moderate advisories (ADR 0026). These pin our own lockfile only:
+# someone who installs the published package resolves server-filesystem's own ranges.
+overrides:
+  # GHSA-g3hv-75wg-m249, through eslint (development) and server-filesystem.
+  'minimatch@<11.0.1': 11.0.3
+  # GHSA-3g3m-2fjr-6pw4. No server-filesystem release depends on a fixed glob yet.
+  '@modelcontextprotocol/server-filesystem>glob': 14.0.3

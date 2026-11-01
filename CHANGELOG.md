@@ -11,6 +11,10 @@ All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions fol
 - **`sudowall demo` no longer writes to your own state directory.** Its gateway process did not get the demo's state directory and wrote `names.json` to the default one (`~/.local/state/sudowall` on Linux). It now gets `XDG_STATE_HOME`, and `LOCALAPPDATA` on Windows, set to the demo's temporary directory, like everything else the demo writes.
 - **Shutdown:** `session.ended` is written before the ledger closes. The gateway no longer logs `EVENT SINK FAILED … session.ended … the ledger is closed` when the client disconnects, and the ledger now records the end of the session.
 
+### Security
+
+- **Dependency advisories in the build:** this repository's lockfile now uses minimatch 11.0.3 (GHSA-g3hv-75wg-m249) and glob 14.0.3 (GHSA-3g3m-2fjr-6pw4) through pnpm overrides ([ADR 0026](docs/adr/0026-dependency-audit-overrides.md)). The published package still depends on `@modelcontextprotocol/server-filesystem` 2.1.0, the newest release, whose own ranges give an npm install minimatch 10.2.6 and glob 13.0.6. That server never imports glob; the demo uses it with only the demo inbox allowed.
+
 ## 0.7.0 (2026-10-30)
 
 ### Changed
