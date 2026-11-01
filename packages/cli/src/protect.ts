@@ -417,7 +417,12 @@ export function planFile(
 export function planAll(
   clients: readonly ClientId[],
   mode: 'protect' | 'unprotect',
-  o: WrapOptions & { home?: string; project?: string; platform?: NodeJS.Platform },
+  o: WrapOptions & {
+    home?: string;
+    project?: string;
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+  },
 ): { plans: FilePlan[]; missing: { client: ClientId; file: string }[] } {
   const plans: FilePlan[] = [];
   const missing: { client: ClientId; file: string }[] = [];

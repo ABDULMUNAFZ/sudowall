@@ -325,18 +325,22 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
 - [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. If 0.7.1 is published, copy its section from `release/0.7.x` (with its date) below 0.8.0, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
 - [ ] Bump `packages/cli/package.json` and `GATEWAY_VERSION` in `packages/gateway/src/upstream.ts` to 0.8.0, so newer-version messages from 0.7.1 name `v0.8.0`.
 - [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version, so the `sudowall` command now checks first, before it loads anything else, and exits 1 with `SudoWall needs Node.js 24.11 or newer (you have v24.10.0). Update Node and run it again.` (`packages/cli/src/bin.ts`, tested with a faked `process.version` in `packages/cli/test/node-version.test.ts`). `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A real Node.js below 24.11 was not run. Every place that says Node.js 24:
-  - `README.md:20` `See it work in two minutes (Node.js 24; macOS, Linux or Windows):`: replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `README.md:20` `See it work in two minutes. Node.js 24 on macOS, Linux and Windows (Windows tested in CI):`: replace `Node.js 24` with `Node.js 24.11 or newer`.
   - `README.md:156` `Requirements: Node.js 24, pnpm 12, ...` (building from source): replace `Node.js 24` with `Node.js 24.11 or newer`.
   - `docs/demo.md:24` `Requirements: Node.js 24, pnpm 12, Claude Code.`: replace `Node.js 24` with `Node.js 24.11 or newer`.
   - `packages/cli/README.md:9` (the npm page): already says `Node.js 24.11 or later`. Make it `Node.js 24.11 or newer`, the wording of the startup message.
-  - `apps/site/get-started.html:53` (live) `Node.js 24 on macOS, Linux or Windows`: replace `Node.js 24` with `Node.js 24.11 or newer`.
+  - `apps/site/get-started.html:53` (live) `Node.js 24 on macOS, Linux or Windows`: replace with `Node.js 24.11 or newer on macOS, Linux and Windows (Windows tested in CI)` (this also makes the platform item below).
   - `apps/site/index.html:99` (live) `Nothing to install: Node.js 24 is enough`: replace with `Nothing to install: Node.js 24.11 or newer is enough`.
-  - `apps/site/index.html:311` (live) `Node.js 24 or newer`: replace with `Node.js 24.11 or newer`.
+  - `apps/site/index.html:311` (live) `Node.js 24 or newer`: replace with `Node.js 24.11 or newer. Windows tested in CI.` (see the platform item below).
   - `apps/site/index.html:328` (live) `Check Node.js 24 or newer:`: replace with `Check Node.js 24.11 or newer:`.
   - `apps/site/index.html:349` (live), the typing terminal's `node -v` output `v24.x`: replace with `v24.11.0` (any 24.x is no longer enough).
   - `docs/pitch.md`: no Node.js version is mentioned; nothing to change.
   - Not user copy, leave as is: `CLAUDE.md:33` (`Node.js 24 LTS`, the development stack), the measured versions in `docs/architecture.md:9`, `docs/compatibility.md:3`, `docs/performance.md:7`, `docs/real-world-test.md:5` and `docs/integrations/dodo-payments-run/README.md:5` (all 24.22), and the issue template placeholder `Node 24.22`.
-- [ ] `packages/cli/README.md:9` (the npm page) says "on macOS or Linux". `README.md:20` and the site say macOS, Linux or Windows, and CI smoke-tests Windows. Decide which is meant and make them agree.
+- [ ] **Platforms: "macOS, Linux and Windows (Windows tested in CI)".** Decided: Windows is supported. The package declares `os: darwin, linux, win32`; CI runs the package smoke test on `windows-latest` (init, wrap, `protect --apply` of a Cursor config on a fake home, `demo --ci`), and `packages/cli/test/protect.test.ts` plans `protect` against a fake Windows profile (Claude Code, Claude Desktop under `%APPDATA%`, Cursor). Nobody has run it on a real Windows machine by hand. Already on the branch: `README.md:20`, `README.md:68`, `README.md:118` and `packages/cli/README.md:9` (the npm page). The other READMEs (`apps/site/README.md`, `demo/README.md`, `docs/integrations/dodo-payments-run/README.md`) name no platform. On the live site, at release:
+  - `apps/site/get-started.html:53`: see the Node.js item above.
+  - `apps/site/index.html:9` (the page description) `Claude Code, Claude Desktop, Cursor; macOS, Linux, Windows.`: replace `macOS, Linux, Windows.` with `macOS, Linux and Windows (Windows tested in CI).`
+  - `apps/site/index.html:310` `<h3>macOS &middot; Linux &middot; Windows</h3>` stays; `:311` `<p>Node.js 24 or newer</p>` becomes `<p>Node.js 24.11 or newer. Windows tested in CI.</p>` (this replaces the `:311` change in the Node.js item).
+  - `apps/site/index.html:95` `the package is checked on macOS, Linux and Windows` is already true; leave it.
 - [ ] `docs/integrations/dodo-payments.md`: keep the note that `dodopayments-mcp` 2.59.0 needs Deno 2.8 or earlier, unless a newer Dodo release has fixed it by then.
 
 ## Release plan

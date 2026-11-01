@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyPlan,
   isWrapped,
+  planAll,
   planFile,
   redactArgs,
   redactUrl,
@@ -267,6 +268,130 @@ describe('planning a config file', () => {
       '***',
       '/path/to/dir',
       'https://example.com/mcp',
+    ]);
+  });
+});
+
+describe('protect dry run on Windows (fake profile: Claude Code, Claude Desktop, Cursor)', () => {
+  // A Windows profile laid out under a temporary folder: %USERPROFILE% is <root>/Users/alice and
+  // %APPDATA% defaults to %USERPROFILE%/AppData/Roaming. Planning reads the files and never writes.
+  const W = {
+    version: '9.9.9',
+    config: 'C:\\Users\\alice\\AppData\\Roaming\\sudowall\\config.json',
+    platform: 'win32' as const,
+  };
+
+  function windowsProfile(appData?: string) {
+    const root = tmp();
+    const home = join(root, 'Users', 'alice');
+    const roaming = appData ?? join(home, 'AppData', 'Roaming');
+    const project = join(home, 'source', 'my app');
+    const files = {
+      claudeCode: join(home, '.claude.json'),
+      claudeCodeProject: join(project, '.mcp.json'),
+      desktop: join(roaming, 'Claude', 'claude_desktop_config.json'),
+      cursor: join(home, '.cursor', 'mcp.json'),
+      cursorProject: join(project, '.cursor', 'mcp.json'),
+    };
+    const local = (pkg: string, ...args: string[]) => ({
+      command: 'npx',
+      args: ['-y', pkg, ...args],
+    });
+    const content: Record<keyof typeof files, unknown> = {
+      claudeCode: {
+        numStartups: 3,
+        mcpServers: { memory: { type: 'stdio', ...local('@modelcontextprotocol/server-memory') } },
+      },
+      claudeCodeProject: {
+        mcpServers: {
+          files: local('@modelcontextprotocol/server-filesystem', 'C:\\Users\\alice\\docs'),
+        },
+      },
+      desktop: {
+        mcpServers: { notion: { type: 'http', url: 'https://mcp.notion.com/mcp' } },
+        preferences: { theme: 'dark' },
+      },
+      cursor: { mcpServers: { git: { command: 'uvx', args: ['mcp-server-git'] } } },
+      cursorProject: { mcpServers: { dodo: local('dodopayments-mcp') } },
+    };
+    for (const [k, f] of Object.entries(files)) {
+      mkdirSync(join(f, '..'), { recursive: true });
+      writeFileSync(f, `${JSON.stringify(content[k as keyof typeof files], null, 2)}\n`);
+    }
+    const originals = Object.fromEntries(
+      Object.entries(files).map(([k, f]) => [k, readFileSync(f, 'utf8')]),
+    );
+    return { home, project, files, originals };
+  }
+
+  it('finds every client file in its Windows location and wraps each server as cmd /c npx', () => {
+    const { home, project, files, originals } = windowsProfile();
+    const { plans, missing } = planAll(['claude-code', 'claude-desktop', 'cursor'], 'protect', {
+      ...W,
+      home,
+      project,
+      env: {}, // no APPDATA: the default under the profile is used
+    });
+    expect(missing).toEqual([]);
+    expect(plans.map((p) => [p.client, p.file])).toEqual([
+      ['claude-code', files.claudeCode],
+      ['claude-code', files.claudeCodeProject],
+      ['claude-desktop', files.desktop],
+      ['cursor', files.cursor],
+      ['cursor', files.cursorProject],
+    ]);
+    for (const p of plans) {
+      expect(p.servers.map((s) => s.action)).toEqual(['wrap']);
+      const next = JSON.parse(p.next ?? '{}') as {
+        mcpServers: Record<string, { command: string; args: string[]; url?: string }>;
+      };
+      for (const entry of Object.values(next.mcpServers)) {
+        expect(entry.command).toBe('cmd');
+        expect(entry.args.slice(0, 7)).toEqual([
+          '/c',
+          'npx',
+          '-y',
+          'sudowall@9.9.9',
+          'wrap',
+          '--config',
+          W.config,
+        ]);
+        expect(entry.url).toBeUndefined();
+      }
+      // Undoing the planned change gives back the file exactly.
+      const back = planFile(
+        p.client,
+        p.file,
+        p.servers[0]?.group.scope ?? '',
+        p.next ?? '',
+        'unprotect',
+        W,
+      );
+      expect(back.next).toBe(p.original);
+    }
+    // A dry run: nothing on disk changed, and no backup or lock file was written.
+    for (const [k, f] of Object.entries(files)) {
+      expect(readFileSync(f, 'utf8')).toBe(originals[k]);
+      expect(readdirSync(join(f, '..')).filter((n) => n.includes('sudowall'))).toEqual([]);
+    }
+  });
+
+  it('uses %APPDATA% for Claude Desktop when it is set elsewhere (a redirected profile)', () => {
+    const elsewhere = join(tmp(), 'D', 'Profiles', 'alice', 'Roaming');
+    const { home, project, files } = windowsProfile(elsewhere);
+    const { plans, missing } = planAll(['claude-desktop'], 'protect', {
+      ...W,
+      home,
+      project,
+      env: { APPDATA: elsewhere },
+    });
+    expect(missing).toEqual([]);
+    expect(plans.map((p) => p.file)).toEqual([files.desktop]);
+    // The macOS and Linux locations are not consulted on Windows.
+    const none = planAll(['claude-desktop'], 'protect', { ...W, home, project, env: {} });
+    expect(none.plans).toEqual([]);
+    expect(none.missing.map((m) => m.file)).toEqual([
+      join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'),
     ]);
   });
 });
