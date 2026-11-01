@@ -1,0 +1,105 @@
+From d415e7cdd38aa3778d01c19084831ebdf0e7a328 Mon Sep 17 00:00:00 2001
+From: Invinciblx777 <invinciblx777@gmail.com>
+Date: Sun, 1 Nov 2026 20:27:17 +0530
+Subject: [PATCH] chore(filesystem): update minimatch to 11.0.3
+
+minimatch below 11.0.1 is affected by GHSA-g3hv-75wg-m249. The server
+declares minimatch ^10.0.1, so no 2.x release can resolve a fixed
+version. It calls only minimatch(path, pattern, { dot: true }), which
+minimatch 11 keeps. The lockfile adds @isaacs/nonrecursive-glob-match
+1.0.3 (BlueOak-1.0.0), a new dependency of minimatch 11.
+
+npm run validate -w src/filesystem: 25 test files passed, 655 tests
+passed, 14 skipped, before and after. npm run coverage -w
+src/filesystem passed. npm audit -w src/filesystem: 0 vulnerabilities.
+---
+ .changeset/filesystem-minimatch-11.md |  5 +++++
+ package-lock.json                     | 25 ++++++++++++++++++++++++-
+ src/filesystem/package.json           |  2 +-
+ 3 files changed, 30 insertions(+), 2 deletions(-)
+ create mode 100644 .changeset/filesystem-minimatch-11.md
+
+diff --git a/.changeset/filesystem-minimatch-11.md b/.changeset/filesystem-minimatch-11.md
+new file mode 100644
+index 0000000..df0f3d6
+--- /dev/null
++++ b/.changeset/filesystem-minimatch-11.md
+@@ -0,0 +1,5 @@
++---
++"@modelcontextprotocol/server-filesystem": patch
++---
++
++Update `minimatch` to `^11.0.3`, outside the range of GHSA-g3hv-75wg-m249 (minimatch below 11.0.1). `search_files` and the `excludePatterns` of `search_files` and `directory_tree` match exactly as before.
+diff --git a/package-lock.json b/package-lock.json
+index e9a5c86..59dbbf7 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -667,6 +667,12 @@
+         "url": "https://github.com/sponsors/nzakas"
+       }
+     },
++    "node_modules/@isaacs/nonrecursive-glob-match": {
++      "version": "1.0.3",
++      "resolved": "https://registry.npmjs.org/@isaacs/nonrecursive-glob-match/-/nonrecursive-glob-match-1.0.3.tgz",
++      "integrity": "sha512-SI7kyKHq4XXDRozw+r9GlRZkia1ZkFrpLW98r2IC2Bpr8YkFGE3fvjzmxCG0x78A++69HmDNrDvSMYBZmHGpKA==",
++      "license": "BlueOak-1.0.0"
++    },
+     "node_modules/@jridgewell/resolve-uri": {
+       "version": "3.1.2",
+       "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
+@@ -3864,6 +3870,7 @@
+       "version": "10.2.5",
+       "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.5.tgz",
+       "integrity": "sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==",
++      "dev": true,
+       "license": "BlueOak-1.0.0",
+       "dependencies": {
+         "brace-expansion": "^5.0.5"
+@@ -5361,7 +5368,7 @@
+       "dependencies": {
+         "@modelcontextprotocol/server": "^2.3.1",
+         "diff": "^8.0.3",
+-        "minimatch": "^10.0.1",
++        "minimatch": "^11.0.3",
+         "zod": "^4.2.0"
+       },
+       "bin": {
+@@ -5381,6 +5388,22 @@
+         "node": ">=24"
+       }
+     },
++    "src/filesystem/node_modules/minimatch": {
++      "version": "11.0.3",
++      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-11.0.3.tgz",
++      "integrity": "sha512-iny/40PEGkNJQ5/Pv6z3nm6FbRAby32GeZRjCUJk2WnNDbgPSTcdI+DDvLqsgBdD4cD5sMtMheqPPnehCCa8Nw==",
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "@isaacs/nonrecursive-glob-match": "^1.0.3",
++        "brace-expansion": "^5.0.12"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "src/memory": {
+       "name": "@modelcontextprotocol/server-memory",
+       "version": "2.0.1",
+diff --git a/src/filesystem/package.json b/src/filesystem/package.json
+index 989760d..f95cef7 100644
+--- a/src/filesystem/package.json
++++ b/src/filesystem/package.json
+@@ -36,7 +36,7 @@
+   "dependencies": {
+     "@modelcontextprotocol/server": "^2.3.1",
+     "diff": "^8.0.3",
+-    "minimatch": "^10.0.1",
++    "minimatch": "^11.0.3",
+     "zod": "^4.2.0"
+   },
+   "devDependencies": {
+-- 
+2.56.0
+
