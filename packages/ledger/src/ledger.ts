@@ -58,6 +58,9 @@ const MIGRATIONS = [
   `,
 ];
 
+/** Newest version of the ledger tables this build reads and writes. */
+export const LEDGER_SCHEMA_VERSION = MIGRATIONS.length;
+
 export class LedgerError extends Error {
   constructor(
     readonly code: 'KEY_MISMATCH' | 'INVALID_EVENT' | 'NOT_A_LEDGER',

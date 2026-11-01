@@ -108,10 +108,10 @@ Entries appear in increasing `seq`. Entries after the last checkpoint MAY be pre
 
 Input: an export (or the database). Output: `ok`, or the first failure with its kind and `seq` (or `checkpointSeq`).
 
-1. Parse the header. Check `spec == "tg-ledger/1"` and `keyId == hex(H(publicKey))[0..32]`. If an expected public key or `keyId` was supplied out of band, it MUST match.
+1. Parse the header. If `spec` is `tg-ledger/<n>` with `n` above the newest format this verifier knows, stop with `NEWER_VERSION` (§7.2). Check `spec == "tg-ledger/1"` and `keyId == hex(H(publicKey))[0..32]`. If an expected public key or `keyId` was supplied out of band, it MUST match.
 2. For each entry in order, with `expectedSeq` starting at 1:
    1. `seq == expectedSeq`, otherwise fail `SEQ_GAP` (deletion or reorder) or `SEQ_DUPLICATE` (insertion).
-   2. The event parses against the event schema for its `schemaVersion`, otherwise fail `BAD_EVENT`.
+   2. If the event's `schemaVersion` is an integer above the newest event schema this verifier knows, the entry was written by a newer SudoWall: remember the first such `seq`, check only steps 3 and 4 over the stored text, and go on (§7.2). Otherwise the event parses against the event schema for its `schemaVersion`, or fail `BAD_EVENT`.
    3. `prevHash` equals the previous computed `entryHash` (zeros for seq 1), otherwise fail `CHAIN_BREAK`.
    4. Recompute `entryHash`. It must equal `hash`, otherwise fail `HASH_MISMATCH`.
 
@@ -124,6 +124,12 @@ Input: an export (or the database). Output: `ok`, or the first failure with its 
    4. If `toSeq` is beyond the last entry, fail `TRUNCATED` (signed entries were removed).
    5. `lastEntryHash == entryHash(toSeq)` and `merkleRoot` matches the recomputed root, otherwise fail `CHECKPOINT_MISMATCH`, reporting the block's `fromSeq` (a consistent rewrite cannot be pinpointed further from a Merkle root).
 4. Report `ok` with `lastSignedSeq` and `unsignedTail = lastSeq - lastSignedSeq`.
+
+### 7.2 Data from a newer SudoWall
+
+A failure kind says what went wrong; `NEWER_VERSION` says this verifier cannot tell. It is reported when the header or a checkpoint uses a newer `tg-ledger/<n>`, or when an entry's event has a newer `schemaVersion` and nothing this verifier can check failed (the hash chain over the stored text, the signatures, the anchor). Any check that fails first is reported instead, so relabelling an edited entry as "newer" still breaks the chain or a signed checkpoint. `NEWER_VERSION` is not tampering and not `ok`: the CLI prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; event schema <n>, this build reads up to <m>), upgrade to verify it.` and exits `5`, never the tamper exit code `4`.
+
+State database tables are versioned per component in `tg_schema`. A build that finds a component newer than it supports refuses the database with the same kind of message (`upgrade to open it`) and exit code `5`; `wrap` and `serve` check before they start. Builds from 0.8.0 on record their version in `tg_writer` so older builds can name it; the version is shown only when it is a plain `x.y.z` string.
 
 ## 8. Redaction
 

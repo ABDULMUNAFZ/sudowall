@@ -3,15 +3,17 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Config } from '@sudowall/core';
 import {
+  LEDGER_SCHEMA_VERSION,
   Ledger,
   Redactor,
+  assertStateReadable,
   deriveKey,
   loadOrCreateKeys,
   type InstallationKeys,
 } from '@sudowall/ledger';
-import { PolicyStateStore } from '@sudowall/policy';
-import { ProvenanceEngine } from '@sudowall/provenance';
-import { ApprovalStore } from './approvals.js';
+import { POLICY_STATE_SCHEMA_VERSION, PolicyStateStore } from '@sudowall/policy';
+import { PROVENANCE_MIGRATIONS, ProvenanceEngine } from '@sudowall/provenance';
+import { APPROVALS_SCHEMA_VERSION, ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
 
 /** The product's former name. Its directories are still used if they exist and the new ones do not. */
@@ -89,6 +91,20 @@ export class GatewayStore {
     private readonly config: Config,
     private readonly log: Logger,
   ) {}
+
+  /**
+   * Throws `NewerVersionError` when a newer SudoWall has migrated the state database past what
+   * this build supports. Read-only; creates nothing. Called at startup so the gateway refuses
+   * to start instead of failing every call.
+   */
+  assertReadable(): void {
+    assertStateReadable(this.paths.dbPath, {
+      ledger: LEDGER_SCHEMA_VERSION,
+      provenance: PROVENANCE_MIGRATIONS.length,
+      policy: POLICY_STATE_SCHEMA_VERSION,
+      approvals: APPROVALS_SCHEMA_VERSION,
+    });
+  }
 
   keys(): InstallationKeys {
     this.keysCache ??= loadOrCreateKeys(this.paths.keyDir);

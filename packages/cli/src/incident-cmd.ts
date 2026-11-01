@@ -23,6 +23,7 @@ import {
   rawPublicKey,
 } from '@sudowall/ledger';
 import { UsageError } from './errors.js';
+import { EXIT } from './main.js';
 
 export interface IncidentFlags {
   db: string | undefined;
@@ -98,7 +99,8 @@ export async function incidentCommand(args: string[], flags: IncidentFlags): Pro
     if (format === 'json') out(JSON.stringify(report, null, 2));
     else if (format === 'markdown') out(renderMarkdown(report));
     else out(renderText(report));
-    return report.ledger.ok ? 0 : 4;
+    if (report.ledger.ok) return EXIT.ok;
+    return report.ledger.newerVersion ? EXIT.newerVersion : EXIT.verifyFailed;
   } catch (e) {
     if (e instanceof IncidentNotFound) throw new UsageError(e.message);
     throw e;

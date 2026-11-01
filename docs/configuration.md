@@ -101,4 +101,4 @@ Arguments and results are redacted before they are stored anywhere (`ledger-spec
 
 ## Exit codes
 
-`0` clean exit, `1` runtime error, `2` usage error, `3` config error, `4` ledger verification failed (`sudowall ledger verify`).
+`0` clean exit, `1` runtime error, `2` usage error, `3` config error, `4` ledger verification failed (`sudowall ledger verify`, `sudowall incident`), `5` the data was written by a newer SudoWall: this build cannot read or verify it, so upgrade (this is not damage or tampering; see `ledger-spec.md` §7.2).

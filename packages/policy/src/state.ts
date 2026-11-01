@@ -15,6 +15,9 @@ const MIGRATIONS = [
   `,
 ];
 
+/** Newest version of the policy state tables this build reads and writes. */
+export const POLICY_STATE_SCHEMA_VERSION = MIGRATIONS.length;
+
 /**
  * Persistent policy state in the shared state database: which values have been in an executed
  * call of each sink argument (`first_seen`). Values are stored as keyed hashes, never in clear.
