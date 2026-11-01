@@ -1,6 +1,6 @@
 # 0.8.0 draft: behaviour delta against 0.7.0
 
-Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). The package version is still 0.7.0 and nothing is published to npm. `main` now also holds `release/0.7.x` (0.7.1, not published), merged through PR #2 on 2026-11-01; this branch has not been merged with it. The live demo and www.sudowall.tech still run 0.7.0.
+Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). Nothing is published to npm. `main` holds `release/0.7.x` (0.7.1, not published), merged through PRs #2 and #3 on 2026-11-01, and this branch merged `main` in `211dbae`, so the package version here is 0.7.1 until release day. The live demo and www.sudowall.tech still run 0.7.0.
 
 Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`, and again for the commits after `26782ba`, up to `cbc4d32`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01) and [Since 26782ba](#since-26782ba-2026-11-01), the release candidates in [Release candidates](#release-candidates-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
 
@@ -92,7 +92,7 @@ Rows 3 to 5 are a **downgrade break**, and they matter while the demo runs 0.7.0
 - **The event schema:** the branch adds an optional `valueRef` to provenance matches. The 0.7.0 event schema is strict, so 0.7.0 reports a branch-written ledger with exit code 4, the code for a tampered ledger.
 - **The state database:** the branch migrates the provenance tables to version 3, and 0.7.0 then refuses to open the database.
 
-**What changed since `4afaeba` (decision recorded in [ADR 0024](adr/0024-newer-data-and-downgrades.md)):** the branch writes events with **schema version 2** (events that use `valueRef` or the `same-host` near kind must be version 2), and records the product version that last wrote each database. A prepared **0.7.1** knows that a schema number above its own means "newer", not "tampered": the last three rows above were run with 0.7.1 on a copy of branch-written state. It shows `v0.7.0` as the writer because the branch's version is not bumped yet; at release it reads `v0.8.0`. 0.8.0 does the same for any later version. **0.7.0 itself cannot be fixed**: it still reports `BAD_EVENT`, exit 4, on 0.8.0 ledgers. The ledger spec (§7.2) now says: downgrades are not supported; upgrading is.
+**What changed since `4afaeba` (decision recorded in [ADR 0024](adr/0024-newer-data-and-downgrades.md)):** the branch writes events with **schema version 2** (events that use `valueRef` or the `same-host` near kind must be version 2), and records the product version that last wrote each database. A prepared **0.7.1** knows that a schema number above its own means "newer", not "tampered": the last three rows above were run with 0.7.1 on a copy of branch-written state. It showed `v0.7.0` as the writer because these runs were before the branch merged `main`; a build of the branch now records 0.7.1, and at release it reads `v0.8.0`. 0.8.0 does the same for any later version. **0.7.0 itself cannot be fixed**: it still reports `BAD_EVENT`, exit 4, on 0.8.0 ledgers. The ledger spec (§7.2) now says: downgrades are not supported; upgrading is.
 
 Do not run a branch build against the default state directory (`~/.local/state/tortoisegate` on this machine) on a machine that must keep running 0.7.0. The directory still has no database. **One correction to the earlier version of this page:** it said none of the runs for this report touched that directory. That was wrong for `names.json`: the demo's gateway child process did not get the demo's state directory, so it wrote the tool-name store into the default directory. A branch demo run on 2026-11-01 at 12:57 rewrote `~/.local/state/tortoisegate/names.json`, and earlier branch test runs that day may have too. 0.7.0 has the same bug. The branch fixes it in `4271334`; since then the file's modification time has not changed, across full test suites, e2e runs and demo runs. Its contents were not read for this report.
 
@@ -284,7 +284,7 @@ Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
 5. **The read check's parser:** decided ([ADR 0025](adr/0025-read-check-parser.md)). `@babel/parser` 8.0.7 replaced TypeScript after passing all 100 cases: about 2 MB installed instead of 24 MB, about 22 ms for the first check instead of 190 ms. It requires Node.js 24.11.0 or later, so `engines` moved from 24.0.0.
 6. **At gateway shutdown,** the log showed `EVENT SINK FAILED … session.ended … the ledger is closed`: fixed. `Session.close()` returned at once to a second caller while the first was still stopping upstreams, so the gateway closed the ledger before `session.ended` was written. Every caller now waits for the same close. `packages/gateway/test/shutdown.test.ts` checks the client-closed path, `stop()`, and both at once: `session.ended` is the last ledger entry and nothing is logged at warn or error.
-7. **Dependency audit:** decided ([ADR 0026](adr/0026-dependency-audit-overrides.md)). `minimatch` <11.0.1 (GHSA-g3hv-75wg-m249) reaches the workspace through `eslint` and also through `@modelcontextprotocol/server-filesystem`, which ships; `glob` 9 to 14.0.1 (GHSA-3g3m-2fjr-6pw4) only through `server-filesystem`. No `server-filesystem` release depends on fixed versions (2.1.0 is the newest), so `pnpm-workspace.yaml` overrides them to minimatch 11.0.3 and glob 14.0.3 on both branches. **The overrides fix the workspace only.** A user's `npx sudowall` still gets minimatch 10.2.6 and glob 13.0.6 through `server-filesystem`'s own ranges. `server-filesystem` 2.1.0 never imports glob; it calls minimatch for `search_files` patterns in the demo's filesystem server. Say this in the release text.
+7. **Dependency audit:** decided ([ADR 0026](adr/0026-dependency-audit-overrides.md)). `minimatch` <11.0.1 (GHSA-g3hv-75wg-m249) reaches the workspace through `eslint` and also through `@modelcontextprotocol/server-filesystem`, which ships; `glob` 9 to 14.0.1 (GHSA-3g3m-2fjr-6pw4) only through `server-filesystem`. No `server-filesystem` release depends on fixed versions (2.1.0 is the newest), so `pnpm-workspace.yaml` overrides them to minimatch 11.0.3 and glob 14.0.3 on both branches. **The overrides fix the workspace only.** A user's `npx sudowall` still gets minimatch 10.2.6 and glob 13.0.6 through `server-filesystem`'s own ranges. `server-filesystem` 2.1.0 never imports glob; it calls minimatch for the patterns in `search_files` and `directory_tree` arguments in the demo's filesystem server. The release text says this: both CHANGELOG sections, 0.7.1 (on `release/0.7.x` and here) and Unreleased (0.8.0), have a "Known advisories" entry. The upstream issue for minimatch is drafted in [server-filesystem-minimatch.md](upstream/server-filesystem-minimatch.md) and **not opened yet**; when it is, add its link to the minimatch line of both entries. Upstream's glob removal ([#5351](https://github.com/modelcontextprotocol/servers/pull/5351)) is merged but not released: the release PR [#5401](https://github.com/modelcontextprotocol/servers/pull/5401) was still open on 2026-11-01, and npm `latest` was still 2.1.0.
 
 ## Since 4afaeba (2026-11-01)
 
@@ -329,7 +329,7 @@ Built with `pnpm run package` and `npm pack` on each branch, then renamed so the
 | `sudowall-0.7.1-candidate-2e7a792.tgz` | `f1c26660dddba335d5e73892ef9bd3e648519d9eb6212b145859a5982f5df250` |
 | `sudowall-0.8.0-candidate-cbc4d32.tgz` | `fe7adbb91d49f9fd235d26790ce49ffe5ba56e9389eaa024394e678d5a01e992` |
 
-The 0.8.0 candidate prints `0.7.0`: the version is bumped on release day.
+The 0.8.0 candidate prints `0.7.0`: it was built before the branch merged `main` (since `211dbae` a build prints `0.7.1`), and the version is set to 0.8.0 on release day.
 
 Each was installed with `npm install <tarball>` into an empty folder, with an empty npm cache and a fresh `HOME`, `XDG_*` and `TMPDIR`, on Node.js 24.11.0 (npm 11.6.1) and on 26.13.0 (npm 11.20.0), the newest release on 2026-11-01 (27.0.0 is an alpha). Both Node.js builds are the official Linux x64 tarballs, checked against `SHASUMS256.txt` (its GPG signature was not checked). Fedora 44 (x86_64).
 
@@ -360,7 +360,7 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
       `<span data-count="406">406</span> tests`
       with the release count, for example `<span data-count="697">697</span> tests`.
 - [ ] `docs/pitch.md:27`. Replace `406 automated tests` with the release count, for example `697 automated tests`.
-- [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. If 0.7.1 is published, copy its section from `release/0.7.x` (with its date) below 0.8.0, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
+- [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. The 0.7.1 section is already below it (from the merge with `main`): if 0.7.1 is published, give it the same heading as on `release/0.7.x` (`## 0.7.1 (YYYY-MM-DD)`) and make its text match that branch, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
 - [ ] Bump `packages/cli/package.json` and `GATEWAY_VERSION` in `packages/gateway/src/upstream.ts` to 0.8.0, so newer-version messages from 0.7.1 name `v0.8.0`.
 - [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version, so the `sudowall` command now checks first, before it loads anything else, and exits 1 with `SudoWall needs Node.js 24.11 or newer (you have v24.10.0). Update Node and run it again.` (`packages/cli/src/bin.ts`, tested with a faked `process.version` in `packages/cli/test/node-version.test.ts`). `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A real Node.js below 24.11 was not run. Every place that says Node.js 24:
   - `README.md:20` `See it work in two minutes. Node.js 24 on macOS, Linux and Windows (Windows tested in CI):`: replace `Node.js 24` with `Node.js 24.11 or newer`.
@@ -379,6 +379,7 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
   - `apps/site/index.html:9` (the page description) `Claude Code, Claude Desktop, Cursor; macOS, Linux, Windows.`: replace `macOS, Linux, Windows.` with `macOS, Linux and Windows (Windows tested in CI).`
   - `apps/site/index.html:310` `<h3>macOS &middot; Linux &middot; Windows</h3>` stays; `:311` `<p>Node.js 24 or newer</p>` becomes `<p>Node.js 24.11 or newer. Windows tested in CI.</p>` (this replaces the `:311` change in the Node.js item).
   - `apps/site/index.html:95` `the package is checked on macOS, Linux and Windows` is already true; leave it.
+- [ ] check server-filesystem; upgrade if #5401 shipped. `npm view @modelcontextprotocol/server-filesystem version dependencies`: if it is newer than 2.1.0 (release PR [#5401](https://github.com/modelcontextprotocol/servers/pull/5401) merged and published), set that exact version in `packages/cli/package.json` and `packages/gateway/package.json`, drop the `glob` override in `pnpm-workspace.yaml` if it no longer depends on glob (and the `minimatch` one only if it depends on minimatch 11.0.1 or later; `eslint` also pulls minimatch in, so check `pnpm audit` without it), run `pnpm install`, the full suite, `demo --ci`, the web UI e2e and `pnpm smoke:package`, and update the "Known advisories" entry in the 0.8.0 CHANGELOG section and ADR 0026. If it is still 2.1.0, change nothing.
 - [ ] `docs/integrations/dodo-payments.md`: keep the note that `dodopayments-mcp` 2.59.0 needs Deno 2.8 or earlier, unless a newer Dodo release has fixed it by then.
 
 ## Release plan
@@ -397,6 +398,7 @@ The npm rules these steps rely on (npm docs, checked 2026-11-01):
 - [ ] CI is green on the commit to be released, including `dependency audit and licences` (fixed in the workspace by the overrides in [ADR 0026](adr/0026-dependency-audit-overrides.md); the published package still resolves the old minimatch and glob, see known risk 7).
 - [ ] `npm whoami` prints the owner's npm account, and `gh auth status` shows a login that can create releases.
 - [ ] Node.js is 24.11 or later (`node -v`). `release/0.7.x` works on any 24.x; the 0.8.0 build needs 24.11.
+- [ ] The CHANGELOG section being released has the "Known advisories" entry, and if the upstream minimatch issue ([draft](upstream/server-filesystem-minimatch.md)) is open, its link is on the entry's minimatch line. On `release/0.7.x` that is a commit before the release-date commit.
 
 ### 1. Publish 0.7.1 (branch `release/0.7.x`)
 
@@ -455,7 +457,9 @@ git switch main
 git merge --ff-only origin/main
 git switch -c release/0.8.0
 (cd packages/cli && npm pkg set version=0.8.0)
-sed -i "s/GATEWAY_VERSION = '0.7.0'/GATEWAY_VERSION = '0.8.0'/" packages/gateway/src/upstream.ts
+sed -i "s/GATEWAY_VERSION = '0.7.1'/GATEWAY_VERSION = '0.8.0'/" packages/gateway/src/upstream.ts
+grep '"version"' packages/cli/package.json                   # "version": "0.8.0",
+grep "GATEWAY_VERSION =" packages/gateway/src/upstream.ts    # export const GATEWAY_VERSION = '0.8.0';
 # Apply every checklist item above EXCEPT the apps/site ones: a push to main that changes
 # apps/site deploys www.sudowall.tech, and the site must not describe 0.8.0 before it is on npm.
 pnpm install --frozen-lockfile
