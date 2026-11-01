@@ -111,6 +111,8 @@ In a sink rule every leaf names a sink argument with `arg`; in a server/tool rul
 
 `sdk_read_only` assumes a Stainless-generated SDK, where `list` and `retrieve` are HTTP GETs (true for Dodo Payments 2.59.0, checked against its source). It loads `@babel/parser` on first use (about 20 ms once); a check takes about 0.02 ms for typical code and about 1 ms at its 16 KiB input limit ([ADR 0025](adr/0025-read-check-parser.md)). Use it only inside `not` of an `ask` or `block` rule, or in an `allow` rule, as the `dodo-payments` template does: anything it cannot prove then falls back to asking. A matching `block` rule always beats an `allow` that relies on `sdk_read_only`, whatever the rule order: the evaluator takes the most restrictive match (rule 2 above), and `packages/policy/test/sdk-read-only-precedence.test.ts` checks every order of a five-rule policy, every order of the template's rules, and random orders with fast-check.
 
+The start-up warning for `failure.onPolicyErrorNonSink: allow` ([configuration](configuration.md)) finds code-running tools only through rules that use `sdk_read_only`: a tool that runs code but has no such rule gets no warning, since the check reads the policy, not tool names.
+
 `first_seen` state is recorded when a forwarded call returns a successful result (not `isError`), and persists in the shared state database as keyed hashes, so restarts and other gateway processes see it. Calls that were blocked, asked and not approved, or failed never make a value "seen".
 
 ### 5.3 Actions and approvals
