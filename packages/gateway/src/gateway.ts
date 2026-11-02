@@ -2,9 +2,10 @@ import { join } from 'node:path';
 import { SudoWallError, type Config, type ToolCallEvent } from '@sudowall/core';
 import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@sudowall/policy';
 import { DbApprovalChannel, type ApprovalChannel, type ApprovalDetails } from './approvals.js';
+import { ExportingSink, createCriblExporter } from './cribl.js';
 import { checkEnvReferences } from './env.js';
 import { HttpFrontend } from './http-frontend.js';
-import type { Logger } from './log.js';
+import { silentLogger, type Logger } from './log.js';
 import { FileNameStore, type NameStore } from './namespacing.js';
 import { StaticDenyListPipeline, type DecisionPipeline } from './pipeline.js';
 import { PolicyPipeline } from './policy-pipeline.js';
@@ -62,18 +63,25 @@ export function approvalDetails(
 
 /**
  * The default event path: validate, redact, then append to the signed ledger and, if configured,
- * to a JSON Lines file as well.
+ * to a JSON Lines file as well. With Cribl export enabled, each event the stores accepted is also
+ * queued, in sanitized form, for background delivery (ADR 0027).
  */
-export function createSink(config: Config, store: GatewayStore): EventSink {
+export function createSink(
+  config: Config,
+  store: GatewayStore,
+  deps: { env?: NodeJS.ProcessEnv; log?: Logger } = {},
+): EventSink {
   const sinks: EventSink[] = [new LedgerSink(() => store.ledger())];
   const j = config.events.jsonl;
   if (j !== undefined) sinks.push(new JsonlFileSink(j.path, j.rotateBytes, j.keepFiles));
+  let stores = sinks.length === 1 ? (sinks[0] as EventSink) : new FanoutSink(sinks);
+  const cribl = config.events.cribl;
+  const exporter = createCriblExporter(cribl, deps.env ?? process.env, deps.log ?? silentLogger);
+  if (exporter !== undefined && cribl !== undefined) {
+    stores = new ExportingSink(stores, exporter, cribl.environment);
+  }
   return new ValidatingSink(
-    new PreparingSink(
-      () => store.redactor(),
-      config.ledger.maxStoredResultBytes,
-      sinks.length === 1 ? (sinks[0] as EventSink) : new FanoutSink(sinks),
-    ),
+    new PreparingSink(() => store.redactor(), config.ledger.maxStoredResultBytes, stores),
   );
 }
 
@@ -120,7 +128,7 @@ export async function runGateway(
   const stateDir = opts.stateDir ?? defaultStateDir(env);
   const store = opts.store ?? new GatewayStore(storePaths(config, env, stateDir), config, log);
   store.assertReadable();
-  const inner = opts.sink ?? createSink(config, store);
+  const inner = opts.sink ?? createSink(config, store, { env, log });
   // Closing the sink also signs pending ledger entries and closes the state database.
   const sink: EventSink = {
     write: (e) => inner.write(e),
