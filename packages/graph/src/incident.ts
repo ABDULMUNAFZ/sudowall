@@ -293,7 +293,7 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
         ok: verified.ok,
         newerVersion: !verified.ok && verified.kind === 'NEWER_VERSION',
         message: verified.ok
-          ? `${String(verified.entries)} entries verified, signed up to entry ${String(verified.lastSignedSeq)}`
+          ? `${String(verified.entries)} ${verified.entries === 1 ? 'entry' : 'entries'} verified, signed up to entry ${String(verified.lastSignedSeq)}`
           : verified.kind === 'NEWER_VERSION'
             ? verified.message.replace(/\.$/, '')
             : `${verified.kind}${verified.seq !== undefined ? ` at entry ${String(verified.seq)}` : ''}: ${verified.message}`,

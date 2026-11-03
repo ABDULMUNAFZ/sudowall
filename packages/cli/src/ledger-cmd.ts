@@ -21,6 +21,9 @@ import {
 import { createPrivateKey } from 'node:crypto';
 import { EXIT, UsageError } from './main.js';
 
+/** "1 entry", "2 entries". */
+const count = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+
 export interface LedgerFlags {
   db: string | undefined;
   keyDir: string | undefined;
@@ -98,7 +101,7 @@ export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise
       );
       if (r.ok) {
         say(
-          `OK: ${r.entries} entries, ${r.checkpoints} checkpoints, last signed entry ${r.lastSignedSeq}, ` +
+          `OK: ${count(r.entries, 'entry', 'entries')}, ${count(r.checkpoints, 'checkpoint', 'checkpoints')}, last signed entry ${r.lastSignedSeq}, ` +
             `${r.unsignedTail} unsigned (newer than the last checkpoint). Ledger ${r.ledgerId}, key ${r.keyId}.`,
         );
         if (r.unsigned) {

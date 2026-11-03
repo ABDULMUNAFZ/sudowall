@@ -47,7 +47,7 @@ The demo starts a private local test chain, puts SudoWall in front of two real M
    Gate: allowed. Sent 0.005 ETH. Transaction 0xa38d…812f success in block 1 (chain 31337).
 
 4. Every step is in a signed, hash-chained ledger. sudowall ledger verify:
-   OK: 13 entries, 1 checkpoints, last signed entry 13, 0 unsigned (newer than the last checkpoint).
+   OK: 13 entries, 1 checkpoint, last signed entry 13, 0 unsigned (newer than the last checkpoint).
    Now someone edits entry 10 in a copy of the ledger (the amount of the blocked payment):
    FAILED at entry 10: HASH_MISMATCH: entry hash does not match
 ```

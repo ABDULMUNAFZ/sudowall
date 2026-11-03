@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +8,8 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { EVENT_SCHEMA_VERSION, type Event } from '@sudowall/core';
+import { Ledger, loadOrCreateKeys } from '@sudowall/ledger';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const EVERYTHING = fileURLToPath(
@@ -55,17 +58,36 @@ async function session(
   return { stderr, results };
 }
 
+/** A `session.started` event, the smallest valid ledger entry. */
+function started(i: number): Event {
+  return {
+    schemaVersion: EVENT_SCHEMA_VERSION,
+    id: randomUUID(),
+    ts: new Date(Date.UTC(2026, 10, 3, 7, 0, 0, i)).toISOString(),
+    sessionId: '00000000-0000-4000-8000-000000000001',
+    type: 'session.started',
+    client: { name: 'test', version: '1' },
+    protocolVersion: '2025-11-25',
+    transport: 'stdio',
+  };
+}
+
 describe('ledger commands', () => {
   it('verify passes after a session, then fails at the edited entry after tampering', async () => {
     const home = tmp();
     await session(home);
     const ok = cli(home, ['ledger', 'verify']);
+    const db = new Database(join(home, 'sudowall', 'ledger.db'));
+    const n = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+    const entries = n('SELECT count(*) AS n FROM ledger_entries');
+    const checkpoints = n('SELECT count(*) AS n FROM ledger_checkpoints');
     expect(ok.stdout).toMatch(
-      /^OK: \d+ entries, \d+ checkpoints, last signed entry \d+, 0 unsigned/,
+      new RegExp(
+        `^OK: ${String(entries)} entries, ${String(checkpoints)} ${checkpoints === 1 ? 'checkpoint' : 'checkpoints'}, last signed entry ${String(entries)}, 0 unsigned`,
+      ),
     );
     expect(ok.code).toBe(0);
 
-    const db = new Database(join(home, 'sudowall', 'ledger.db'));
     db.exec('DROP TRIGGER ledger_entries_no_update');
     db.prepare(
       "UPDATE ledger_entries SET event_json = replace(event_json, 'Echo', 'Ecko') WHERE type = 'tool.result'",
@@ -100,6 +122,26 @@ describe('ledger commands', () => {
     const event = JSON.parse(lines[2] ?? '') as { event: { id: string } };
     const byId = cli(home, ['ledger', 'inspect', event.event.id]);
     expect(JSON.parse(byId.stdout)).toMatchObject({ seq: 2 });
+  });
+
+  it('verify counts in words: "1 entry, 1 checkpoint", "2 entries, 2 checkpoints"', () => {
+    for (const [count, line] of [
+      [1, 'OK: 1 entry, 1 checkpoint, last signed entry 1, 0 unsigned'],
+      [2, 'OK: 2 entries, 2 checkpoints, last signed entry 2, 0 unsigned'],
+    ] as const) {
+      const home = tmp();
+      const dir = join(home, 'sudowall');
+      const ledger = Ledger.open({
+        path: join(dir, 'ledger.db'),
+        keys: loadOrCreateKeys(dir),
+        checkpointEveryEntries: 1,
+      });
+      for (let i = 0; i < count; i++) ledger.append(started(i));
+      ledger.close();
+      const r = cli(home, ['ledger', 'verify']);
+      expect(r.code).toBe(0);
+      expect(r.stdout.startsWith(`${line} (newer than the last checkpoint). Ledger `)).toBe(true);
+    }
   });
 
   it('a wrong public key fails verification', async () => {

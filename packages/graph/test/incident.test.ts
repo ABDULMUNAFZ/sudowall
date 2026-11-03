@@ -134,10 +134,29 @@ describe('incident report (audit)', () => {
         valueId: sha256ValueId,
       });
       expect(r.ledger.ok).toBe(true);
+      expect(r.ledger.message).toBe(
+        `${String(EVENTS.length)} entries verified, signed up to entry ${String(EVENTS.length)}`,
+      );
       expect(renderText(r)).toMatch(/^Incident: /);
       expect(renderText(r)).not.toMatch(/fail/i);
       expect(renderMarkdown(r)).toMatch(/^## Incident: /);
       expect(renderMarkdown(r)).not.toMatch(/fail/i);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a ledger of one entry: "1 entry verified"', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-incident-one-'));
+    const path = join(dir, 'ledger.db');
+    const ledger = Ledger.open({ path, keys: loadOrCreateKeys(join(dir, 'keys')) });
+    ledger.append(pausedCall().event as unknown as Parameters<Ledger['append']>[0]);
+    ledger.close();
+    const db = openStateDb(path);
+    try {
+      const r = await incidentReport({ db, ref: '1', valueId: sha256ValueId });
+      expect(r.ledger.ok).toBe(true);
+      expect(r.ledger.message).toBe('1 entry verified, signed up to entry 1');
     } finally {
       db.close();
     }

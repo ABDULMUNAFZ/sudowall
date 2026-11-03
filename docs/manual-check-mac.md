@@ -56,7 +56,7 @@ sw demo
 - [ ] The terminal stops at step 1 with `Paused for a human. Open the approval UI above: it shows the recipient, that it was copied from the email, and the rule. Click Deny (or Approve, to see it go through).`
 - [ ] In the browser, **Approvals** shows one waiting call: `send_funds` of 0.005 ETH to `0xFe5c1268f8c1CF1b4381938bf1D9C684d99091ed`, the rule `ask-untrusted-recipient`, where the address came from (untrusted content from the `files` server reading the invoice email), the arguments with their SHA-256, and **Approve** and **Deny** buttons.
 - [ ] Click **Deny**. Within a second the terminal prints `Gate: SW_APPROVAL_DENIED. ask-untrusted-recipient: The recipient address was copied from untrusted content.` and `Attacker received: 0 ETH`. The call moves to the decided list below, marked denied.
-- [ ] Steps 2 to 4 run on their own: `Gate: SW_BLOCKED. block-lookalike-recipient: ...`, `Lookalike received: 0 ETH`, `Gate: allowed. Sent 0.005 ETH ...`, then `OK: 14 entries, 1 checkpoints, ...`, `Anchored: reaches checkpoint 1 as recorded.`, and after the edit `FAILED at entry 10: HASH_MISMATCH: entry hash does not match`.
+- [ ] Steps 2 to 4 run on their own: `Gate: SW_BLOCKED. block-lookalike-recipient: ...`, `Lookalike received: 0 ETH`, `Gate: allowed. Sent 0.005 ETH ...`, then `OK: 14 entries, 1 checkpoint, ...`, `Anchored: reaches checkpoint 1 as recorded.`, and after the edit `FAILED at entry 10: HASH_MISMATCH: entry hash does not match`.
 - [ ] `Summary` has four `ok` lines, and the terminal says `The approval UI stays open at ...` and `Press Ctrl-C to stop the demo`. Leave it running for step 4.
 
 ## 4. Every page, Explain and Record (3 minutes)

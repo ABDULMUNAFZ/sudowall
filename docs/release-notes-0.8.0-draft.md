@@ -38,13 +38,13 @@ Summary
   ok    ledger verify, then after an edit: OK, then caught
 ```
 
-Both verify `OK: 13 entries, 1 checkpoints, last signed entry 13, 0 unsigned (newer than the last checkpoint).` Entry 5 is the paused `evm/send_funds` to `0xFe5c…91ed` in both: `incident 5` reports it as "Decision: ask; human denied it in the cli; outcome: denied".
+Both verify `OK: 13 entries, 1 checkpoint, last signed entry 13, 0 unsigned (newer than the last checkpoint).` (Both runs printed `1 checkpoints`; the branch says `1 checkpoint` since the plural fix of 2026-11-03, and 0.7.x keeps `1 checkpoints`.) Entry 5 is the paused `evm/send_funds` to `0xFe5c…91ed` in both: `incident 5` reports it as "Decision: ask; human denied it in the cli; outcome: denied".
 
 **One difference in the demo output:** step 4 has one more line. After masking run-specific ids, ports and tokens, this is the whole diff between the two outputs. Since `f6ea3c3` the new line is indented like the lines around it (branch output, 2026-11-01):
 
 ```text
 4. Every step is in a signed, hash-chained ledger. sudowall ledger verify:
-   OK: 13 entries, 1 checkpoints, last signed entry 13, 0 unsigned (newer than the last checkpoint). Ledger …, key ….
+   OK: 13 entries, 1 checkpoint, last signed entry 13, 0 unsigned (newer than the last checkpoint). Ledger …, key ….
    Anchored: reaches checkpoint 1 as recorded.
    Now someone edits entry 10 in a copy of the ledger (the amount of the blocked payment):
    FAILED at entry 10: HASH_MISMATCH: entry hash does not match
@@ -362,11 +362,7 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
 - [ ] `docs/pitch.md:27`. Replace `406 automated tests` with the release count, for example `697 automated tests`.
 - [ ] `CHANGELOG.md`: rename "Unreleased" to "0.8.0" with the date. The 0.7.1 section is already below it (from the merge with `main`): if 0.7.1 is published, give it the same heading as on `release/0.7.x` (`## 0.7.1 (YYYY-MM-DD)`) and make its text match that branch, and in the 0.8.0 "Fixed" entry about newer data replace `The same handling is prepared for 0.7.x as 0.7.1 (branch \`release/0.7.x\`, not published).`with`0.7.1 has the same handling.`
 - [ ] Bump `packages/cli/package.json` and `GATEWAY_VERSION` in `packages/gateway/src/upstream.ts` to 0.8.0, so newer-version messages from 0.7.1 name `v0.8.0`.
-- [ ] **`ledger verify` prints "1 checkpoints".** `packages/cli/src/ledger-cmd.ts:101` always writes `${r.checkpoints} checkpoints`, so every demo ends with `OK: 14 entries, 1 checkpoints, ...` (seen again in `npx -y sudowall@0.7.1 demo --ci` on 2026-11-03). Print `1 checkpoint` for one, as the local app already does with `count()` in `apps/web-ui/src/pages.tsx:487`. This is a code change, so it lands in its own commit with a test for one checkpoint, before the release commit, not on release day. Then:
-  - `packages/cli/test/ledger.test.ts:64` matches `\d+ checkpoints`: make it accept the singular.
-  - Quoted output to update: `README.md:50`, `docs/integrations/dodo-payments.md:71`, the demo checks at the top of this page and the release-candidate table. Leave `docs/integrations/dodo-payments-run/output.txt` as recorded: it is the untruncated output of the 2026-11-01 run.
-  - `entries` has the same problem for a ledger of one entry. The demo never shows it; if it is fixed too, `/OK: \d+ entries/` in `packages/cli/test/init-demo.test.ts:98`, `packages/cli/test/policy.test.ts:214` and `examples/scripted-agent/test/demo.e2e.test.ts:235` still match counts above 1 only.
-  - CHANGELOG, 0.8.0 "Fixed": `ledger verify` says `1 checkpoint`, not `1 checkpoints`.
+- [x] **Done on 2026-11-03: counts are singular for one.** `ledger verify` printed `1 checkpoints` (and `1 entries` for a one-entry ledger), `incident` said `1 entries verified`, and the local app's Integrations page said `1 servers protected`. They now say `1 checkpoint`, `1 entry` and `1 server` (`packages/cli/src/ledger-cmd.ts`, `packages/graph/src/incident.ts`, `apps/web-ui/src/pages.tsx`), with tests for one and for two (`packages/cli/test/ledger.test.ts`, `packages/graph/test/incident.test.ts`, `apps/web-ui/src/text.test.ts`). `README.md`, `docs/integrations/dodo-payments.md`, `docs/manual-check-mac.md` and the demo checks above quote the new line, and the CHANGELOG has it under Unreleased. Left as recorded: the release-candidate table (those tarballs print `1 checkpoints`) and `docs/integrations/dodo-payments-run/output.txt` (the untruncated output of the 2026-11-01 run). Nothing to do on release day.
 - [ ] **Node.js 24.11.** 0.8.0 declares `engines: >=24.11.0` (ADR 0025); 0.7.x declares `>=24.0.0`. npm only warns on a lower version, so the `sudowall` command now checks first, before it loads anything else, and exits 1 with `SudoWall needs Node.js 24.11 or newer (you have v24.10.0). Update Node and run it again.` (`packages/cli/src/bin.ts`, tested with a faked `process.version` in `packages/cli/test/node-version.test.ts`). `@babel/parser` 8 itself declares `^22.18.0 || >=24.11.0`. A real Node.js below 24.11 was not run. Every place that says Node.js 24:
   - `README.md:20` `See it work in two minutes. Node.js 24 on macOS, Linux and Windows (Windows tested in CI):`: replace `Node.js 24` with `Node.js 24.11 or newer`.
   - `README.md:156` `Requirements: Node.js 24, pnpm 12, ...` (building from source): replace `Node.js 24` with `Node.js 24.11 or newer`.

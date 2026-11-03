@@ -552,7 +552,9 @@ export function Integrations({ product }: PageProps) {
         <Integration
           name="Claude Code, Claude Desktop, Cursor"
           status={
-            protectedCount > 0 ? `${String(protectedCount)} servers protected` : 'not protected yet'
+            protectedCount > 0
+              ? `${count(protectedCount, 'server', 'servers')} protected`
+              : 'not protected yet'
           }
           tone={protectedCount > 0 ? 'allow' : 'ask'}
         >

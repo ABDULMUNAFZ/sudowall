@@ -68,7 +68,7 @@ Run on 2026-11-01 with everything real: the packaged SudoWall from this branch, 
 | `client.customers.list({ email: '<ticket's>' })`                              | asked (a read with an untrusted value); denied in the UI                                                                         |
 | `client.payments.retrieve('pay_9fXk2', { method: 'post', path: '/refunds' })` | asked (not a proven read); denied in the UI                                                                                      |
 
-`sudowall ledger verify`: `OK: 22 entries, 1 checkpoints, last signed entry 22`. The gateway and the UI logged nothing at warn or error. The rules are also covered by unit tests (`packages/policy/test/dodo-template.test.ts`, `sdk-read-only.test.ts`, `sdk-read-only-precedence.test.ts`).
+`sudowall ledger verify`: `OK: 22 entries, 1 checkpoint, last signed entry 22`. The gateway and the UI logged nothing at warn or error. The rules are also covered by unit tests (`packages/policy/test/dodo-template.test.ts`, `sdk-read-only.test.ts`, `sdk-read-only-precedence.test.ts`).
 
 Use **Deno 2.8 or earlier** with `dodopayments-mcp` 2.59.0. With Deno 2.9.6 every `execute` call fails inside Dodo's server with `Deno exited before being ready`, with or without SudoWall: Deno 2.9 needs `--allow-net` for the worker's Unix socket, which the worker does not grant (Dodo's README; dodopayments/dodopayments-typescript#330). Dodo's local code execution does not work on Windows.
 

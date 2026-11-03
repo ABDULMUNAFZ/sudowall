@@ -38,6 +38,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 - Request ids are compared in canonical form (`1` and `1.0`, `"a"` and `"\u0061"` are the same id), replies keep the id as the client spelled it, and duplicate ids are refused while the first is still being admitted.
 - New limits: `maxPendingRequests` (-32004), `maxSessions` (HTTP 503), `sessionIdleMs`, `maxWriteBufferBytes`. SSE events are size-checked before delivery, and multi-line payloads are framed correctly.
 - A second HTTP request with an in-flight id gets 409 and no longer replaces the first one's stream.
+- Counts of one are singular: `ledger verify` prints `1 checkpoint` and `1 entry` (was `1 checkpoints`, `1 entries`), `incident` says `1 entry verified`, and the local app's Integrations page says `1 server protected`.
 - Remote upstreams: notifications are not awaited, cancellation aborts the request stream, and the GET stream reconnects with backoff.
 - Provenance: numeric result fields are indexed, each value in an argument is its own match, lookups are bounded and prefer untrusted rows, and old rows are pruned after 90 days. `provenance.taintScope: session` is available.
 - Ledger verification of a database reads one snapshot; `ledger export` respects backpressure.
