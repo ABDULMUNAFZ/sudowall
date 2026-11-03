@@ -4,6 +4,8 @@ SudoWall can send a sanitized copy of each decision to a [Cribl Stream](https://
 
 This is a community integration. It is not made, endorsed or supported by Cribl.
 
+**Experimental in 0.8.0.** The record format and settings may change in a later release. Export failures after startup (a rejected token, an unreachable Source, dropped records) appear only in the gateway's stderr log for now: `sudowall status`, the local app and the ledger do not show them. Under `wrap`, that log is the MCP client's log for the server. Check the setup with `sudowall cribl test` (below) whenever you set or change the token.
+
 ## What is sent, and what never is
 
 One JSON record per event, as newline-delimited JSON (`content-type: application/x-ndjson`), with `Authorization: <token>`.
