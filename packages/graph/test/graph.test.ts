@@ -184,8 +184,9 @@ describe.skipIf(tgConfig === undefined)(
   'TigerGraph parity (real server: set SW_TIGERGRAPH_HOST)',
   () => {
     /**
-     * Compare what both backends can express: TigerGraph never receives `display`, and it returns
-     * an empty string for an attribute a vertex never had, where the local store omits it.
+     * Compare what both backends can express: TigerGraph never receives `display` or the
+     * `contained` edge's `sourceLabel` (incident reports fill both in from the local ledger), and
+     * it returns an empty string for an attribute a vertex never had, where the local store omits it.
      */
     const comparable = (s: Subgraph) => ({
       vertices: s.vertices.map((v) => ({
@@ -199,7 +200,11 @@ describe.skipIf(tgConfig === undefined)(
       })),
       edges: s.edges.map((e) => ({
         ...e,
-        attrs: Object.fromEntries(Object.entries(e.attrs).map(([k, x]) => [k, String(x)])),
+        attrs: Object.fromEntries(
+          Object.entries(e.attrs)
+            .filter(([k]) => !(e.type === 'contained' && k === 'sourceLabel'))
+            .map(([k, x]) => [k, String(x)]),
+        ),
       })),
     });
 
