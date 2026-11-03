@@ -71,6 +71,10 @@ Then restart the client and open `npx sudowall ui` to watch decisions. The gate 
 
 `npx sudowall init --template dodo-payments` writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: reads run, refunds and other changes ask you first, and a change using an email or URL copied from a support ticket or email is blocked. Setup and a tested run: [docs/integrations/dodo-payments.md](docs/integrations/dodo-payments.md).
 
+### Security logs: Cribl
+
+Optionally send a sanitized copy of each decision (no arguments, results or values) to a Cribl Stream HTTP/S Source. Off by default; the local signed ledger stays the record. See [docs/integrations/cribl.md](docs/integrations/cribl.md).
+
 ## How it works
 
 1. **Source tracking.** Every tool output is labelled trusted or untrusted. When a later call uses an address, email, URL or amount that appeared in untrusted content, or a lookalike of one, the call is flagged.

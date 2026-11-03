@@ -78,6 +78,80 @@ export const UpstreamSchema = z.discriminatedUnion('transport', [
 ]);
 export type Upstream = z.infer<typeof UpstreamSchema>;
 
+/** True for the hosts plain http may be used with (credentials never leave the machine). */
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname);
+}
+
+/**
+ * Optional export of a sanitized copy of each recorded event to a Cribl HTTP/S (Bulk API)
+ * Source (`docs/integrations/cribl.md`, ADR 0027). Off unless `enabled` is true. The token is
+ * only ever read from an environment variable, so config files never hold it.
+ */
+export const CriblExportSchema = z
+  .strictObject({
+    enabled: z.boolean().default(false),
+    /** The Source's bulk endpoint, e.g. `https://default.main.<org>.cribl.cloud:20000/cribl/_bulk`. */
+    url: z
+      .url()
+      .refine(
+        (raw) => {
+          const u = URL.parse(raw);
+          return (
+            u !== null &&
+            (u.protocol === 'https:' || (u.protocol === 'http:' && isLoopbackHost(u.hostname)))
+          );
+        },
+        { message: 'Cribl URL must be https, or http to 127.0.0.1 / localhost / [::1]' },
+      )
+      .refine(
+        (raw) => {
+          const u = URL.parse(raw);
+          return (
+            u !== null && u.username === '' && u.password === '' && u.search === '' && u.hash === ''
+          );
+        },
+        { message: 'Cribl URL must not contain credentials, a query string or a fragment' },
+      )
+      .optional(),
+    /** Environment variable holding the Source's auth token, sent as `Authorization: <token>`. */
+    authToken: z.strictObject({ fromEnv: EnvNameSchema }).optional(),
+    /** Label added to every exported record. */
+    environment: z.enum(['development', 'test', 'production']).default('development'),
+    batchSize: z.int().min(1).max(1000).default(25),
+    flushIntervalMs: z.int().min(100).max(60_000).default(2_000),
+    requestTimeoutMs: z.int().min(100).max(60_000).default(5_000),
+    /** Retries after the first attempt, for timeouts, connection errors, 408, 429 and 5xx. */
+    maxRetries: z.int().min(0).max(10).default(3),
+    /** Records waiting to be sent; when full, the newest record is dropped and counted. */
+    maxQueueSize: z.int().min(1).max(100_000).default(1_000),
+    /** Longest the gateway waits on shutdown to send what is queued. */
+    shutdownTimeoutMs: z.int().min(0).max(30_000).default(3_000),
+  })
+  .superRefine((c, ctx) => {
+    if (!c.enabled) return;
+    if (c.url === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['url'], message: 'url is required when enabled' });
+      return;
+    }
+    const host = URL.parse(c.url)?.hostname;
+    if (c.authToken === undefined && host !== undefined && !isLoopbackHost(host)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['authToken'],
+        message: 'authToken ({ "fromEnv": "<VARIABLE>" }) is required for a non-local Cribl URL',
+      });
+    }
+    if (c.batchSize > c.maxQueueSize) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['batchSize'],
+        message: 'batchSize must not exceed maxQueueSize',
+      });
+    }
+  });
+export type CriblExportConfig = z.infer<typeof CriblExportSchema>;
+
 /** Glob over names: `*` matches any run of characters; everything else is literal. */
 const GlobSchema = z.string().min(1);
 
@@ -216,6 +290,7 @@ export const ConfigSchema = z
             keepFiles: z.int().min(1).max(1000).default(10),
           })
           .optional(),
+        cribl: CriblExportSchema.optional(),
       })
       .prefault({}),
     trust: z

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { criblCommand, criblSectionFromConfig } from './cribl-cmd.js';
 import { demoCommand } from './demo.js';
 import { graphCommand, incidentCommand } from './incident-cmd.js';
 import { initCommand } from './init-cmd.js';
@@ -34,10 +35,11 @@ export const EXIT = {
 const USAGE = `SudoWall ${GATEWAY_VERSION}: a firewall for AI agents. Nothing moves until it's checked.
 
 Usage:
-  sudowall demo [--ci] [--keep] [--no-open] [--approval-timeout <s>]
+  sudowall demo [--ci] [--keep] [--no-open] [--approval-timeout <s>] [--config <file>]
       Two-minute walkthrough on a private local test chain: a scripted agent (no LLM) reads
       poisoned emails and tries three payments; you decide the paused one in the approval UI;
       the ledger is verified, then shown catching an edit. Installs the pinned Anvil if missing.
+      With --config, the demo gateway also uses that file's events.cribl export settings.
   sudowall init [--template <name>] [--dir <dir>] [--force]
       Write a starter config (observe mode) and a policy template to your config directory.
   sudowall protect [--client <name>] [--project <dir>] [--config <file>] [--apply] [--offline]
@@ -71,6 +73,9 @@ Usage:
   sudowall graph sync [--db <file>]
       Push the data-flow graph to TigerGraph (SW_TIGERGRAPH_HOST, SW_TIGERGRAPH_TOKEN or
       SW_TIGERGRAPH_USERNAME/SW_TIGERGRAPH_PASSWORD). Sends ids, verdicts and keyed hashes only.
+  sudowall cribl test --config <file>
+      Check the events.cribl section and send one connectivity record (no event data) to the
+      Cribl Source. Prints the HTTP status; never the token.
   sudowall ui [--config <file>] [--port <n>] [--db <file>] [--key-dir <dir>]
       Serve the local web UI on 127.0.0.1: live decisions, approvals, ledger Verify.
       Prints the address to open; it contains this run's access token.
@@ -105,7 +110,7 @@ export { UsageError } from './errors.js';
 import { printBanner } from './banner.js';
 import { RuntimeError, UsageError } from './errors.js';
 
-function readConfigFile(path: string): unknown {
+export function readConfigFile(path: string): unknown {
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
@@ -323,11 +328,23 @@ export async function main(argv: string[]): Promise<number> {
         throw new UsageError('--approval-timeout must be a whole number of seconds from 5 to 3600');
       }
     }
+    const cribl =
+      values.config === undefined
+        ? undefined
+        : criblSectionFromConfig(readConfigFile(values.config));
     return demoCommand({
+      ...(cribl === undefined ? {} : { cribl }),
       ci: values.ci === true,
       keep: values.keep === true,
       open: values['no-open'] !== true && process.stdout.isTTY,
       ...(approvalTimeoutSeconds === undefined ? {} : { approvalTimeoutSeconds }),
+    });
+  }
+
+  if (command === 'cribl') {
+    return criblCommand(positionals.slice(1), {
+      config: values.config,
+      readConfig: readConfigFile,
     });
   }
 

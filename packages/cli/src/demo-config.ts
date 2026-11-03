@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { CriblExportConfig } from '@sudowall/core';
 import { parsePolicyYaml } from '@sudowall/policy';
 import type { DemoAssets } from './assets.js';
 
@@ -32,6 +33,8 @@ export interface DemoOptions {
   baseSepolia?: boolean;
   approvalTimeoutSeconds?: number;
   assets: DemoAssets;
+  /** Cribl export settings for the demo gateway (token by environment reference only). */
+  cribl?: CriblExportConfig;
 }
 
 export interface DemoFiles {
@@ -97,6 +100,7 @@ export function writeDemoConfig(o: DemoOptions): DemoFiles {
     policy: { path: policyPath },
     approvals: { timeoutSeconds: o.approvalTimeoutSeconds ?? 120 },
     ledger: { path: dbPath, keyDir },
+    ...(o.cribl === undefined ? {} : { events: { cribl: o.cribl } }),
   };
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
   return { configPath, policyPath, dbPath, keyDir };

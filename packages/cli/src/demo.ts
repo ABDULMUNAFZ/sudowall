@@ -11,6 +11,7 @@ import {
   startUiServer,
   type RunningUi,
 } from '@sudowall/gateway';
+import type { CriblExportConfig } from '@sudowall/core';
 import { openStateDb } from '@sudowall/ledger';
 import { ensureAnvil, rpc, balanceWei, startAnvil, type RunningAnvil } from './anvil.js';
 import { cliEntry, demoAssets, webUiDir } from './assets.js';
@@ -27,6 +28,8 @@ export interface DemoFlags {
   open: boolean;
   /** How long the paused payment waits for a human before the gate denies it (default 300). */
   approvalTimeoutSeconds?: number;
+  /** Also export the demo's events to Cribl (`demo --config <file>` with events.cribl). */
+  cribl?: CriblExportConfig;
 }
 
 interface ToolResult {
@@ -110,7 +113,14 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
       anvilUrl: anvil.url,
       approvalTimeoutSeconds: approvalTimeout,
       assets,
+      ...(flags.cribl === undefined ? {} : { cribl: flags.cribl }),
     });
+    // The gateway reads the Cribl token from its own environment: pass that one variable only.
+    const tokenVar = flags.cribl?.authToken?.fromEnv;
+    const tokenEnv =
+      tokenVar !== undefined && process.env[tokenVar] !== undefined
+        ? { [tokenVar]: process.env[tokenVar] }
+        : {};
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [cliEntry(), 'serve', '--config', files.configPath, '--log-level', 'error'],
@@ -119,6 +129,7 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
         ...getDefaultEnvironment(),
         XDG_STATE_HOME: stateDir,
         ...(process.platform === 'win32' ? { LOCALAPPDATA: stateDir } : {}),
+        ...tokenEnv,
       },
       stderr: 'pipe',
     });
@@ -137,6 +148,9 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     out('Started SudoWall in enforce mode with the money-moving policy, in front of:');
     out('  files  the reference filesystem MCP server on the demo inbox (its output is untrusted)');
     out('  evm    a payments MCP server (get_balance, send_funds) on the local chain\n');
+    if (flags.cribl?.url !== undefined) {
+      out(`Exporting sanitized decision records to Cribl at ${new URL(flags.cribl.url).host}.\n`);
+    }
 
     ui = await startUiServer({
       dbPath: files.dbPath,
