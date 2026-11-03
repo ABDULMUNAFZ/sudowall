@@ -158,6 +158,7 @@ Live results against a Cribl.Cloud organization are recorded in [cribl-usage-evi
 ## Limits
 
 - Best-effort, in-memory delivery; no replay from the ledger yet.
+- **No token check at startup.** The gateway does not contact the Source when it starts, so a wrong or revoked token is not reported then. Cribl's [HTTP/S (Bulk API) Source documentation](https://docs.cribl.io/stream/sources-https/) (checked 2026-11-03) describes no request that checks the token without ingesting data: the `/cribl_health` endpoint is off unless enabled on the Source and is documented to report whether the Source is healthy, not whether a token is accepted; the response to an empty request is not documented; and no status code for a rejected token is documented (a request with no token returned HTTP 401 in our live test). Sending a real record at every start would add one to your Cribl data each time an MCP client starts a wrapped server. Run `sudowall cribl test` after you set or rotate the token. After that, a rejected token appears only as `cribl export failed` warnings (`"status":401` or `403`) in the gateway's stderr log.
 - No gzip compression of requests yet.
 - One Source per gateway config.
 - Tool and server names are exported when they look like identifiers. A tool whose name itself encodes sensitive data would need a redaction rule; names that are not identifiers are already replaced.
