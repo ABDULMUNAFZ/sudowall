@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseConfig } from '@sudowall/core';
-import { NPM_EXEC_VARIABLES, buildEnv, withoutNpxRunVariables } from '../src/env.js';
+import {
+  NPM_EXEC_VARIABLES,
+  buildEnv,
+  gatewayOnlyEnv,
+  withoutNpxRunVariables,
+} from '../src/env.js';
 
 const upstream = (extra: Record<string, unknown>) => {
   const u = parseConfig({
@@ -58,6 +63,41 @@ describe('upstream environment', () => {
 
   it('passes only the named variables without "*"', () => {
     expect(buildEnv(upstream({ inheritEnv: ['HOME'] }), NPX_ENV)).toEqual({ HOME: '/home/u' });
+  });
+});
+
+describe("the gateway's own secrets", () => {
+  const config = (cribl: Record<string, unknown>) =>
+    parseConfig({
+      schemaVersion: 1,
+      upstreams: [{ id: 'srv', transport: 'stdio', command: 'npx' }],
+      events: { cribl },
+    });
+  const gatewayEnv = { PATH: '/usr/bin', HOME: '/home/u', CRIBL_TOKEN: 'cribl-secret' };
+
+  it('names the Cribl token variable, enabled or not', () => {
+    const url = 'https://cribl.example.com/cribl/_bulk';
+    const ref = { authToken: { fromEnv: 'CRIBL_TOKEN' } };
+    expect([...gatewayOnlyEnv(config({ enabled: true, url, ...ref }))]).toEqual(['CRIBL_TOKEN']);
+    expect([...gatewayOnlyEnv(config({ enabled: false, url, ...ref }))]).toEqual(['CRIBL_TOKEN']);
+    expect([...gatewayOnlyEnv(config({ enabled: false }))]).toEqual([]);
+  });
+
+  it('are not inherited by upstreams, with "*" or by name', () => {
+    const withhold = new Set(['CRIBL_TOKEN']);
+    const all = buildEnv(upstream({ inheritEnv: '*' }), gatewayEnv, withhold);
+    expect(all).toEqual({ PATH: '/usr/bin', HOME: '/home/u' });
+    const named = buildEnv(upstream({ inheritEnv: ['HOME', 'CRIBL_TOKEN'] }), gatewayEnv, withhold);
+    expect(named).toEqual({ HOME: '/home/u' });
+  });
+
+  it('still reach an upstream that references one in its own env (an explicit choice)', () => {
+    const env = buildEnv(
+      upstream({ inheritEnv: [], env: { TOKEN: { fromEnv: 'CRIBL_TOKEN' } } }),
+      gatewayEnv,
+      new Set(['CRIBL_TOKEN']),
+    );
+    expect(env).toEqual({ TOKEN: 'cribl-secret' });
   });
 });
 

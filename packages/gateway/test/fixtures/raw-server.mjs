@@ -96,6 +96,11 @@ function handle(line) {
         return;
       }
       if (name === 'crash') process.exit(7);
+      // The names of the variables this server was started with (values stay private).
+      if (name === 'env-names')
+        return reply({
+          content: [{ type: 'text', text: JSON.stringify(Object.keys(process.env).sort()) }],
+        });
       if (name === 'huge')
         return reply({ content: [{ type: 'text', text: 'x'.repeat(Number(args.bytes ?? 1)) }] });
       if (name === 'sample') {

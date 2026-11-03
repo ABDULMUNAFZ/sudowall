@@ -50,7 +50,7 @@ Add an `events.cribl` section to the config you run the gateway with (`--config`
 Then set the variable where the gateway runs, never in a file in a repository:
 
 - `sudowall serve`: in the shell that starts it.
-- `sudowall wrap` (what `protect` installs): in the MCP client's entry for that server, as an `env` value. That file is local to your machine; keep it out of Git and backups you share.
+- `sudowall wrap` (what `protect` installs): in the MCP client's entry for that server, as an `env` value. That file is local to your machine; keep it out of Git and backups you share. The gateway keeps this variable to itself: wrapped servers get the rest of that environment but never the variable named in `authToken`, even with `"inheritEnv": "*"`. Only an upstream whose own `env` references it with `{ "fromEnv" }` receives it.
 
 | Setting             | Default       | Range                         | Notes                                                                   |
 | ------------------- | ------------- | ----------------------------- | ----------------------------------------------------------------------- |

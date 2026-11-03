@@ -89,6 +89,7 @@ stdio: `{ "id", "transport": "stdio", "command", "args": [], "env": {}, "inherit
 
 - The child gets **only** the variables named in `inheritEnv` plus `env`. The default `inheritEnv` is `PATH HOME USER LOGNAME SHELL LANG LC_ALL LC_CTYPE TZ TMPDIR TERM`, plus the Windows variables needed to start a process (`SYSTEMROOT WINDIR COMSPEC PATHEXT APPDATA LOCALAPPDATA USERPROFILE TEMP TMP`). This keeps secrets in the gateway's environment from reaching every server.
 - `"inheritEnv": "*"` passes everything. `wrap` uses it, because the MCP client launched the gateway with the environment it meant for that server.
+- The gateway's own secrets are never inherited, with `"*"` or by name: the variable named in `events.cribl.authToken`. An upstream's own `env` can still reference it with `{ "fromEnv" }`.
 - stderr is logged line by line as `upstream stderr`.
 
 Streamable HTTP: `{ "id", "transport": "streamable-http", "url", "headers": {} }`

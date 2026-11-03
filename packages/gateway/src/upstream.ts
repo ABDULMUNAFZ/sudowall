@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { rawGet, type Config, type Upstream } from '@sudowall/core';
 import type { Channel, CloseReason } from './channel.js';
-import { buildEnv, resolveEnvValue } from './env.js';
+import { buildEnv, gatewayOnlyEnv, resolveEnvValue } from './env.js';
 import { HttpUpstreamChannel } from './http-upstream.js';
 import { classify, type Message } from './jsonrpc.js';
 import type { Logger } from './log.js';
@@ -81,7 +81,7 @@ export class UpstreamConnection {
           {
             command: this.spec.command,
             args: this.spec.args,
-            env: buildEnv(this.spec, this.gatewayEnv),
+            env: buildEnv(this.spec, this.gatewayEnv, gatewayOnlyEnv(this.cfg)),
             cwd: this.spec.cwd,
           },
           max,

@@ -1,4 +1,4 @@
-import type { EnvValue, Upstream } from '@sudowall/core';
+import type { Config, EnvValue, Upstream } from '@sudowall/core';
 
 export class MissingEnvError extends Error {
   constructor(readonly variable: string) {
@@ -45,21 +45,37 @@ export function withoutNpxRunVariables(env: NodeJS.ProcessEnv): Record<string, s
 }
 
 /**
+ * Variables that hold the gateway's own secrets, which upstream servers never inherit: the
+ * Cribl Source token (`events.cribl.authToken`), named even while export is disabled. `wrap`
+ * passes its whole environment on (`"inheritEnv": "*"`), and that environment is also where
+ * the token is set, so without this every wrapped server would get it.
+ */
+export function gatewayOnlyEnv(config: Config): ReadonlySet<string> {
+  const names = new Set<string>();
+  const token = config.events.cribl?.authToken;
+  if (token !== undefined) names.add(token.fromEnv);
+  return names;
+}
+
+/**
  * Builds a stdio upstream's environment: only the gateway variables named in `inheritEnv`
- * (or all of them for `"*"`, minus npx's per-run variables), then the upstream's own `env`
- * entries on top.
+ * (or all of them for `"*"`, minus npx's per-run variables), never those in `withhold`, then
+ * the upstream's own `env` entries on top (an explicit `{ fromEnv }` there still resolves).
  */
 export function buildEnv(
   spec: Extract<Upstream, { transport: 'stdio' }>,
   gatewayEnv: NodeJS.ProcessEnv,
+  withhold: ReadonlySet<string> = new Set(),
 ): Record<string, string> {
-  let out: Record<string, string> = {};
+  const out: Record<string, string> = {};
   if (spec.inheritEnv === '*') {
-    out = withoutNpxRunVariables(gatewayEnv);
+    for (const [k, v] of Object.entries(withoutNpxRunVariables(gatewayEnv))) {
+      if (!withhold.has(k)) out[k] = v;
+    }
   } else {
     for (const k of spec.inheritEnv) {
       const v = gatewayEnv[k];
-      if (v !== undefined) out[k] = v;
+      if (v !== undefined && !withhold.has(k)) out[k] = v;
     }
   }
   for (const [k, v] of Object.entries(spec.env)) out[k] = resolveEnvValue(v, gatewayEnv);

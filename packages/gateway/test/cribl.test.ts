@@ -712,7 +712,11 @@ describe('ExportingSink', () => {
 // ---------------------------------------------------------------------------------------------
 // The real gateway with export enabled: decisions do not wait for Cribl, the ledger is unchanged.
 
-async function gatewayWithCribl(url: string, extra: Record<string, unknown> = {}) {
+async function gatewayWithCribl(
+  url: string,
+  extra: Record<string, unknown> = {},
+  upstream: Record<string, unknown> = {},
+) {
   const dir = tempDir();
   const lines: string[] = [];
   const log = createLogger({ level: 'debug', write: (l) => lines.push(l) });
@@ -726,7 +730,7 @@ async function gatewayWithCribl(url: string, extra: Record<string, unknown> = {}
       schemaVersion: 1,
       mode: 'enforce',
       listen: { transport: 'stdio' },
-      upstreams: [rawUpstream('up')],
+      upstreams: [{ ...rawUpstream('up'), ...upstream }],
       deny: { tools: [{ tool: 'crash' }] },
       ledger: { path: dbPath, keyDir: join(dir, 'keys') },
       events: {
@@ -812,6 +816,25 @@ describe('gateway with Cribl export', () => {
     }
     expect(g.lines.join('\n')).not.toContain(TOKEN);
     expect(verify(g.dbPath)).toBe(true);
+  });
+
+  it('never passes the token variable to an upstream, even with inheritEnv "*" (wrap)', async () => {
+    const s = await mockSource();
+    const g = await gatewayWithCribl(s.url, {}, { inheritEnv: '*' });
+    g.stdin.write(`${CALL(2, 'env-names')}\n`);
+    await g.response(2);
+    await g.gw.stop();
+    const reply = g
+      .out()
+      .split('\n')
+      .find((l) => l.includes('"id":2,'));
+    const names = JSON.parse(
+      (JSON.parse(reply ?? '{}') as { result: { content: { text: string }[] } }).result.content[0]
+        ?.text ?? '[]',
+    ) as string[];
+    expect(names).toContain('PATH'); // "*" still passes the rest of the environment
+    expect(names).not.toContain('TEST_CRIBL_TOKEN');
+    expect(g.out()).not.toContain(TOKEN);
   });
 
   it('keeps deciding and recording while the Source is down', async () => {
