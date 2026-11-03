@@ -205,6 +205,18 @@ describe('toCriblRecord (allowlist serializer)', () => {
     });
   });
 
+  it('leaves environment out of every record unless the config sets it', () => {
+    for (const r of [
+      toCriblRecord(callEvent(), undefined),
+      toCriblRecord(resultEvent(), undefined),
+      toCriblRecord(approvalEvent(), undefined),
+      criblTestRecord(undefined, ids.call),
+    ]) {
+      expect(r).toBeDefined();
+      expect(Object.keys(r ?? {})).not.toContain('environment');
+    }
+  });
+
   it('exports a tool result and an approval without their data', () => {
     expect(toCriblRecord(resultEvent(), 'test')).toMatchObject({
       eventType: 'tool_result',
@@ -332,8 +344,9 @@ describe('Cribl export config', () => {
   });
 
   it('fills in bounded defaults', () => {
-    expect(CriblExportSchema.parse({ ...ok, ...token })).toMatchObject({
-      environment: 'development',
+    const parsed = CriblExportSchema.parse({ ...ok, ...token });
+    expect(parsed.environment).toBeUndefined();
+    expect(parsed).toMatchObject({
       batchSize: 25,
       flushIntervalMs: 2000,
       requestTimeoutMs: 5000,
@@ -349,6 +362,7 @@ describe('Cribl export config', () => {
     ['not a URL', { url: 'cribl.example.com' }],
     ['credentials in the URL', { url: `https://user:${TOKEN}@cribl.example.com/cribl/_bulk` }],
     ['a query string', { url: `https://cribl.example.com/cribl/_bulk?token=${TOKEN}` }],
+    ['a fragment', { url: `https://cribl.example.com/cribl/_bulk#${TOKEN}` }],
     ['no URL', { url: undefined }],
     ['a literal token in the config', { authToken: TOKEN }],
     ['no token for a remote URL', { authToken: undefined }],
@@ -410,6 +424,8 @@ class MockSource {
   readonly received: Received[] = [];
   /** Replies used in order; after they run out, every request gets 200. */
   replies: Reply[] = [];
+  /** Hanging requests whose connection the client closed (the server did not end them). */
+  abortedByClient = 0;
   private server: Server;
   private hanging: (() => void)[] = [];
   url = '';
@@ -422,7 +438,14 @@ class MockSource {
         this.received.push({ at: Date.now(), headers: req.headers, body });
         const reply = this.replies.shift() ?? { status: 200 };
         if (reply === 'hang') {
-          this.hanging.push(() => res.destroy());
+          let destroyedHere = false;
+          res.on('close', () => {
+            if (!destroyedHere) this.abortedByClient += 1;
+          });
+          this.hanging.push(() => {
+            destroyedHere = true;
+            res.destroy();
+          });
           return;
         }
         res.writeHead(reply.status, reply.headers);
@@ -462,6 +485,14 @@ class MockSource {
         r();
       });
     });
+  }
+}
+
+async function waitUntil(cond: () => boolean, timeoutMs = 2000): Promise<void> {
+  const end = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error('condition not met in time');
+    await sleep(10);
   }
 }
 
@@ -577,7 +608,7 @@ describe('CriblExporter', () => {
     expect((b?.at ?? 0) - (a?.at ?? 0)).toBeGreaterThanOrEqual(950);
   });
 
-  it.each([400, 401, 403, 413])('does not retry a permanent %i', async (status) => {
+  it.each([400, 401, 403, 404, 413])('does not retry a permanent %i', async (status) => {
     const s = await mockSource();
     s.replies = [{ status }];
     const { lines, log } = capture();
@@ -668,6 +699,28 @@ describe('CriblExporter', () => {
     expect(e.stats).toMatchObject({ delivered: 0, failed: 2 });
   });
 
+  it('aborts the request in flight at the shutdown deadline and does not retry it', async () => {
+    const s = await mockSource();
+    s.replies = ['hang'];
+    const { lines, log } = capture();
+    // The request timeout is far beyond the deadline, so only the shutdown can end the request.
+    const e = exporter(s.url, { requestTimeoutMs: 60_000, shutdownTimeoutMs: 200, log });
+    e.enqueue(rec(1));
+    void e.flush();
+    await s.waitFor(1);
+    expect(s.abortedByClient).toBe(0);
+    const started = Date.now();
+    await e.close();
+    expect(Date.now() - started).toBeLessThan(1500);
+    await waitUntil(() => s.abortedByClient === 1);
+    expect(s.received).toHaveLength(1);
+    expect(e.stats).toMatchObject({ delivered: 0, failed: 1, retries: 0 });
+    const failed = lines
+      .map((l) => JSON.parse(l) as Record<string, unknown>)
+      .find((l) => l['msg'] === 'cribl export failed');
+    expect(failed).toMatchObject({ reason: 'aborted', attempt: 1 });
+  });
+
   it('never logs the token, the URL path or the body', async () => {
     const s = await mockSource();
     s.replies = [{ status: 500 }, { status: 401 }];
@@ -706,6 +759,24 @@ describe('ExportingSink', () => {
     const sink = new ExportingSink(new MemorySink(), e, 'test');
     await expect(sink.write(callEvent())).resolves.toBeUndefined();
     expect(e.stats.dropped).toBe(1);
+  });
+
+  it('counts and logs a record that cannot be built, without failing the write', async () => {
+    const s = await mockSource();
+    const { lines, log } = capture();
+    const e = exporter(s.url, { log });
+    const inner = new MemorySink();
+    const sink = new ExportingSink(inner, e, 'test');
+    // Not a valid event: the serializer throws on the missing decision.
+    const broken = { ...callEvent(), decision: undefined } as unknown as Event;
+    await expect(sink.write(broken)).resolves.toBeUndefined();
+    expect(e.pending).toBe(0);
+    expect(e.stats).toMatchObject({ queued: 0, dropped: 1 });
+    const warn = lines
+      .map((l) => JSON.parse(l) as Record<string, unknown>)
+      .find((l) => l['msg'] === 'cribl export dropped records');
+    expect(warn).toMatchObject({ dropped: 1, reason: 'unbuildable' });
+    expect(lines.join('\n')).not.toContain('send_funds');
   });
 });
 

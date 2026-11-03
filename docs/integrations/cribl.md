@@ -11,7 +11,7 @@ One JSON record per event, as newline-delimited JSON (`content-type: application
 | Field                                           | In               | Meaning                                                                                       |
 | ----------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------- |
 | `schemaVersion`                                 | all              | `1`                                                                                           |
-| `source`, `sudowallVersion`, `environment`      | all              | `sudowall`, the gateway version, and `development` / `test` / `production` from the config    |
+| `source`, `sudowallVersion`, `environment`      | all              | `sudowall`, the gateway version, and `development` / `test` / `production` (only if set)      |
 | `eventType`                                     | all              | `tool_call_decision`, `tool_result`, `approval_resolved` or `connectivity_test`               |
 | `eventId`, `timestamp`                          | all              | ledger event id (`sudowall ledger inspect <eventId>` shows the signed original), RFC 3339 UTC |
 | `sessionId`                                     | all but test     | random id the gateway made for the MCP session                                                |
@@ -52,18 +52,18 @@ Then set the variable where the gateway runs, never in a file in a repository:
 - `sudowall serve`: in the shell that starts it.
 - `sudowall wrap` (what `protect` installs): in the MCP client's entry for that server, as an `env` value. That file is local to your machine; keep it out of Git and backups you share. The gateway keeps this variable to itself: wrapped servers get the rest of that environment but never the variable named in `authToken`, even with `"inheritEnv": "*"`. Only an upstream whose own `env` references it with `{ "fromEnv" }` receives it.
 
-| Setting             | Default       | Range                         | Notes                                                                   |
-| ------------------- | ------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `enabled`           | `false`       |                               | nothing is sent unless true                                             |
-| `url`               | none          | https URL                     | required when enabled; plain http only to 127.0.0.1, localhost or [::1] |
-| `authToken`         | none          | `{ "fromEnv": "NAME" }`       | required for a non-local URL; a literal token is rejected               |
-| `environment`       | `development` | development, test, production | added to every record                                                   |
-| `batchSize`         | 25            | 1 to 1000                     | records per request; a full batch is sent at once                       |
-| `flushIntervalMs`   | 2000          | 100 to 60000                  | a partial batch waits at most this long                                 |
-| `requestTimeoutMs`  | 5000          | 100 to 60000                  | per HTTP request                                                        |
-| `maxRetries`        | 3             | 0 to 10                       | retries after the first attempt, for temporary failures only            |
-| `maxQueueSize`      | 1000          | 1 to 100000                   | must be at least `batchSize`                                            |
-| `shutdownTimeoutMs` | 3000          | 0 to 30000                    | longest the gateway waits on exit to send what is queued                |
+| Setting             | Default | Range                         | Notes                                                                   |
+| ------------------- | ------- | ----------------------------- | ----------------------------------------------------------------------- |
+| `enabled`           | `false` |                               | nothing is sent unless true                                             |
+| `url`               | none    | https URL                     | required when enabled; plain http only to 127.0.0.1, localhost or [::1] |
+| `authToken`         | none    | `{ "fromEnv": "NAME" }`       | required for a non-local URL; a literal token is rejected               |
+| `environment`       | none    | development, test, production | added to every record; when unset, records have no `environment` field  |
+| `batchSize`         | 25      | 1 to 1000                     | records per request; a full batch is sent at once                       |
+| `flushIntervalMs`   | 2000    | 100 to 60000                  | a partial batch waits at most this long                                 |
+| `requestTimeoutMs`  | 5000    | 100 to 60000                  | per HTTP request                                                        |
+| `maxRetries`        | 3       | 0 to 10                       | retries after the first attempt, for temporary failures only            |
+| `maxQueueSize`      | 1000    | 1 to 100000                   | must be at least `batchSize`                                            |
+| `shutdownTimeoutMs` | 3000    | 0 to 30000                    | longest the gateway waits on exit to send what is queued                |
 
 The URL must not contain credentials, a query string or a fragment. A config error, or a token variable that is missing or empty, stops startup with exit code 3; the message names the variable, never its value.
 
@@ -125,7 +125,7 @@ Steps for a Cribl.Cloud organization (the free plan works). Names follow the cur
 - Export never delays or fails a decision. The gateway hands each event to the exporter after the ledger accepted it; the exporter only queues it.
 - Temporary failures (timeout, connection error, 408, 429, 5xx) are retried up to `maxRetries` times with exponential backoff and jitter, waiting at least `Retry-After` (capped at 30 s). Other 4xx responses (400, 401, 403, 413) are not retried.
 - One batch is in flight at a time, so records arrive in order.
-- When the queue is full, new records are dropped and counted; a warning is logged on the first drop and every 100th.
+- When the queue is full, new records are dropped and counted; a warning is logged on the first drop and every 100th. An event that cannot be turned into a record (not expected: only validated fields are read) is dropped and counted the same way, with reason `unbuildable`.
 - On shutdown, queued records get `shutdownTimeoutMs`; the rest are counted as failed. The final log line `cribl export stopped` gives `queued`, `delivered`, `dropped`, `failed` and `retries`.
 - Logs show the status code and class, attempt, event count, duration and a short reason. They never show the token, the URL path or record bodies. Set `--log-level debug` to see every delivery.
 - Delivery is in memory only. Records queued when the process is killed are lost; the ledger still has every event.

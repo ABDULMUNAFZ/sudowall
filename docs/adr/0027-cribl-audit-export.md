@@ -19,6 +19,7 @@ The gateway already writes every event through an `EventSink` chain (validate, r
 - **Diagnostics** log the status code and class, attempt number, event count, duration and a short reason (`timeout`, `ECONNREFUSED`, `http-503`). Never the token, the URL path or any record body.
 - **No new dependency.** Node's built-in `fetch`, `AbortSignal.timeout` and `AbortSignal.any`.
 - **`auditRecordHash` is not exported.** The ledger computes entry hashes inside the store; sinks do not see them. `eventId` is exported instead: `sudowall ledger inspect <eventId>` shows the signed original.
+- **`environment` has no default** (changed 2026-11-03; it defaulted to `development`). A record carries `environment` only when the config sets it, so production records are never labelled `development` by default. Leaving it unset was the smaller change than requiring it, and keeps existing configs valid.
 - **No risk score is invented.** SudoWall has no risk level; Cribl-side severity in the setup guide is derived from the decision and labelled as such.
 
 ## Consequences

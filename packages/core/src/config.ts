@@ -116,8 +116,8 @@ export const CriblExportSchema = z
       .optional(),
     /** Environment variable holding the Source's auth token, sent as `Authorization: <token>`. */
     authToken: z.strictObject({ fromEnv: EnvNameSchema }).optional(),
-    /** Label added to every exported record. */
-    environment: z.enum(['development', 'test', 'production']).default('development'),
+    /** Label added to every exported record; when unset, records carry no `environment` field. */
+    environment: z.enum(['development', 'test', 'production']).optional(),
     batchSize: z.int().min(1).max(1000).default(25),
     flushIntervalMs: z.int().min(100).max(60_000).default(2_000),
     requestTimeoutMs: z.int().min(100).max(60_000).default(5_000),
