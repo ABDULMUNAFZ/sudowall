@@ -5,9 +5,27 @@ import { RawJsonError, rawGet, scanJson, type RawNode } from '@sudowall/core';
  * The text is what gets forwarded; the index is only read.
  */
 export type Message =
-  | { kind: 'request'; text: string; root: RawNode; id: RawNode; idKey: string; method: string }
+  | {
+      kind: 'request';
+      text: string;
+      root: RawNode;
+      id: RawNode;
+      /** Canonical id (see `idKeyOf`): equal ids have equal keys. */
+      idKey: string;
+      /** The id exactly as sent, echoed in replies. */
+      idText: string;
+      method: string;
+    }
   | { kind: 'notification'; text: string; root: RawNode; method: string }
-  | { kind: 'response'; text: string; root: RawNode; id: RawNode; idKey: string; isError: boolean };
+  | {
+      kind: 'response';
+      text: string;
+      root: RawNode;
+      id: RawNode;
+      idKey: string;
+      idText: string;
+      isError: boolean;
+    };
 
 export type ParseFailure = { kind: 'invalid'; code: number; reason: string };
 
@@ -22,11 +40,52 @@ export const RpcCode = {
   UpstreamUnavailable: -32001,
   MessageTooLarge: -32002,
   RequestTimeout: -32003,
+  /** Too many requests in flight on this session (`limits.maxPendingRequests`). */
+  TooManyRequests: -32004,
 } as const;
 
-/** Stable key for an id node: its exact source text (so `1` and `"1"` differ, as in JSON-RPC). */
+const JSON_NUMBER = /^(-?)(0|[1-9]\d*)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/;
+/** Exponents beyond this stay in exponent form, so a hostile `1e999999` cannot blow up a key. */
+const MAX_PLAIN_EXPONENT = 400;
+
+/**
+ * Canonical JSON text of a number: equal values give equal text (`1`, `1.0`, `10e-1` -> `1`;
+ * `-0` -> `0`). Integers are written without an exponent, so the key is still the id a strictly
+ * typed peer expects.
+ */
+export function canonicalNumber(text: string): string {
+  const m = JSON_NUMBER.exec(text);
+  if (m === null) return text;
+  const neg = m[1] === '-';
+  const frac = m[3] ?? '';
+  let digits = `${m[2] ?? ''}${frac}`.replace(/^0+/, '');
+  let exp = Number(m[4] ?? '0') - frac.length;
+  if (digits === '' || !Number.isFinite(exp)) return digits === '' ? '0' : text;
+  const trailing = /0*$/.exec(digits)?.[0].length ?? 0;
+  digits = digits.slice(0, digits.length - trailing);
+  exp += trailing;
+  const sign = neg ? '-' : '';
+  if (exp >= 0) {
+    return exp <= MAX_PLAIN_EXPONENT
+      ? `${sign}${digits}${'0'.repeat(exp)}`
+      : `${sign}${digits}e${exp}`;
+  }
+  const point = digits.length + exp;
+  if (point > 0) return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
+  return -point <= MAX_PLAIN_EXPONENT
+    ? `${sign}0.${'0'.repeat(-point)}${digits}`
+    : `${sign}${digits}e${exp}`;
+}
+
+/**
+ * Stable key for an id (or progress token) node: canonical JSON text of its value, so equal ids
+ * match however they were spelled (`"a"` and `"\u0061"`, `1` and `1.0`), while `1` and `"1"` still
+ * differ, as in JSON-RPC.
+ */
 export function idKeyOf(text: string, id: RawNode): string {
-  return text.slice(id.start, id.end);
+  if (id.kind === 'string') return JSON.stringify(id.value);
+  const raw = text.slice(id.start, id.end);
+  return id.kind === 'number' ? canonicalNumber(raw) : raw;
 }
 
 export function classify(text: string): Message | ParseFailure {
@@ -80,7 +139,15 @@ export function classify(text: string): Message | ParseFailure {
       return { kind: 'invalid', code: RpcCode.InvalidRequest, reason: 'params must be structured' };
     }
     if (id === undefined) return { kind: 'notification', text, root, method: method.value };
-    return { kind: 'request', text, root, id, idKey: idKeyOf(text, id), method: method.value };
+    return {
+      kind: 'request',
+      text,
+      root,
+      id,
+      idKey: idKeyOf(text, id),
+      idText: text.slice(id.start, id.end),
+      method: method.value,
+    };
   }
   if (id === undefined) {
     return {
@@ -98,7 +165,15 @@ export function classify(text: string): Message | ParseFailure {
       reason: 'response must have exactly one of result or error',
     };
   }
-  return { kind: 'response', text, root, id, idKey: idKeyOf(text, id), isError: hasError };
+  return {
+    kind: 'response',
+    text,
+    root,
+    id,
+    idKey: idKeyOf(text, id),
+    idText: text.slice(id.start, id.end),
+    isError: hasError,
+  };
 }
 
 /** Serialises a JSON-RPC error response. `idText` is raw JSON text (e.g. `7`, `"a"`, `null`). */

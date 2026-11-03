@@ -17,10 +17,12 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 - `subscriptions/listen` and server-to-client requests in aggregate mode.
 - OAuth for Streamable HTTP upstreams.
 - Benchmarks for HTTP transports, aggregate mode and near-limit message sizes.
+- Cribl export health in `sudowall status` and the local app (after 0.8.0): delivered, failed and dropped counts, the last failure's status and time, and a clear "token rejected" state. Today these are only in the gateway's stderr log (0.8.0 security review, Medium finding). Then drop the experimental label.
 
 ## Tooling
 
 - Upgrade to TypeScript 7 together with typescript-eslint once it supports it (ADR 0011).
+- Tests leave their `mkdtemp` directories in the OS temp folder. The provenance helper (about 200 MB each) is fixed; the others are small but add up over many runs: `tg-ledger-`, `tg-test-`, `tg-policy-`, `tg-cli-`, `tg-prov-cli-`, `sw-dodo-`, `tg-gw-home-`, `sw-everyday-` and more (about 7,000 directories on 2026-11-01). Give each a cleanup hook.
 
 ## Ledger
 

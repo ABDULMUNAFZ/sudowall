@@ -51,6 +51,18 @@ const Leaf = z.union([
   z.strictObject({ ...Ref, glob: GlobSchema }),
   z.strictObject({ ...Ref, first_seen: z.literal(true) }),
   z.strictObject({ ...Ref, amount_gt: DecimalSchema }),
+  /**
+   * True only when the value is code that is provably a read: an `async function run(client)`
+   * whose every call is `client.<resource>.list(query?)` or `.retrieve(id)` on these resources,
+   * with literal arguments (see `sdk-read-only.ts`). Anything else, including code that does not
+   * parse, is false. Use it to relax ask to allow, never the other way round.
+   */
+  z.strictObject({
+    ...Ref,
+    sdk_read_only: z.strictObject({
+      resources: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9]*$/)).min(1),
+    }),
+  }),
 ]);
 
 export type Condition =
@@ -70,7 +82,12 @@ const RuleSchema = z.strictObject({
   description: z.string().optional(),
   match: z.union([
     z.strictObject({ sink: IdSchema }),
-    z.strictObject({ server: GlobSchema.default('*'), tool: GlobSchema.default('*') }),
+    z.strictObject({
+      server: GlobSchema.default('*'),
+      tool: GlobSchema.default('*'),
+      /** Tool-name globs this rule does not select, even if `tool` matches. */
+      exclude: z.array(GlobSchema).min(1).optional(),
+    }),
   ]),
   when: ConditionSchema.optional(),
   action: z.enum(['allow', 'ask', 'block']),

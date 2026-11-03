@@ -52,3 +52,40 @@ export function ledgerSummary(entries: number, lastCheckpointSeq: number | null)
   }
   return `${recorded} Signed up to entry ${String(lastCheckpointSeq)}.`;
 }
+
+/** The ledger line of an incident. A newer SudoWall's ledger is not called unsigned: it was not checked. */
+export function incidentLedgerText(l: {
+  ok: boolean;
+  newerVersion?: boolean;
+  message: string;
+  entries: number[];
+  allSigned: boolean;
+}): string {
+  const head = l.ok
+    ? 'Ledger verified'
+    : l.newerVersion === true
+      ? 'Ledger cannot be verified by this version'
+      : 'Ledger verification FAILED';
+  const signed =
+    l.newerVersion === true
+      ? ', which this version cannot verify.'
+      : !l.ok
+        ? ', none of which can be trusted until the ledger verifies.'
+        : l.allSigned
+          ? ', all signed.'
+          : ', not all signed yet.';
+  return `${head}: ${l.message}. Entries ${l.entries.join(', ')}${signed}`;
+}
+
+/**
+ * The line an incident leads with when its ledger failed verification (damage, tampering, a
+ * rollback or the wrong key), or `undefined`. Data from a newer SudoWall is not a failure.
+ */
+export function incidentFailureText(l: {
+  ok: boolean;
+  newerVersion?: boolean;
+  message: string;
+}): string | undefined {
+  if (l.ok || l.newerVersion === true) return undefined;
+  return `Verification failed: ${l.message}. Do not rely on this report until the ledger verifies.`;
+}

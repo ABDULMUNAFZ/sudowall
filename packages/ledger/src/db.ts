@@ -143,3 +143,19 @@ export function assertStateReadable(path: string, supported: Readonly<Record<str
     db.close();
   }
 }
+
+/** The `writer` component: which product version last wrote this database. */
+export const WRITER_MIGRATIONS = [
+  'CREATE TABLE tg_writer (id INTEGER PRIMARY KEY CHECK (id = 1), version TEXT NOT NULL, updated_at TEXT NOT NULL)',
+];
+
+/**
+ * Records the product version writing this database, so an older build that refuses it can
+ * say which version did (see `readWriterVersion`). Builds before 0.8.0 ignore the table.
+ */
+export function recordWriter(db: StateDb, version: string, at: Date = new Date()): void {
+  migrateComponent(db, 'writer', WRITER_MIGRATIONS);
+  db.prepare(
+    'INSERT INTO tg_writer (id, version, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at',
+  ).run(version, at.toISOString());
+}

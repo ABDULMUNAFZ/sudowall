@@ -1,0 +1,56 @@
+name: npm registry smoke
+
+# Runs a published version from the npm registry on Linux, macOS and Windows, on the oldest
+# Node.js 0.8.0 supports (24.11.0) and the newest release: `npx -y sudowall@<version>` with an
+# empty npm cache, `--version`, `demo --ci` (four ok lines), and no SudoWall state left in the
+# runner's real home or app-data folders. Started by hand after a publish:
+#
+#   gh workflow run npm-registry-smoke.yml -f version=0.7.1
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version to check, e.g. 0.7.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: sudowall@${{ inputs.version }} (${{ matrix.os }}, Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['24.11.0', newest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      # Only for scripts/: the package itself comes from the registry, nothing is built here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # "newest" is the newest stable release: '*' with check-latest reads actions/node-versions,
+          # which lists releases only. 'latest' reads nodejs.org/dist/index.json, whose first entry
+          # can be a prerelease (it was v27.0.0-alpha.0.0.0 on 2026-11-03).
+          node-version: ${{ matrix.node == 'newest' && '*' || matrix.node }}
+          check-latest: ${{ matrix.node == 'newest' }}
+          package-manager-cache: false
+      - name: libusb for Foundry's Anvil (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libusb
+      # On Windows the demo installs the pinned Foundry build itself, which this job tests.
+      - name: Install Foundry (pinned, checksum verified)
+        if: runner.os != 'Windows'
+        run: |
+          bash scripts/install-foundry.sh
+          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
+      - name: Registry smoke
+        env:
+          VERSION: ${{ inputs.version }}
+        run: node scripts/registry-smoke.mjs "$VERSION"
+        shell: bash

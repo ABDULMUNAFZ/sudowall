@@ -20,19 +20,22 @@ You can also pass the id of the call's result or approval. In the local UI, ever
 Example, from the demo's paused payment:
 
 ```text
-Incident: evm/send_funds at 2026-10-29T18:42:41.090Z (ledger entry 5, event 0dcbfbfd-…)
+Incident: evm/send_funds at 2026-11-01T07:51:14.645Z (ledger entry 5, event ec6e76d1-…)
 Decision: ask; human denied it in the cli; outcome: denied
 Rules: ask-untrusted-recipient, ask-first-seen-recipient
+Why: ask-untrusted-recipient: The recipient address was copied from untrusted content. Argument `to` matched untrusted content from `files/read_text_file` (exact). ask-first-seen-recipient: First payment to this recipient.
 
 Where its values came from:
-  /to = 0xFe5c…91ed (evm-address): exact match with untrusted content from files/read_text_file at 2026-10-29T18:42:41.075Z
-    which was the result of files/read_text_file at 2026-10-29T18:42:41.059Z (event c826f674-…, allow)
+  /amount = 0.005 (amount): normalized match with untrusted content from files/read_text_file at 2026-11-01T07:51:14.635Z
+    which was the result of files/read_text_file at 2026-11-01T07:51:14.624Z (event afaba30f-…, allow)
+  /to = 0xFe5c…91ed (evm-address): exact match with untrusted content from files/read_text_file at 2026-11-01T07:51:14.635Z
+    which was the result of files/read_text_file at 2026-11-01T07:51:14.624Z (event afaba30f-…, allow)
 
 Ledger: OK, 13 entries verified, signed up to entry 13.
 Entries this report rests on: 3, 4, 5, 6, 7; all covered by a signed checkpoint.
 ```
 
-Exit code 0 when the ledger verifies, 4 when it does not, 2 for an unknown id.
+Values are listed by argument path, then by source, so the order does not change between versions. Exit code 0 when the ledger verifies, 4 when it does not, 5 when part of it was written by a newer SudoWall, 2 for an unknown id.
 
 ## TigerGraph (optional)
 

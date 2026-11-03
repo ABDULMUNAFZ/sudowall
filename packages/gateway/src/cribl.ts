@@ -21,7 +21,8 @@ interface RecordBase {
   schemaVersion: typeof CRIBL_RECORD_SCHEMA_VERSION;
   source: 'sudowall';
   sudowallVersion: string;
-  environment: CriblExportConfig['environment'];
+  /** Present only when the config sets it; never guessed. */
+  environment?: NonNullable<CriblExportConfig['environment']>;
   /** The ledger event id: `sudowall ledger inspect <eventId>` shows the signed original. */
   eventId: string;
   /** RFC 3339 UTC time the gateway recorded the event. */
@@ -93,7 +94,7 @@ function base(event: Event, environment: CriblExportConfig['environment']): Reco
     schemaVersion: CRIBL_RECORD_SCHEMA_VERSION,
     source: 'sudowall',
     sudowallVersion: GATEWAY_VERSION,
-    environment,
+    ...(environment === undefined ? {} : { environment }),
     eventId: event.id,
     timestamp: event.ts,
     sessionId: event.sessionId,
@@ -183,7 +184,7 @@ export function criblTestRecord(
     schemaVersion: CRIBL_RECORD_SCHEMA_VERSION,
     source: 'sudowall',
     sudowallVersion: GATEWAY_VERSION,
-    environment,
+    ...(environment === undefined ? {} : { environment }),
     eventId,
     timestamp: now.toISOString(),
     metadata: { sensitiveFieldsRemoved: true },
@@ -306,7 +307,10 @@ export interface CriblExportStats {
   /** Records accepted into the queue. */
   queued: number;
   delivered: number;
-  /** Records dropped because the queue was full or the exporter was closed. */
+  /**
+   * Records dropped because the queue was full, the exporter was closed, or the event could not
+   * be turned into a record.
+   */
   dropped: number;
   /** Records given up on after a permanent error, the last retry, or the shutdown deadline. */
   failed: number;
@@ -345,14 +349,7 @@ export class CriblExporter {
 
   enqueue(record: CriblRecord): boolean {
     if (this.closed || this.queue.length >= this.opts.maxQueueSize) {
-      this.counts.dropped += 1;
-      if (this.counts.dropped === 1 || this.counts.dropped % 100 === 0) {
-        this.opts.log.warn('cribl export dropped records', {
-          dropped: this.counts.dropped,
-          reason: this.closed ? 'closed' : 'queue-full',
-          maxQueueSize: this.opts.maxQueueSize,
-        });
-      }
+      this.countDrop(this.closed ? 'closed' : 'queue-full');
       return false;
     }
     this.queue.push(record);
@@ -360,6 +357,23 @@ export class CriblExporter {
     if (this.queue.length >= this.opts.batchSize) this.kick();
     else this.arm();
     return true;
+  }
+
+  /** Counts an event that could not be turned into a record. Never throws. */
+  dropUnbuildable(): void {
+    this.countDrop('unbuildable');
+  }
+
+  /** Logs on the first drop and every 100th, so a flood of drops cannot flood the log. */
+  private countDrop(reason: 'closed' | 'queue-full' | 'unbuildable'): void {
+    this.counts.dropped += 1;
+    if (this.counts.dropped === 1 || this.counts.dropped % 100 === 0) {
+      this.opts.log.warn('cribl export dropped records', {
+        dropped: this.counts.dropped,
+        reason,
+        maxQueueSize: this.opts.maxQueueSize,
+      });
+    }
   }
 
   /** Sends everything queued now (used by tests and on shutdown). */
@@ -533,6 +547,7 @@ export class ExportingSink implements EventSink {
       if (record !== undefined) this.exporter.enqueue(record);
     } catch {
       // toCriblRecord reads only schema-validated fields; this guards the decision path anyway.
+      this.exporter.dropUnbuildable();
     }
   }
 

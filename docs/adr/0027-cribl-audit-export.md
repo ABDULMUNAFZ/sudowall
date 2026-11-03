@@ -19,10 +19,12 @@ The gateway already writes every event through an `EventSink` chain (validate, r
 - **Diagnostics** log the status code and class, attempt number, event count, duration and a short reason (`timeout`, `ECONNREFUSED`, `http-503`). Never the token, the URL path or any record body.
 - **No new dependency.** Node's built-in `fetch`, `AbortSignal.timeout` and `AbortSignal.any`.
 - **`auditRecordHash` is not exported.** The ledger computes entry hashes inside the store; sinks do not see them. `eventId` is exported instead: `sudowall ledger inspect <eventId>` shows the signed original.
+- **`environment` has no default** (changed 2026-11-03; it defaulted to `development`). A record carries `environment` only when the config sets it, so production records are never labelled `development` by default. Leaving it unset was the smaller change than requiring it, and keeps existing configs valid.
 - **No risk score is invented.** SudoWall has no risk level; Cribl-side severity in the setup guide is derived from the decision and labelled as such.
 
 ## Consequences
 
 - `sudowall cribl test --config <file>` validates the section and sends one `connectivity_test` record; `sudowall demo --config <file>` runs the demo with export on, which produces one allowed, one blocked and one ask (denied) decision.
 - Delivery is best effort and in memory only: records queued when the process is killed are lost. The ledger still holds every event; a replay from the ledger is backlog work.
+- No startup check of the endpoint or token (decided 2026-11-03). Cribl documents no request to the HTTP/S (Bulk API) Source that checks the token without ingesting data: `/cribl_health` is opt-in per Source and documented as a health check only, an empty request's response is undocumented, and so are the status codes for a rejected token. A `connectivity_test` record at every start would put one record in the user's Cribl data per gateway start (one per wrapped server per MCP client launch). So the check stays the explicit `sudowall cribl test`, and the guide states that later failures only reach the gateway's stderr log. Revisit if Cribl documents an authenticated no-op.
 - MCP clients start `wrap` with the environment of the client's server entry, so the token variable must be set there (or in the shell for `serve`).

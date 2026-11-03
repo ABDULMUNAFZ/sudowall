@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { SCHEMA_VERSION, tgjson, type Event } from '@sudowall/core';
+import { EVENT_SCHEMA_VERSION, tgjson, type Event } from '@sudowall/core';
 import { Ledger, entryHash, loadOrCreateKeys, uuidBytes } from '@sudowall/ledger';
 import { describe, expect, it } from 'vitest';
 
@@ -27,7 +27,7 @@ function cli(home: string, args: string[]) {
 
 function call(i: number): Event {
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: EVENT_SCHEMA_VERSION,
     id: randomUUID(),
     ts: new Date(Date.UTC(2026, 10, 1, 7, 0, 0, i)).toISOString(),
     sessionId: '00000000-0000-4000-8000-000000000001',
@@ -68,7 +68,7 @@ function installationWithNewerEntry(): { home: string; db: string } {
   const last = sql.prepare('SELECT hash FROM ledger_entries WHERE seq = 2').get() as {
     hash: string;
   };
-  const ev = { ...call(2), schemaVersion: SCHEMA_VERSION + 1, addedLater: true };
+  const ev = { ...call(2), schemaVersion: EVENT_SCHEMA_VERSION + 1, addedLater: true };
   const text = tgjson(ev);
   sql
     .prepare(
@@ -96,7 +96,7 @@ describe('data from a newer SudoWall (exit 5)', () => {
     const r = cli(home, ['ledger', 'verify']);
     expect(r.code).toBe(5);
     expect(r.stdout).toBe(
-      `CANNOT VERIFY: entry 3 was written by a newer SudoWall (v0.8.0; event schema ${String(SCHEMA_VERSION + 1)}, this build reads up to ${String(SCHEMA_VERSION)}), upgrade to verify it. The hash chain and the checkpoint signatures check out.\n`,
+      `CANNOT VERIFY: entry 3 was written by a newer SudoWall (v0.8.0; event schema ${String(EVENT_SCHEMA_VERSION + 1)}, this build reads up to ${String(EVENT_SCHEMA_VERSION)}), upgrade to verify it. The hash chain and the checkpoint signatures check out.\n`,
     );
     expect(r.stdout).not.toContain('BAD_EVENT');
   });
@@ -109,6 +109,10 @@ describe('data from a newer SudoWall (exit 5)', () => {
       'Ledger: CANNOT VERIFY, entry 3 was written by a newer SudoWall (v0.8.0;',
     );
     expect(r.stdout).not.toContain('FAILED');
+    expect(r.stdout).toContain(
+      'Entries this report rests on: 1; this version cannot verify them (the ledger was written by a newer SudoWall).',
+    );
+    expect(r.stdout).not.toContain('signed yet');
   });
 
   it('wrap refuses a state database a newer SudoWall migrated, with exit 5', () => {

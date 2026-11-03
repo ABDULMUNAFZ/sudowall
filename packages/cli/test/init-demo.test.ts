@@ -48,6 +48,20 @@ describe('init', () => {
     expect(r.stdout).toContain(`'${join(dir, 'config.json')}'`);
   });
 
+  it('the dodo-payments template sets failure.onPolicyErrorNonSink to block explicitly', () => {
+    const dodo = join(tmp(), 'dodo');
+    expect(cli(['init', '--template', 'dodo-payments', '--dir', dodo]).code).toBe(0);
+    expect(JSON.parse(readFileSync(join(dodo, 'config.json'), 'utf8'))).toMatchObject({
+      failure: { onPolicyErrorNonSink: 'block' },
+    });
+    // The other templates leave it to the default (also block).
+    const everyday = join(tmp(), 'everyday');
+    expect(cli(['init', '--dir', everyday]).code).toBe(0);
+    expect(JSON.parse(readFileSync(join(everyday, 'config.json'), 'utf8'))).not.toHaveProperty(
+      'failure',
+    );
+  });
+
   it('defaults to the per-user config directory', () => {
     const r = cli(['init']);
     expect(r.code, r.stderr).toBe(0);
@@ -82,6 +96,9 @@ describe('demo --ci', () => {
       /Gate: allowed\. Sent 0\.005 ETH\. Transaction 0x[0-9a-f]{64} success/,
     );
     expect(r.stdout).toMatch(/OK: \d+ entries/);
+    // Every line of the ledger step is indented like the other steps.
+    expect(r.stdout).toMatch(/\n {3}OK: \d+ entries/);
+    expect(r.stdout).toContain('\n   Anchored: reaches checkpoint 1 as recorded.\n');
     expect(r.stdout).toMatch(/FAILED at entry \d+: HASH_MISMATCH/);
     expect(r.stdout).toContain('ok    ledger verify, then after an edit: OK, then caught');
     expect(r.stdout).not.toContain('FAIL ');

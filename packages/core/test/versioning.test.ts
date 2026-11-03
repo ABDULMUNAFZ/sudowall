@@ -1,6 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { SudoWallError, migrate, parseConfig, parseEvent, type Migration } from '../src/index.js';
+import {
+  CONFIG_SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION,
+  SudoWallError,
+  migrate,
+  parseConfig,
+  parseEvent,
+  type Migration,
+} from '../src/index.js';
 
 function codeOf(fn: () => unknown): string {
   try {
@@ -15,10 +23,14 @@ function codeOf(fn: () => unknown): string {
 describe('schema versioning', () => {
   it('rejects documents from a newer schema version', () => {
     fc.assert(
-      fc.property(fc.integer({ min: 2, max: 1_000_000 }), (v) => {
+      fc.property(fc.integer({ min: 1, max: 1_000_000 }), (n) => {
         // A distinct code: newer data is not invalid data.
-        expect(codeOf(() => parseEvent({ schemaVersion: v }))).toBe('NEWER_VERSION');
-        expect(codeOf(() => parseConfig({ schemaVersion: v }))).toBe('NEWER_VERSION');
+        expect(codeOf(() => parseEvent({ schemaVersion: EVENT_SCHEMA_VERSION + n }))).toBe(
+          'NEWER_VERSION',
+        );
+        expect(codeOf(() => parseConfig({ schemaVersion: CONFIG_SCHEMA_VERSION + n }))).toBe(
+          'NEWER_VERSION',
+        );
       }),
       { numRuns: 50 },
     );

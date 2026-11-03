@@ -1,4 +1,4 @@
-import { verifyDatabase, type StateDb } from '@sudowall/ledger';
+import { verifyDatabase, type StateDb, type VerifyOptions } from '@sudowall/ledger';
 import { LocalGraph, type GraphBackend, type Subgraph } from './local.js';
 import { deltaFor, type Edge, type ValueIdFn, type Vertex } from './model.js';
 
@@ -9,15 +9,31 @@ export interface LedgerEvent {
   event: Json;
 }
 
-/** Every ledger event in order. */
-export function readLedgerEvents(db: StateDb): LedgerEvent[] {
-  return (
-    db.prepare('SELECT seq, event_json FROM ledger_entries ORDER BY seq').all() as {
-      seq: number;
-      event_json: string;
-    }[]
-  ).map((r) => ({ seq: r.seq, event: JSON.parse(r.event_json) as Json }));
+/**
+ * Every ledger event in order. A stored event that is not a JSON object (a damaged database) is
+ * skipped and its seq passed to `onUnreadable`; verification reports the damage itself.
+ */
+export function readLedgerEvents(db: StateDb, onUnreadable?: (seq: number) => void): LedgerEvent[] {
+  const out: LedgerEvent[] = [];
+  for (const r of db.prepare('SELECT seq, event_json FROM ledger_entries ORDER BY seq').all() as {
+    seq: number;
+    event_json: string;
+  }[]) {
+    let event: unknown;
+    try {
+      event = JSON.parse(r.event_json);
+    } catch {
+      event = undefined;
+    }
+    if (event !== null && typeof event === 'object' && !Array.isArray(event)) {
+      out.push({ seq: r.seq, event: event as Json });
+    } else onUnreadable?.(r.seq);
+  }
+  return out;
 }
+
+/** Graph hops walked back from a call: 3 per causal step (used_in, contained, produced). */
+const CAUSAL_HOPS = 48;
 
 /** Builds (or rebuilds) the graph in `backend` from ledger events. */
 export async function buildGraph(
@@ -63,6 +79,13 @@ export interface IncidentReport {
   };
   /** Where the call's values came from, nearest first, then what those producing calls used. */
   path: PathStep[];
+  /**
+   * True when the walk stopped at its depth limit while some call on the path still had values
+   * of its own to trace: the path shown is not the whole history.
+   */
+  pathTruncated: boolean;
+  /** Ledger entries that could not be read as events (only in a damaged database). */
+  unreadableEntries: number[];
   graph: Subgraph;
   ledger: {
     ok: boolean;
@@ -109,34 +132,49 @@ export interface IncidentOptions {
   backend?: GraphBackend;
   /** The installation public key, so verification also checks who signed. */
   expectedPublicKey?: Buffer;
+  /** The anchored checkpoint, so verification also catches a rolled-back history. */
+  expectedCheckpoint?: VerifyOptions['expectedCheckpoint'];
 }
 
 export async function incidentReport(o: IncidentOptions): Promise<IncidentReport> {
-  const events = readLedgerEvents(o.db);
+  const unreadable: number[] = [];
+  const events = readLedgerEvents(o.db, (seq) => unreadable.push(seq));
   const target = findCall(events, o.ref);
   const callId = s(target.event['id']);
   const own = o.backend === undefined;
   const backend = o.backend ?? new LocalGraph();
   try {
     if (own) await buildGraph(events, backend, o.valueId);
-    const graph = await backend.causalPath(callId);
+    const graph = await backend.causalPath(callId, CAUSAL_HOPS);
     const v = new Map(graph.vertices.map((x) => [`${x.type}:${x.id}`, x]));
     const attr = (type: string, id: string, k: string) => s(v.get(`${type}:${id}`)?.attrs[k]);
+    // A source's own label (from its tool result); for a policy list, the label on the edge.
+    const sourceLabel = (sourceId: string, edgeLabel: unknown) =>
+      attr('Source', sourceId, 'label') || s(edgeLabel);
     // Masked labels are computed from the local ledger and never exported, so a remote backend
     // (TigerGraph) does not have them: fill them in here.
     const displays = new Map<string, string>();
+    // Match labels per contained edge, for the same reason (TigerGraph does not store them).
+    const edgeLabels = new Map<string, string>();
     for (const x of events) {
-      for (const vx of deltaFor(x.event, o.valueId).vertices) {
+      const d = deltaFor(x.event, o.valueId);
+      for (const vx of d.vertices) {
         if (vx.type === 'Value') displays.set(vx.id, s(vx.attrs['display']));
+      }
+      for (const ex of d.edges) {
+        if (ex.type === 'contained') {
+          edgeLabels.set(`${ex.from.id}>${ex.to.id}`, s(ex.attrs['sourceLabel']));
+        }
       }
     }
 
     const path: PathStep[] = [];
+    const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
     const seen = new Set<string>();
     const visit = (call: string, depth: number) => {
       if (seen.has(call)) return;
       seen.add(call);
-      const producers: string[] = [];
+      const steps: PathStep[] = [];
       for (const used of graph.edges.filter((e) => e.type === 'used_in' && e.to.id === call)) {
         for (const c of graph.edges.filter(
           (e) => e.type === 'contained' && e.to.id === used.from.id,
@@ -152,7 +190,10 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
             match: { type: s(c.attrs['matchType']), nearKind: s(c.attrs['nearKind']) },
             source: {
               id: c.from.id,
-              label: attr('Source', c.from.id, 'label'),
+              label: sourceLabel(
+                c.from.id,
+                c.attrs['sourceLabel'] ?? edgeLabels.get(`${c.from.id}>${c.to.id}`),
+              ),
               serverId: attr('Source', c.from.id, 'serverId'),
               origin: attr('Source', c.from.id, 'origin'),
               observedAt: attr('Source', c.from.id, 'observedAt'),
@@ -166,14 +207,34 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
               ts: attr('ToolCall', prod.from.id, 'ts'),
               verdict: attr('ToolCall', prod.from.id, 'verdict'),
             };
-            producers.push(prod.from.id);
           }
-          path.push(step);
+          steps.push(step);
         }
       }
-      for (const p of producers) visit(p, depth + 1);
+      // Sorted by argument path, then source, so the report does not depend on the order the
+      // graph backend returns edges in (it changed between versions).
+      steps.sort(
+        (a, b) =>
+          cmp(a.argPath, b.argPath) ||
+          cmp(a.source.observedAt, b.source.observedAt) ||
+          cmp(a.source.id, b.source.id) ||
+          cmp(a.match.type, b.match.type),
+      );
+      path.push(...steps);
+      for (const p of steps) if (p.producedBy !== undefined) visit(p.producedBy.eventId, depth + 1);
     };
     visit(callId, 0);
+    // A call on the path whose own event has provenance matches but whose values are missing
+    // from the walked graph was cut off by the depth limit.
+    const byId = new Map(events.map((x) => [s(x.event['id']), x.event]));
+    const pathTruncated = [...seen].some((call) => {
+      const matches = (byId.get(call)?.['provenance'] as Json | null | undefined)?.['matches'];
+      return (
+        Array.isArray(matches) &&
+        matches.length > 0 &&
+        !graph.edges.some((e) => e.type === 'used_in' && e.to.id === call)
+      );
+    });
 
     const e = target.event;
     const decision = (e['decision'] ?? {}) as Json;
@@ -194,10 +255,10 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
       .filter((x) => ids.has(s(x.event['id'])) || ids.has(s(x.event['callEventId'])))
       .map((x) => x.seq)
       .sort((a, b) => a - b);
-    const verified = verifyDatabase(
-      o.db,
-      o.expectedPublicKey === undefined ? {} : { expectedPublicKey: o.expectedPublicKey },
-    );
+    const verified = verifyDatabase(o.db, {
+      ...(o.expectedPublicKey === undefined ? {} : { expectedPublicKey: o.expectedPublicKey }),
+      ...(o.expectedCheckpoint === undefined ? {} : { expectedCheckpoint: o.expectedCheckpoint }),
+    });
     const lastSignedSeq = verified.ok ? verified.lastSignedSeq : null;
 
     return {
@@ -225,12 +286,14 @@ export async function incidentReport(o: IncidentOptions): Promise<IncidentReport
           : {}),
       },
       path,
+      pathTruncated,
+      unreadableEntries: unreadable,
       graph,
       ledger: {
         ok: verified.ok,
         newerVersion: !verified.ok && verified.kind === 'NEWER_VERSION',
         message: verified.ok
-          ? `${String(verified.entries)} entries verified, signed up to entry ${String(verified.lastSignedSeq)}`
+          ? `${String(verified.entries)} ${verified.entries === 1 ? 'entry' : 'entries'} verified, signed up to entry ${String(verified.lastSignedSeq)}`
           : verified.kind === 'NEWER_VERSION'
             ? verified.message.replace(/\.$/, '')
             : `${verified.kind}${verified.seq !== undefined ? ` at entry ${String(verified.seq)}` : ''}: ${verified.message}`,
@@ -256,10 +319,20 @@ function matchText(p: PathStep): string {
     : `${p.match.type} match with`;
 }
 
+/** True when the ledger failed verification for a reason other than newer data: damage or tampering. */
+const verifyFailed = (r: IncidentReport): boolean => !r.ledger.ok && !r.ledger.newerVersion;
+
 /** Plain-text rendering for the terminal. */
 export function renderText(r: IncidentReport): string {
   const c = r.call;
   const lines = [
+    // A report built on a ledger that does not verify must say so before anything else.
+    ...(verifyFailed(r)
+      ? [
+          `Verification failed: ${r.ledger.message}. Do not rely on this report until \`sudowall ledger verify\` passes.`,
+          '',
+        ]
+      : []),
     `Incident: ${c.serverId}/${c.tool} at ${c.ts} (ledger entry ${String(c.seq)}, event ${c.eventId})`,
     `Decision: ${c.verdict}${c.effective !== c.verdict ? ` (effective: ${c.effective}, ${c.mode} mode)` : ''}${c.approval ? `; human ${c.approval.outcome} it in the ${c.approval.channel}` : ''}; outcome: ${c.outcome || 'pending'}`,
     `Rules: ${c.rules.join(', ') || 'none (default stance)'}`,
@@ -268,6 +341,9 @@ export function renderText(r: IncidentReport): string {
     'Where its values came from:',
   ];
   if (r.path.length === 0) lines.push('  No argument matched untrusted content or a known value.');
+  if (r.pathTruncated) {
+    lines.push('  (The path is longer than shown: tracing stopped at its depth limit.)');
+  }
   for (const p of r.path) {
     const pad = '  '.repeat(p.depth + 1);
     lines.push(
@@ -282,7 +358,15 @@ export function renderText(r: IncidentReport): string {
   lines.push(
     '',
     `Ledger: ${r.ledger.ok ? 'OK' : r.ledger.newerVersion ? 'CANNOT VERIFY' : 'FAILED'}, ${r.ledger.message}.`,
-    `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${r.ledger.allSigned ? 'all covered by a signed checkpoint' : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'}.`,
+    `Entries this report rests on: ${r.ledger.entries.join(', ')}; ${
+      r.ledger.newerVersion
+        ? 'this version cannot verify them (the ledger was written by a newer SudoWall)'
+        : !r.ledger.ok
+          ? 'none of them can be trusted until the ledger verifies'
+          : r.ledger.allSigned
+            ? 'all covered by a signed checkpoint'
+            : 'not all signed yet (a checkpoint is written after a batch of entries, on a timer and on shutdown)'
+    }.`,
   );
   return `${lines.join('\n')}\n`;
 }
@@ -291,6 +375,12 @@ export function renderText(r: IncidentReport): string {
 export function renderMarkdown(r: IncidentReport): string {
   const c = r.call;
   const lines = [
+    ...(verifyFailed(r)
+      ? [
+          `> **Verification failed:** ${r.ledger.message}. Do not rely on this report until \`sudowall ledger verify\` passes.`,
+          '',
+        ]
+      : []),
     `## Incident: \`${c.serverId}/${c.tool}\``,
     '',
     `| | |`,
@@ -307,6 +397,8 @@ export function renderMarkdown(r: IncidentReport): string {
     '',
   ];
   if (r.path.length === 0) lines.push('No argument matched untrusted content or a known value.');
+  if (r.pathTruncated)
+    lines.push('_The path is longer than shown: tracing stopped at its depth limit._');
   for (const p of r.path) {
     lines.push(
       `${'  '.repeat(p.depth)}- \`${p.argPath}\` = \`${p.value.display}\` (${p.value.kind}): ${matchText(p)} ${sourceText(p)}${p.producedBy ? `, the result of \`${p.producedBy.serverId}/${p.producedBy.tool}\` (event \`${p.producedBy.eventId}\`)` : ''}`,
@@ -316,7 +408,15 @@ export function renderMarkdown(r: IncidentReport): string {
     '',
     '### Ledger',
     '',
-    `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${r.ledger.allSigned ? ', all signed.' : ', not all signed yet.'}`,
+    `${r.ledger.ok ? 'Verified' : r.ledger.newerVersion ? '**Cannot verify (newer SudoWall)**' : '**Verification FAILED**'}: ${r.ledger.message}. Entries used: ${r.ledger.entries.join(', ')}${
+      r.ledger.newerVersion
+        ? ', which this version cannot verify.'
+        : !r.ledger.ok
+          ? ', none of which can be trusted until the ledger verifies.'
+          : r.ledger.allSigned
+            ? ', all signed.'
+            : ', not all signed yet.'
+    }`,
   );
   return `${lines.join('\n')}\n`;
 }

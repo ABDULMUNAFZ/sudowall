@@ -1,6 +1,11 @@
 import { join } from 'node:path';
 import { SudoWallError, type Config, type ToolCallEvent } from '@sudowall/core';
-import { PolicyError, loadPolicyFile, type CompiledPolicy } from '@sudowall/policy';
+import {
+  PolicyError,
+  codeExecutionTools,
+  loadPolicyFile,
+  type CompiledPolicy,
+} from '@sudowall/policy';
 import { DbApprovalChannel, type ApprovalChannel, type ApprovalDetails } from './approvals.js';
 import { ExportingSink, createCriblExporter } from './cribl.js';
 import { checkEnvReferences } from './env.js';
@@ -104,16 +109,46 @@ export function loadConfiguredPolicy(config: Config): CompiledPolicy | undefined
   }
 }
 
-/** The decision pipeline for a config: the policy engine if a policy is set, else the deny list. */
-export function createPipeline(config: Config, store: GatewayStore): DecisionPipeline {
+/**
+ * Warnings about the config and policy together. Today one: `failure.onPolicyErrorNonSink` set
+ * to `allow` while the policy covers a tool that runs code, where a policy error would let the
+ * code run unchecked.
+ */
+export function policyConfigWarnings(
+  config: Config,
+  policy: CompiledPolicy,
+): { msg: string; fields: Record<string, unknown> }[] {
+  if (config.failure.onPolicyErrorNonSink !== 'allow') return [];
+  const tools = codeExecutionTools(policy);
+  if (tools.length === 0) return [];
+  const names = [...new Set(tools.map((t) => t.tool))].join(', ');
+  return [
+    {
+      msg: `failure.onPolicyErrorNonSink is "allow", and the policy covers a tool that runs code (${names}). If the policy cannot be evaluated for a call to it, the code runs unchecked. Set "failure": { "onPolicyErrorNonSink": "block" } in the config.`,
+      fields: { tools: tools.map((t) => `${t.server}/${t.tool}`) },
+    },
+  ];
+}
+
+/**
+ * The decision pipeline for a config: the policy engine if a policy is set, else the deny list.
+ * Warnings from `policyConfigWarnings` go to `log`.
+ */
+export function createPipeline(
+  config: Config,
+  store: GatewayStore,
+  log?: Logger,
+): DecisionPipeline {
   const policy = loadConfiguredPolicy(config);
   if (policy === undefined) {
     return new StaticDenyListPipeline(config.deny.tools, () => store.provenance());
   }
+  for (const w of policyConfigWarnings(config, policy)) log?.warn(w.msg, w.fields);
   return new PolicyPipeline(policy, config.deny.tools, {
     provenance: () => store.provenance(),
     state: () => store.policyState(),
     onErrorNonSink: config.failure.onPolicyErrorNonSink,
+    windowSeconds: config.provenance.windowSeconds,
   });
 }
 
@@ -137,7 +172,7 @@ export async function runGateway(
       store.close();
     },
   };
-  const pipeline = opts.pipeline ?? createPipeline(config, store);
+  const pipeline = opts.pipeline ?? createPipeline(config, store, log);
   if (policyPipeline) log.info('policy loaded', { path: config.policy?.path });
   const nameStore = opts.nameStore ?? new FileNameStore(join(stateDir, 'names.json'));
   const approvals =
@@ -163,6 +198,7 @@ export async function runGateway(
       (opts.stdin ?? process.stdin) as NodeJS.ReadStream,
       (opts.stdout ?? process.stdout) as NodeJS.WriteStream,
       config.limits.maxMessageBytes,
+      config.limits.maxWriteBufferBytes,
     );
     const session = new Session({ ...base, client: channel, clientTransport: 'stdio' });
     let resolveDone!: () => void;
@@ -189,6 +225,9 @@ export async function runGateway(
     port: config.listen.port,
     path: config.listen.path,
     maxMessageBytes: config.limits.maxMessageBytes,
+    maxSessions: config.limits.maxSessions,
+    sessionIdleMs: config.limits.sessionIdleMs,
+    maxWriteBufferBytes: config.limits.maxWriteBufferBytes,
     log,
     openSession: (channel, sessionId) => {
       const s = new Session({

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ModeSchema } from './decision.js';
-import { JsonPointerSchema, SCHEMA_VERSION, ServerIdSchema } from './primitives.js';
+import { CONFIG_SCHEMA_VERSION, JsonPointerSchema, ServerIdSchema } from './primitives.js';
 
 /**
  * A config value: either a literal or a reference to an environment variable.
@@ -116,8 +116,8 @@ export const CriblExportSchema = z
       .optional(),
     /** Environment variable holding the Source's auth token, sent as `Authorization: <token>`. */
     authToken: z.strictObject({ fromEnv: EnvNameSchema }).optional(),
-    /** Label added to every exported record. */
-    environment: z.enum(['development', 'test', 'production']).default('development'),
+    /** Label added to every exported record; when unset, records carry no `environment` field. */
+    environment: z.enum(['development', 'test', 'production']).optional(),
     batchSize: z.int().min(1).max(1000).default(25),
     flushIntervalMs: z.int().min(100).max(60_000).default(2_000),
     requestTimeoutMs: z.int().min(100).max(60_000).default(5_000),
@@ -206,7 +206,7 @@ export const UiConfigSchema = z
 
 export const ConfigSchema = z
   .strictObject({
-    schemaVersion: z.literal(SCHEMA_VERSION),
+    schemaVersion: z.literal(CONFIG_SCHEMA_VERSION),
     /** Observe by default: log what would happen, block nothing, until the user opts in. */
     mode: ModeSchema.default('observe'),
     upstreams: z.array(UpstreamSchema).min(1),
@@ -247,6 +247,23 @@ export const ConfigSchema = z
           .int()
           .min(0)
           .default(10 * 60 * 1000),
+        /** Requests in flight on one session; more are answered with -32004. */
+        maxPendingRequests: z.int().min(1).max(100_000).default(1024),
+        /** Concurrent 2025-era HTTP client sessions; more `initialize` requests get HTTP 503. */
+        maxSessions: z.int().min(1).max(10_000).default(64),
+        /** An HTTP client session with no request and no open stream for this long is closed. */
+        sessionIdleMs: z
+          .int()
+          .min(1000)
+          .default(60 * 60 * 1000),
+        /**
+         * Bytes a peer may leave unread in one outgoing stream (stdio pipe, HTTP response). A peer
+         * that stops reading past this is disconnected instead of growing the gateway's memory.
+         */
+        maxWriteBufferBytes: z
+          .int()
+          .min(64 * 1024)
+          .default(64 * 1024 * 1024),
       })
       .prefault({}),
     upstreamLifecycle: z
@@ -293,6 +310,13 @@ export const ConfigSchema = z
           .min(60)
           .max(90 * 86400)
           .default(86400),
+        /**
+         * Which untrusted content makes `session_tainted` true. `installation`: content any
+         * gateway process sharing the state database observed (an MCP client usually runs one
+         * gateway per server, so this is what links a web read in one server to a shell call in
+         * another). `session`: only content this gateway session observed.
+         */
+        taintScope: z.enum(['installation', 'session']).default('installation'),
       })
       .prefault({}),
     /** Policy engine config (Phase 4). */

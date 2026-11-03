@@ -37,6 +37,12 @@ export interface ProvenanceOptions {
   trusted: readonly TrustedSelector[];
   /** Config `provenance.windowSeconds`. */
   windowSeconds: number;
+  /**
+   * Config `provenance.taintScope`. `installation`: untrusted content seen by any gateway process
+   * sharing the database taints every session (one agent often runs one gateway per server).
+   * `session`: only content this gateway session observed counts.
+   */
+  taintScope?: 'installation' | 'session';
 }
 
 /** Tells the analyzer that an argument is an amount in a given unit (from a policy sink). */
@@ -63,18 +69,28 @@ interface Candidate {
 
 const escapePointer = (k: string) => k.replace(/~/g, '~0').replace(/\//g, '~1');
 const MAX_EVIDENCE = 16;
+/** How often (observed sources) the index deletes rows older than any possible window. */
+const PRUNE_EVERY = 1000;
+const TRUST_RANK: Record<TrustLabel, number> = { untrusted: 0, 'trusted-tool': 1, user: 2 };
 
-/** Concatenated string leaves of a JSON value, in document order: the source's canonical text. */
+/**
+ * The source's canonical text: its string leaves, and its number leaves as `key: number` (so
+ * `{"amount": 250}` reads like "amount: 250" and the number can be matched), in document order.
+ */
 export function contentText(v: JsonValue): string {
   const parts: string[] = [];
-  const walk = (x: JsonValue): void => {
+  const walk = (x: JsonValue, key: string | undefined): void => {
     if (typeof x === 'string') parts.push(x);
-    else if (Array.isArray(x)) x.forEach(walk);
-    else if (x !== null && typeof x === 'object' && !JSON.isRawJSON(x)) {
-      for (const k of Object.keys(x)) walk(x[k] as JsonValue);
+    else if (typeof x === 'number' || (x !== null && typeof x === 'object' && JSON.isRawJSON(x))) {
+      const n = typeof x === 'number' ? String(x) : JSON.stringify(x);
+      parts.push(key === undefined ? n : `${key}: ${n}`);
+    } else if (Array.isArray(x)) {
+      for (const it of x) walk(it, key);
+    } else if (x !== null && typeof x === 'object') {
+      for (const k of Object.keys(x)) walk(x[k] as JsonValue, k);
     }
   };
-  walk(v);
+  walk(v, undefined);
   return parts.join('\n');
 }
 
@@ -116,6 +132,7 @@ function scalarText(v: JsonValue | undefined): string | undefined {
  */
 export class ProvenanceEngine {
   readonly index: ProvenanceIndex;
+  private observed = 0;
 
   constructor(private readonly opts: ProvenanceOptions) {
     this.index = new ProvenanceIndex(opts.db, opts.key);
@@ -147,6 +164,7 @@ export class ProvenanceEngine {
     origin: string;
     content: JsonValue;
     observedAt: Date;
+    sessionId?: string | null;
   }): Source {
     const label = this.labelFor(input.serverId, input.kind, input.origin);
     const source: Source = {
@@ -167,9 +185,11 @@ export class ProvenanceEngine {
         serverId: input.serverId,
         origin: input.origin,
         observedAt: input.observedAt,
+        sessionId: input.sessionId ?? null,
       },
       extractValues(contentText(input.content)),
     );
+    if (++this.observed % PRUNE_EVERY === 1) this.index.prune(input.observedAt.getTime());
     return source;
   }
 
@@ -233,7 +253,13 @@ export class ProvenanceEngine {
   /** Matches every structured value in `args` against content observed in the window. */
   analyze(
     args: JsonObject,
-    opts: { now: Date; amountHints?: readonly AmountHint[]; references?: readonly Reference[] },
+    opts: {
+      now: Date;
+      amountHints?: readonly AmountHint[];
+      references?: readonly Reference[];
+      /** The calling session, for `taintScope: session`. */
+      sessionId?: string;
+    },
   ): ProvenanceReport {
     const since = opts.now.getTime() - this.windowMs;
     const idx = this.index;
@@ -247,13 +273,20 @@ export class ProvenanceEngine {
       matchType: ArgumentMatch['matchType'],
       near: NearKind | undefined,
       hits: IndexHit[],
+      reference = false,
     ) => {
       if (hits.length === 0) return;
-      const key = `${c.argPath}\0${c.norm.kind}\0${matchType}\0${near ?? ''}`;
+      // One match per distinct value: two addresses in one free-text argument stay apart. Hits on
+      // the user's own lists are a match of their own, so its label is exactly theirs.
+      const key = `${c.argPath}\0${c.norm.kind}\0${c.norm.value}\0${matchType}\0${near ?? ''}\0${reference ? 'ref' : ''}`;
       const g = groups.get(key);
       if (g !== undefined) g.hits.push(...hits);
       else {
-        const base = { argPath: c.argPath, valueKind: c.norm.kind };
+        const base = {
+          argPath: c.argPath,
+          valueKind: c.norm.kind,
+          valueRef: idx.hash('value', c.norm.kind, c.norm.value).slice(0, 16),
+        };
         const m =
           matchType === 'near'
             ? { ...base, matchType, nearKind: near as NearKind }
@@ -295,6 +328,14 @@ export class ProvenanceEngine {
           .filter((h) => h.valueHash !== valueHash);
         add(c, 'near', 'confusable', sk);
       }
+      if (c.norm.host !== undefined) {
+        // A URL on a host seen in content, with another path or query: where a planted link's
+        // owner can still receive the data.
+        const sameHost = idx
+          .lookup('host', idx.hash('host', kind, c.norm.host), since)
+          .filter((h) => h.valueHash !== valueHash);
+        add(c, 'near', 'same-host', sameHost);
+      }
       if (c.norm.poison !== undefined) {
         const lookalikes = idx
           .lookup('poison', idx.hash('poison', kind, c.norm.poison), since)
@@ -319,7 +360,7 @@ export class ProvenanceEngine {
                 ]
               : [];
           });
-          add(c, 'near', 'address-poisoning', refHits);
+          add(c, 'near', 'address-poisoning', refHits, true);
         }
       }
       const vk = `${c.argPath}\0${kind}\0${c.norm.value}`;
@@ -340,9 +381,13 @@ export class ProvenanceEngine {
         seen.add(k);
         return true;
       });
+      // Least trusted first, so the evidence shown always includes the hits that set the label.
       unique.sort(
         (a, b) =>
-          b.observedAt - a.observedAt || a.sourceId.localeCompare(b.sourceId) || a.start - b.start,
+          TRUST_RANK[a.label] - TRUST_RANK[b.label] ||
+          b.observedAt - a.observedAt ||
+          a.sourceId.localeCompare(b.sourceId) ||
+          a.start - b.start,
       );
       return {
         ...m,
@@ -365,7 +410,10 @@ export class ProvenanceEngine {
         ('nearKind' in a ? a.nearKind : '').localeCompare('nearKind' in b ? b.nearKind : ''),
     );
     return {
-      sessionTainted: idx.taintedSince(since),
+      sessionTainted: idx.taintedSince(
+        since,
+        this.opts.taintScope === 'session' ? (opts.sessionId ?? '') : undefined,
+      ),
       values: [...values.values()].sort(order),
       matches,
     };

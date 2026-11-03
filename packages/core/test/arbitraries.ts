@@ -9,7 +9,7 @@ import type {
   ProvenanceReport,
   Source,
 } from '../src/index.js';
-import { SCHEMA_VERSION, mostRestrictive } from '../src/index.js';
+import { EVENT_SCHEMA_VERSION, mostRestrictive } from '../src/index.js';
 
 /** JSON cannot represent -0; values that came from JSON.parse never contain it. */
 function stripNegativeZero(v: JsonValue): JsonValue {
@@ -63,12 +63,17 @@ const evidence = fc
   .record({ sourceId: id, start: fc.nat(10_000), len: fc.integer({ min: 1, max: 500 }) })
   .map(({ sourceId, start, len }) => ({ sourceId, start, end: start + len }));
 
-const matchBase = fc.record({
-  argPath: pointer,
-  valueKind: fc.constantFrom('evm-address', 'email', 'url', 'amount', 'token'),
-  sourceLabel: trustLabel,
-  evidence: fc.array(evidence, { minLength: 1, maxLength: 3 }),
-});
+const matchBase = fc.record(
+  {
+    argPath: pointer,
+    valueKind: fc.constantFrom('evm-address', 'email', 'url', 'amount', 'token'),
+    sourceLabel: trustLabel,
+    /** Event schema 2. */
+    valueRef: fc.stringMatching(/^[0-9a-f]{16}$/),
+    evidence: fc.array(evidence, { minLength: 1, maxLength: 3 }),
+  },
+  { requiredKeys: ['argPath', 'valueKind', 'sourceLabel', 'evidence'] },
+);
 
 export const argumentMatch: fc.Arbitrary<ArgumentMatch> = fc.oneof(
   matchBase.map((b) => ({ ...b, matchType: 'exact' as const })),
@@ -76,7 +81,14 @@ export const argumentMatch: fc.Arbitrary<ArgumentMatch> = fc.oneof(
   fc
     .tuple(
       matchBase,
-      fc.constantFrom('confusable', 'zero-width', 'case', 'split', 'address-poisoning'),
+      fc.constantFrom(
+        'confusable',
+        'zero-width',
+        'case',
+        'split',
+        'address-poisoning',
+        'same-host',
+      ),
     )
     .map(([b, nearKind]) => ({ ...b, matchType: 'near' as const, nearKind })),
 );
@@ -128,7 +140,7 @@ export const decision: fc.Arbitrary<Decision> = fc
   });
 
 const envelope = fc.record({
-  schemaVersion: fc.constant(SCHEMA_VERSION),
+  schemaVersion: fc.constant(EVENT_SCHEMA_VERSION),
   id,
   ts,
   sessionId: id,

@@ -40,6 +40,16 @@ export const PROVENANCE_MIGRATIONS = [
   CREATE INDEX provenance_values_group
     ON provenance_values (value_hash, raw_hash, label, observed_at);
   `,
+  // 3: URL hosts (`near: same-host`), and the session that observed each source (taint scope).
+  `
+  ALTER TABLE provenance_values ADD COLUMN host_hash TEXT;
+  CREATE INDEX provenance_values_host ON provenance_values (host_hash, observed_at)
+    WHERE host_hash IS NOT NULL;
+  ALTER TABLE provenance_sources ADD COLUMN session_id TEXT;
+  CREATE INDEX provenance_sources_session ON provenance_sources (session_id, label, observed_at);
+  CREATE INDEX provenance_sources_time ON provenance_sources (observed_at);
+  CREATE INDEX provenance_values_time ON provenance_values (observed_at);
+  `,
 ];
 
 export interface SourceRecord {
@@ -50,6 +60,8 @@ export interface SourceRecord {
   serverId: string | null;
   origin: string | null;
   observedAt: Date;
+  /** Gateway session that observed the source (for session-scoped taint). */
+  sessionId?: string | null;
 }
 
 export interface IndexHit {
@@ -62,7 +74,7 @@ export interface IndexHit {
   observedAt: number;
 }
 
-export type Variant = 'value' | 'raw' | 'skeleton' | 'poison';
+export type Variant = 'value' | 'raw' | 'skeleton' | 'poison' | 'host';
 
 /**
  * Rows kept per (value, raw text, label) group: the newest ones. The engine reports at most 16
@@ -70,6 +82,19 @@ export type Variant = 'value' | 'raw' | 'skeleton' | 'poison';
  * value repeated in thousands of results (an agent's own wallet address) keeps lookups bounded.
  */
 export const ROWS_PER_GROUP = 16;
+
+/**
+ * Most rows one lookup returns. A popular host (or a value repeated across many groups) cannot
+ * make a lookup unbounded. Rows are taken least trusted first, then newest, so the rows that
+ * decide a match's label are always among them.
+ */
+export const MAX_LOOKUP_ROWS = 256;
+
+/**
+ * Content older than this can never match: `provenance.windowSeconds` is at most 90 days for any
+ * process sharing the database. Older rows are deleted.
+ */
+export const RETENTION_MS = 90 * 86400 * 1000;
 
 /**
  * The provenance index, in the state database shared by every gateway process of this user.
@@ -89,14 +114,17 @@ export class ProvenanceIndex {
         `SELECT v.source_id AS sourceId, s.label AS label, v.start AS start, v."end" AS "end",
                 v.raw_hash AS rawHash, v.value_hash AS valueHash, v.observed_at AS observedAt
          FROM provenance_values v JOIN provenance_sources s ON s.source_id = v.source_id
-         WHERE v.${col} = ? AND v.observed_at >= ?`,
+         WHERE v.${col} = ? AND v.observed_at >= ?
+         ORDER BY CASE s.label WHEN 'untrusted' THEN 0 WHEN 'trusted-tool' THEN 1 ELSE 2 END,
+                  v.observed_at DESC, v.rowid DESC
+         LIMIT ${String(MAX_LOOKUP_ROWS)}`,
       );
     this.stmts = {
       source: db.prepare(
-        'INSERT INTO provenance_sources (source_id, event_id, kind, label, server_id, origin, observed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO provenance_sources (source_id, event_id, kind, label, server_id, origin, observed_at, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       ),
       value: db.prepare(
-        'INSERT INTO provenance_values (source_id, kind, value_hash, raw_hash, skeleton_hash, poison_hash, start, "end", observed_at, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO provenance_values (source_id, kind, value_hash, raw_hash, skeleton_hash, poison_hash, start, "end", observed_at, label, host_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       ),
       prune: db.prepare(
         `DELETE FROM provenance_values WHERE rowid IN (
@@ -107,9 +135,16 @@ export class ProvenanceIndex {
       byValue: lookup('value_hash'),
       bySkeleton: lookup('skeleton_hash'),
       byPoison: lookup('poison_hash'),
+      byHost: lookup('host_hash'),
       tainted: db.prepare(
         "SELECT 1 FROM provenance_sources WHERE label = 'untrusted' AND observed_at >= ? LIMIT 1",
       ),
+      taintedIn: db.prepare(
+        "SELECT 1 FROM provenance_sources WHERE session_id = ? AND label = 'untrusted' AND observed_at >= ? LIMIT 1",
+      ),
+      pruneValues: db.prepare('DELETE FROM provenance_values WHERE observed_at < ?'),
+      // A source's values carry its observed_at, so they are already gone when it is deleted.
+      pruneSources: db.prepare('DELETE FROM provenance_sources WHERE observed_at < ?'),
       describe: db.prepare(
         'SELECT source_id AS sourceId, event_id AS eventId, kind, label, server_id AS serverId, origin, observed_at AS observedAt FROM provenance_sources WHERE source_id = ?',
       ),
@@ -134,6 +169,7 @@ export class ProvenanceIndex {
           src.serverId,
           src.origin,
           at,
+          src.sessionId ?? null,
         );
         const groups = new Map<string, [string, string]>();
         for (const v of values) {
@@ -150,6 +186,7 @@ export class ProvenanceIndex {
             v.end,
             at,
             src.label,
+            v.host === undefined ? null : this.hash('host', v.kind, v.host),
           );
           groups.set(`${valueHash}${rawHash}`, [valueHash, rawHash]);
         }
@@ -160,19 +197,42 @@ export class ProvenanceIndex {
       .immediate();
   }
 
-  lookup(variant: 'value' | 'skeleton' | 'poison', hash: string, sinceMs: number): IndexHit[] {
+  lookup(
+    variant: 'value' | 'skeleton' | 'poison' | 'host',
+    hash: string,
+    sinceMs: number,
+  ): IndexHit[] {
     const stmt =
       variant === 'value'
         ? this.stmts.byValue
         : variant === 'skeleton'
           ? this.stmts.bySkeleton
-          : this.stmts.byPoison;
+          : variant === 'poison'
+            ? this.stmts.byPoison
+            : this.stmts.byHost;
     return stmt.all(hash, sinceMs) as IndexHit[];
   }
 
-  /** True if any untrusted content was observed since `sinceMs`. */
-  taintedSince(sinceMs: number): boolean {
-    return this.stmts.tainted.get(sinceMs) !== undefined;
+  /**
+   * True if untrusted content was observed since `sinceMs`: by any session sharing this database,
+   * or, with `sessionId`, by that session only.
+   */
+  taintedSince(sinceMs: number, sessionId?: string): boolean {
+    return sessionId === undefined
+      ? this.stmts.tainted.get(sinceMs) !== undefined
+      : this.stmts.taintedIn.get(sessionId, sinceMs) !== undefined;
+  }
+
+  /** Deletes rows older than the longest possible window. Returns the number of value rows. */
+  prune(nowMs: number): number {
+    const before = nowMs - RETENTION_MS;
+    return this.db
+      .transaction(() => {
+        const n = this.stmts.pruneValues.run(before).changes;
+        this.stmts.pruneSources.run(before);
+        return n;
+      })
+      .immediate();
   }
 
   /** Metadata of a source (for the approval UI): never content. */

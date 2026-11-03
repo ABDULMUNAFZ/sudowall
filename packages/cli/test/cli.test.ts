@@ -11,6 +11,8 @@ import { GATEWAY_VERSION } from '@sudowall/gateway';
 import { upstreamIdFor } from '../src/main.js';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
+/** The `sudowall` bin, as npm links it. */
+const BIN = fileURLToPath(new URL('../dist/bin.js', import.meta.url));
 const MEMORY = fileURLToPath(
   new URL('../node_modules/@modelcontextprotocol/server-memory/dist/index.js', import.meta.url),
 );
@@ -83,7 +85,7 @@ describe('sudowall command line', () => {
 
   it('runs through a symlinked bin (as npm installs it)', () => {
     const link = join(tmp(), 'sudowall');
-    symlinkSync(CLI, link);
+    symlinkSync(BIN, link);
     const r = spawnSync(process.execPath, [link, '--version'], { encoding: 'utf8' });
     expect(r.stdout).toBe(`${GATEWAY_VERSION}\n`);
   });

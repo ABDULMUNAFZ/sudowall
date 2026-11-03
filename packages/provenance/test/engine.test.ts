@@ -11,7 +11,11 @@ import { KEY, NOW, engine, freshDb, minutesAgo, seen } from './helpers.js';
 const classes = (r: ProvenanceReport) =>
   r.matches.map((m) => (m.matchType === 'near' ? `near:${m.nearKind}` : m.matchType)).sort();
 const flagged = (r: ProvenanceReport) =>
-  r.matches.some((m) => m.matchType === 'near' || m.sourceLabel === 'untrusted');
+  r.matches.some(
+    (m) =>
+      (m.matchType === 'near' && m.nearKind !== 'same-host') ||
+      (m.matchType !== 'near' && m.sourceLabel === 'untrusted'),
+  );
 
 describe('corpus', () => {
   it.each(CORPUS.map((c) => [c.name, c] as const))('%s', (_name, c) => {

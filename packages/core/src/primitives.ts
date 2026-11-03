@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
-/** Current version of every persisted SudoWall document (events, config). */
-export const SCHEMA_VERSION = 1;
+/**
+ * Version of the ledger event schema this build writes. 2 (0.8.0) added `valueRef` and the
+ * `same-host` near kind to provenance matches. Version 1 events stay valid as they were.
+ */
+export const EVENT_SCHEMA_VERSION = 2;
+
+/** Version of the gateway config document this build writes. */
+export const CONFIG_SCHEMA_VERSION = 1;
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 export type JsonObject = { [key: string]: JsonValue };

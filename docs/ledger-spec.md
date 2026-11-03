@@ -9,6 +9,7 @@ This document is the normative spec for the SudoWall ledger. A third party shoul
 **Not guaranteed:**
 
 - **Entries after the last checkpoint.** They are hash-chained but unsigned. Someone with write access to the file can truncate them or rewrite them consistently. Checkpoints are frequent (default every 256 entries or 60 s) to keep this window short.
+- **Rollback without an anchor.** Replacing the whole database with an older, correctly signed copy of itself passes the checks of section 7 alone. The local anchor (section 7.1) catches this; an attacker who can also rewrite the anchor file is the next item.
 - **An attacker with the signing key.** On the same machine, as the same OS user, such an attacker can rewrite the whole ledger and re-sign it. Exporting checkpoints off the machine (and later, optional on-chain anchoring) is what defends against this.
 - **Behaviour.** The ledger proves that history was not edited. It does not prove that the agent behaved well, or that every action went through the gate.
 
@@ -123,11 +124,22 @@ Input: an export (or the database). Output: `ok`, or the first failure with its 
    3. `prevCheckpointHash` matches, otherwise fail `CHECKPOINT_CHAIN_BREAK`.
    4. If `toSeq` is beyond the last entry, fail `TRUNCATED` (signed entries were removed).
    5. `lastEntryHash == entryHash(toSeq)` and `merkleRoot` matches the recomputed root, otherwise fail `CHECKPOINT_MISMATCH`, reporting the block's `fromSeq` (a consistent rewrite cannot be pinpointed further from a Merkle root).
-4. Report `ok` with `lastSignedSeq` and `unsignedTail = lastSeq - lastSignedSeq`.
+4. If an expected checkpoint (the anchor, section 7.1) was supplied: the ledger id MUST match it, a checkpoint with its `checkpointSeq` MUST exist and its hash MUST equal the anchored hash, otherwise fail `ROLLBACK`.
+5. Report `ok` with `lastSignedSeq`, `unsignedTail = lastSeq - lastSignedSeq`, `latestCheckpointHash`, `anchored` (an expected checkpoint was checked) and `unsigned` (entries exist and no checkpoint does).
+
+Verifying a database reads it in one transaction, so a gateway appending at the same time cannot make entries and checkpoints disagree.
+
+### 7.1 Local anchor and rollback
+
+Each time the ledger signs a checkpoint it also writes `ledger-anchor.json` in the key directory (`sudowall/ledger-anchor@1`: `ledgerId`, `keyId`, `checkpointSeq`, `toSeq`, `checkpointHash`, `createdAt`; mode 0600, written to a temporary file and renamed). The anchor only moves forward: a write with a lower `checkpointSeq` is ignored. `sudowall ledger verify` checks against it by default, and `--expect-checkpoint <seq>:<hash>` (or an anchor JSON) checks against one kept elsewhere. A database older than its anchor, or from another ledger, fails `ROLLBACK`; an anchor that exists but cannot be read is also reported as `ROLLBACK`, never as verified.
+
+`sudowall ledger verify` warns when no entry is signed yet and notes when no anchor was found. `--strict` fails when any entry is newer than the last signed checkpoint, or no anchor was found; run it after the gateways stopped (they sign pending entries on a clean shutdown). `sudowall ledger anchor` prints the current anchor so it can be copied off the machine. The anchor lives next to the signing key, so it does not stop an attacker who controls that directory; a copy kept elsewhere does.
 
 ### 7.2 Data from a newer SudoWall
 
 A failure kind says what went wrong; `NEWER_VERSION` says this verifier cannot tell. It is reported when the header or a checkpoint uses a newer `tg-ledger/<n>`, or when an entry's event has a newer `schemaVersion` and nothing this verifier can check failed (the hash chain over the stored text, the signatures, the anchor). Any check that fails first is reported instead, so relabelling an edited entry as "newer" still breaks the chain or a signed checkpoint. `NEWER_VERSION` is not tampering and not `ok`: the CLI prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; event schema <n>, this build reads up to <m>), upgrade to verify it.` and exits `5`, never the tamper exit code `4`.
+
+**Downgrades are not supported; upgrading is.** A newer build reads and verifies everything an older one wrote, including ledgers that mix both (event schema 1 entries followed by 2). An older build that meets newer data stops with `NEWER_VERSION` and exit code `5` and changes nothing: it never reports the data as damaged, never migrates it down and never appends to it. Builds before 0.7.1 do not know `NEWER_VERSION` and report newer events as `BAD_EVENT` (exit 4); use 0.7.1 or later to look at newer data, or better, upgrade.
 
 State database tables are versioned per component in `tg_schema`. A build that finds a component newer than it supports refuses the database with the same kind of message (`upgrade to open it`) and exit code `5`; `wrap` and `serve` check before they start. Builds from 0.8.0 on record their version in `tg_writer` so older builds can name it; the version is shown only when it is a plain `x.y.z` string.
 

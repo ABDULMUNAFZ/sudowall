@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Api, takeToken, type Product, type State } from './api.js';
+import { createPoller } from './poll.js';
 import {
   Activity,
   Agents,
@@ -39,7 +40,11 @@ export function App() {
   const [state, setState] = useState<State | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [productError, setProductError] = useState<string | null>(null);
   const [route, setRoute] = useState(routeFromHash);
+  // Polls never overlap, and an answer older than one already shown (a manual refresh raced a
+  // tick) is dropped; see poll.ts and its tests.
+  const abort = useRef(new AbortController());
 
   useEffect(() => {
     const on = () => {
@@ -52,30 +57,54 @@ export function App() {
     };
   }, []);
 
-  const refresh = useCallback(() => {
-    if (api === null) return;
-    api
-      .state()
-      .then((s) => {
-        setState(s);
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        setError((e as Error).message);
-      });
-  }, [api]);
-
-  const refreshProduct = useCallback(() => {
-    if (api === null) return;
-    api
-      .product()
-      .then(setProduct)
-      .catch(() => {
-        // The pages still work from decisions and approvals alone.
-      });
-  }, [api]);
+  const statePoller = useMemo(
+    () =>
+      api === null
+        ? null
+        : createPoller({
+            fetch: () => api.state(abort.current.signal),
+            onValue: (s: State) => {
+              setState(s);
+              setError(null);
+            },
+            onError: (e) => {
+              setError(e.message);
+            },
+          }),
+    [api],
+  );
+  const productPoller = useMemo(
+    () =>
+      api === null
+        ? null
+        : createPoller({
+            fetch: () => api.product(abort.current.signal),
+            onValue: (p: Product | null) => {
+              setProduct(p);
+              setProductError(null);
+            },
+            onError: (e) => {
+              // The pages still work from decisions and approvals; say the settings may be stale.
+              setProductError(e.message);
+            },
+          }),
+    [api],
+  );
+  const refresh = useCallback(
+    (force = false) => {
+      statePoller?.tick(force);
+    },
+    [statePoller],
+  );
+  const refreshProduct = useCallback(
+    (force = false) => {
+      productPoller?.tick(force);
+    },
+    [productPoller],
+  );
 
   useEffect(() => {
+    const controller = abort;
     refresh();
     refreshProduct();
     const t = setInterval(refresh, POLL_MS);
@@ -83,6 +112,8 @@ export function App() {
     return () => {
       clearInterval(t);
       clearInterval(p);
+      controller.current.abort();
+      controller.current = new AbortController();
     };
   }, [refresh, refreshProduct]);
 
@@ -110,8 +141,8 @@ export function App() {
     state,
     product,
     refresh: () => {
-      refresh();
-      refreshProduct();
+      refresh(true);
+      refreshProduct(true);
     },
     go,
   };
@@ -182,6 +213,11 @@ export function App() {
       </nav>
       <main>
         {error !== null && <p className="error banner">{error}</p>}
+        {productError !== null && product !== null && (
+          <p className="error banner">
+            Settings could not be refreshed ({productError}); what is shown may be out of date.
+          </p>
+        )}
         {pending > 0 && top !== 'approvals' && top !== '' && (
           <button
             type="button"

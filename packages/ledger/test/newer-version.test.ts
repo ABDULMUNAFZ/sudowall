@@ -1,14 +1,21 @@
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { NewerVersionError, SCHEMA_VERSION, tgjson } from '@sudowall/core';
+import {
+  EVENT_SCHEMA_VERSION,
+  NewerVersionError,
+  tgjson,
+  type ToolCallEvent,
+} from '@sudowall/core';
 import { describe, expect, it } from 'vitest';
 import {
+  WRITER_MIGRATIONS,
   ZERO_HASH,
   assertStateReadable,
   entryHash,
   exportLines,
   migrateComponent,
   openStateDb,
+  readWriterVersion,
   uuidBytes,
   verifyDatabase,
   verifyExport,
@@ -17,7 +24,7 @@ import {
 import { openLedger, sampleEvents, tempDir, toolCall } from './helpers.js';
 
 /** An event schema this build does not know: written by a newer SudoWall. */
-const NEWER = SCHEMA_VERSION + 1;
+const NEWER = EVENT_SCHEMA_VERSION + 1;
 
 interface Line {
   kind: 'header' | 'entry' | 'checkpoint';
@@ -81,7 +88,11 @@ describe('data written by a newer SudoWall', () => {
     expect(r.message).toContain(`event schema ${String(NEWER)}, this build reads up to`);
     expect(r.message).toContain('upgrade to verify it');
     expect(r.message).toContain('hash chain and the checkpoint signatures check out');
-    expect(r.newer).toEqual({ what: 'event schema', found: NEWER, supported: SCHEMA_VERSION });
+    expect(r.newer).toEqual({
+      what: 'event schema',
+      found: NEWER,
+      supported: EVENT_SCHEMA_VERSION,
+    });
   });
 
   it('still reports tampering: a newer entry with a wrong hash', () => {
@@ -93,7 +104,7 @@ describe('data written by a newer SudoWall', () => {
   it('still reports tampering: a broken entry after a newer one', () => {
     const { lines, ledgerId } = exported(3);
     append(lines, ledgerId, newerEvent(0));
-    append(lines, ledgerId, tgjson({ schemaVersion: SCHEMA_VERSION, type: 'tool.call' }));
+    append(lines, ledgerId, tgjson({ schemaVersion: EVENT_SCHEMA_VERSION, type: 'tool.call' }));
     expect(verify(lines)).toMatchObject({ ok: false, kind: 'BAD_EVENT', seq: 5 });
   });
 
@@ -220,5 +231,97 @@ describe('data written by a newer SudoWall', () => {
     }).toThrow(
       'written by a newer SudoWall (state database provenance schema 2, this build reads up to 1)',
     );
+  });
+});
+
+describe('the writer record (0.8.0 and later)', () => {
+  it('Ledger.open records the product version in tg_writer, and the last writer wins', () => {
+    const dir = tempDir();
+    openLedger(dir, { writerVersion: '0.8.0' }).close();
+    const path = join(dir, 'ledger.db');
+    let db = openStateDb(path, { readonly: true });
+    expect(readWriterVersion(db)).toBe('0.8.0');
+    db.close();
+    openLedger(dir, { writerVersion: '0.8.1' }).close();
+    db = openStateDb(path, { readonly: true });
+    expect(readWriterVersion(db)).toBe('0.8.1');
+    const v = db.prepare("SELECT version FROM tg_schema WHERE component = 'writer'").get();
+    db.close();
+    expect(v).toEqual({ version: WRITER_MIGRATIONS.length });
+  });
+
+  it('a ledger opened without a writer version has no record', () => {
+    const dir = tempDir();
+    openLedger(dir).close();
+    const db = openStateDb(join(dir, 'ledger.db'), { readonly: true });
+    expect(readWriterVersion(db)).toBeUndefined();
+    db.close();
+  });
+});
+
+describe('a ledger continued across the upgrade', () => {
+  it('verifies in full with event schema 1 entries followed by schema 2 entries', () => {
+    const dir = tempDir();
+    const ledger = openLedger(dir, { checkpointEveryEntries: 3 });
+    for (const e of sampleEvents(3)) ledger.append({ ...e, schemaVersion: 1 });
+    for (const e of sampleEvents(3)) {
+      ledger.append({
+        ...(toolCall({ to: 'https://evil.example/collect' }, 10) as ToolCallEvent),
+        id: e.id,
+        schemaVersion: 2,
+        provenance: {
+          sessionTainted: true,
+          values: [],
+          matches: [
+            {
+              argPath: '/to',
+              valueKind: 'url',
+              sourceLabel: 'untrusted',
+              valueRef: '0123456789abcdef',
+              matchType: 'near',
+              nearKind: 'same-host',
+              evidence: [{ sourceId: e.id, start: 0, end: 5 }],
+            },
+          ],
+        },
+      });
+    }
+    ledger.close();
+    const db = openStateDb(join(dir, 'ledger.db'), { readonly: true });
+    const r = verifyDatabase(db);
+    const versions = (
+      db.prepare('SELECT event_json FROM ledger_entries ORDER BY seq').all() as {
+        event_json: string;
+      }[]
+    ).map((x) => (JSON.parse(x.event_json) as { schemaVersion: number }).schemaVersion);
+    db.close();
+    expect(versions).toEqual([1, 1, 1, 2, 2, 2]);
+    expect(r).toMatchObject({ ok: true, entries: 6, lastSignedSeq: 6 });
+  });
+
+  it('a schema 1 entry that uses a schema 2 field is BAD_EVENT', () => {
+    const dir = tempDir();
+    const ledger = openLedger(dir);
+    expect(() => {
+      ledger.append({
+        ...(toolCall({}, 1) as ToolCallEvent),
+        schemaVersion: 1,
+        provenance: {
+          sessionTainted: false,
+          values: [],
+          matches: [
+            {
+              argPath: '/to',
+              valueKind: 'url',
+              sourceLabel: 'untrusted',
+              matchType: 'near',
+              nearKind: 'same-host',
+              evidence: [{ sourceId: toolCall({}).id, start: 0, end: 1 }],
+            },
+          ],
+        },
+      });
+    }).toThrow();
+    ledger.close();
   });
 });

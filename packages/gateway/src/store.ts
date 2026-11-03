@@ -3,18 +3,21 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Config } from '@sudowall/core';
 import {
+  ANCHOR_FILE,
   LEDGER_SCHEMA_VERSION,
   Ledger,
   Redactor,
   assertStateReadable,
   deriveKey,
   loadOrCreateKeys,
+  WRITER_MIGRATIONS,
   type InstallationKeys,
 } from '@sudowall/ledger';
 import { POLICY_STATE_SCHEMA_VERSION, PolicyStateStore } from '@sudowall/policy';
 import { PROVENANCE_MIGRATIONS, ProvenanceEngine } from '@sudowall/provenance';
 import { APPROVALS_SCHEMA_VERSION, ApprovalStore } from './approvals.js';
 import type { Logger } from './log.js';
+import { GATEWAY_VERSION } from './upstream.js';
 
 /** The product's former name. Its directories are still used if they exist and the new ones do not. */
 const LEGACY_NAME = 'tortoisegate';
@@ -103,6 +106,7 @@ export class GatewayStore {
       provenance: PROVENANCE_MIGRATIONS.length,
       policy: POLICY_STATE_SCHEMA_VERSION,
       approvals: APPROVALS_SCHEMA_VERSION,
+      writer: WRITER_MIGRATIONS.length,
     });
   }
 
@@ -131,6 +135,8 @@ export class GatewayStore {
         checkpointEverySeconds: l.checkpoint.everySeconds,
         durability: l.durability,
         busyTimeoutMs: l.busyTimeoutMs,
+        anchorPath: join(this.keys().dir, ANCHOR_FILE),
+        writerVersion: GATEWAY_VERSION,
         onError: (e) => {
           this.log.error('LEDGER CHECKPOINT FAILED', { error: e.message });
         },
@@ -146,6 +152,7 @@ export class GatewayStore {
       key: deriveKey(this.keys().hmacSecret, 'provenance-index'),
       trusted: this.config.trust.trustedTools,
       windowSeconds: this.config.provenance.windowSeconds,
+      taintScope: this.config.provenance.taintScope,
     });
     return this.provenanceCache;
   }

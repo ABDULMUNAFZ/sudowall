@@ -1,7 +1,13 @@
 import { randomUUID, sign } from 'node:crypto';
 import { EventSchema, tgjson, type Event } from '@sudowall/core';
 import { z } from 'zod';
-import { migrateComponent, openStateDb, type OpenStateDbOptions, type StateDb } from './db.js';
+import {
+  migrateComponent,
+  openStateDb,
+  recordWriter,
+  type OpenStateDbOptions,
+  type StateDb,
+} from './db.js';
 import {
   SPEC,
   ZERO_HASH,
@@ -12,6 +18,7 @@ import {
   uuidBytes,
   type CheckpointBody,
 } from './hashing.js';
+import { writeAnchor } from './anchor.js';
 import type { InstallationKeys } from './keys.js';
 
 /** Schema migrations for the ledger tables (index = version upgraded from). */
@@ -80,6 +87,14 @@ export interface LedgerOptions extends OpenStateDbOptions {
   now?: () => Date;
   /** Called when a timed checkpoint fails (it is retried on the next tick). */
   onError?: (e: Error) => void;
+  /**
+   * Anchor file (`ANCHOR_FILE` in the key directory) updated with every new checkpoint, so a
+   * rollback of the database to an older prefix is detectable. A failed anchor write is reported
+   * through `onError` and never fails the append.
+   */
+  anchorPath?: string;
+  /** Product version recorded in `tg_writer` when the ledger opens (see `recordWriter`). */
+  writerVersion?: string;
 }
 
 export interface EntryRow {
@@ -216,6 +231,7 @@ export class Ledger {
     const db = openStateDb(opts.path, opts);
     try {
       migrateComponent(db, 'ledger', MIGRATIONS);
+      if (opts.writerVersion !== undefined) recordWriter(db, opts.writerVersion);
       return new Ledger(db, opts);
     } catch (e) {
       db.close();
@@ -300,6 +316,22 @@ export class Ledger {
       signature,
       sha256Buf(msg),
     );
+    if (this.opts.anchorPath !== undefined) {
+      try {
+        // Inside the IMMEDIATE transaction: the write lock orders anchors across processes.
+        writeAnchor(this.opts.anchorPath, {
+          kind: 'sudowall/ledger-anchor@1',
+          ledgerId: body.ledgerId,
+          keyId: body.keyId,
+          checkpointSeq: body.checkpointSeq,
+          toSeq: body.toSeq,
+          checkpointHash: sha256Buf(msg),
+          createdAt: body.createdAt,
+        });
+      } catch (e) {
+        this.opts.onError?.(e as Error);
+      }
+    }
     return body;
   }
 

@@ -1,15 +1,25 @@
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrateComponent, openStateDb, type StateDb } from '@sudowall/ledger';
+import { onTestFinished } from 'vitest';
 import { ProvenanceEngine, type TrustedSelector } from '../src/index.js';
 
 export const KEY = randomBytes(32);
 
+/**
+ * A new state database in its own temp directory, removed when the calling test finishes. Some
+ * tests fill the index to its bound, so a leaked directory can hold about 200 MB.
+ */
 export function freshDb(): { db: StateDb; path: string } {
-  const path = join(mkdtempSync(join(tmpdir(), 'tg-prov-')), 'ledger.db');
+  const dir = mkdtempSync(join(tmpdir(), 'tg-prov-'));
+  const path = join(dir, 'ledger.db');
   const db = openStateDb(path);
+  onTestFinished(() => {
+    if (db.open) db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
   migrateComponent(db, 'noop', []);
   return { db, path };
 }

@@ -2,7 +2,61 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
-## 0.7.1 (prepared, not published)
+## Unreleased
+
+Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).
+
+### Added
+
+- **Optional Cribl export** (experimental, off by default): the `events.cribl` config section sends a sanitized record of each decision, tool result and approval to a Cribl Stream HTTP/S (Bulk API) Source. Records carry ids, names that look like identifiers, the verdict, matched rule ids, the policy hash and match counts; never arguments, results, values, error messages or the free-text reason. https only (plain http only to this machine), no redirects, the token only through `{ "fromEnv" }`. Export happens after the ledger write and never delays or fails a decision; delivery is best effort with a bounded queue, retries with backoff and a time-limited flush on exit. Upstream servers never inherit the token variable, also under `wrap`. New `sudowall cribl test --config <file>` and `sudowall demo --config <file>`. Export failures after startup (a rejected token, an unreachable Source, dropped records) appear only in the gateway's stderr log for now: `sudowall status`, the local app and the ledger do not show them. The gateway does not check the token at startup (Cribl documents no request that checks it without ingesting data); run `sudowall cribl test`. `environment` has no default and is added to records only when set. Guide: [docs/integrations/cribl.md](docs/integrations/cribl.md), decisions in [ADR 0027](docs/adr/0027-cribl-audit-export.md).
+
+### Security
+
+- **Dodo Payments template v3:** code is parsed, and only a proven read runs unasked: `async function run(client)` whose every call is `client.<resource>.list(query)` or `.retrieve(id)` on a fixed list of resources, with literal arguments and no value from untrusted content. Everything else asks, and code that writes with a value from untrusted content is still blocked. Read-looking text (comments, strings, `&&`, aliases, bracket access, request options) no longer lets a write run unasked (audit H1). New policy condition `sdk_read_only`. Input that parsers may read differently is never proven: unusual whitespace, line terminators and invisible characters, non-ASCII outside strings and comments, hashbangs, HTML-like comments, `using`, decorators, import attributes, duplicate keys, and anything the parser could only recover from. It parses with `@babel/parser` 8.0.7, a new runtime dependency of about 2 MB loaded only when a policy uses it ([ADR 0025](docs/adr/0025-read-check-parser.md)).
+- **Everyday template v2:** a final rule asks when a tool that is not named like a read gets a value from untrusted content, a lookalike of one, or a URL on the same host as an untrusted one. Policy selectors accept `exclude: [glob, ...]`.
+- **New near kind `same-host`** for URLs on the host of an untrusted URL with another path or query.
+- **Provenance failures fail closed:** if a result cannot be recorded, calls that would be allowed ask until the provenance window has passed (`provenance-gap`).
+- **Rollback detection:** each checkpoint updates a monotonic `ledger-anchor.json`; `ledger verify` (and the UI and incident reports) fail with `ROLLBACK` on an older history or a damaged anchor. New `ledger verify --expect-checkpoint` and `--strict`, and `ledger anchor`.
+- Upstream stderr is redacted for credentials before it is logged.
+- A slow sink can no longer let a timed-out or cancelled call be forwarded afterwards.
+- Client notifications that carry a request method are dropped instead of forwarded.
+- **`failure.onPolicyErrorNonSink` and code-running tools:** `init --template dodo-payments` writes `"failure": { "onPolicyErrorNonSink": "block" }` (the default) explicitly. When it is `allow` and the policy covers a tool that runs code (any rule on it uses `sdk_read_only`, such as Dodo's `execute`), the gateway logs a warning at start: a policy error on such a call would let the code run unchecked.
+
+### Versioning and downgrades
+
+See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not supported; upgrading is.
+
+- **Event schema 2.** New events are written with `schemaVersion: 2` (they may carry `valueRef` and the `same-host` near kind). Version 1 events stay valid, so ledgers that continue across the upgrade verify in full. The config file stays at `schemaVersion: 1`.
+- **Data from a newer SudoWall is not reported as tampering.** `ledger verify` prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; …), upgrade to verify it.` and exits with the new code `5`; tampering stays `4`. A state database from a newer build is refused the same way, and `wrap` and `serve` check before they start. 0.7.1 has the same handling.
+- The ledger records the product version that writes it (`tg_writer`), so older builds can name it.
+
+### Requirements
+
+- **Node.js 24.11.0 or later** (was 24.0.0), because `@babel/parser` 8 requires it ([ADR 0025](docs/adr/0025-read-check-parser.md)). On an older Node.js the `sudowall` command stops before it loads anything else and prints `SudoWall needs Node.js 24.11 or newer (you have <version>). Update Node and run it again.`, with exit code 1. npm itself only warns.
+
+### Fixed
+
+- **Shutdown:** `session.ended` is written before the ledger closes. The gateway no longer logs `EVENT SINK FAILED … session.ended … the ledger is closed` when the client disconnects.
+- **Incident reports for a ledger from a newer SudoWall** say the entries cannot be verified by this version (terminal, Markdown and the local app), instead of "not all signed yet".
+- **Incident reports for a ledger that fails verification** lead with `Verification failed: <reason>. Do not rely on this report ...` (terminal, Markdown and the local app) and say the entries cannot be trusted, instead of "not all signed yet".
+- Request ids are compared in canonical form (`1` and `1.0`, `"a"` and `"\u0061"` are the same id), replies keep the id as the client spelled it, and duplicate ids are refused while the first is still being admitted.
+- New limits: `maxPendingRequests` (-32004), `maxSessions` (HTTP 503), `sessionIdleMs`, `maxWriteBufferBytes`. SSE events are size-checked before delivery, and multi-line payloads are framed correctly.
+- A second HTTP request with an in-flight id gets 409 and no longer replaces the first one's stream.
+- Counts of one are singular: `ledger verify` prints `1 checkpoint` and `1 entry` (was `1 checkpoints`, `1 entries`), `incident` says `1 entry verified`, and the local app's Integrations page says `1 server protected`.
+- Remote upstreams: notifications are not awaited, cancellation aborts the request stream, and the GET stream reconnects with backoff.
+- Provenance: numeric result fields are indexed, each value in an argument is its own match, lookups are bounded and prefer untrusted rows, and old rows are pruned after 90 days. `provenance.taintScope: session` is available.
+- Ledger verification of a database reads one snapshot; `ledger export` respects backpressure.
+- `protect`: stricter detection of wrapped entries, header variables do not overwrite existing ones, `unprotect` keeps later env changes, URL secrets are masked, and config writes take a lock.
+- Incident reports show when a path was cut at the depth limit and which ledger entries could not be read, and label sources by their own trust.
+- The app: polls no longer race, settings errors are shown, the Overview labels watching-only counts separately, Activity shows how each call ended and pages back with "Show older", and Record shows signing and anchor status.
+
+### Known advisories
+
+- **`npm audit` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) in a project that installs `sudowall`.** Both come from `@modelcontextprotocol/server-filesystem` 2.1.0, the filesystem MCP server that `sudowall demo` runs. No release of it allows the fixed versions yet, and the overrides in this repository do not reach your install. SudoWall does not import either package, and only `sudowall demo` starts that server.
+  - glob: `server-filesystem` 2.1.0 never imports it, so this advisory cannot be reached. Upstream has removed the dependency; the change ships in its next release.
+  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet; the issue is [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420).
+
+## 0.7.1 (2026-11-03)
 
 ### Fixed
 
@@ -14,6 +68,12 @@ All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions fol
 ### Security
 
 - **Dependency advisories in the build:** this repository's lockfile now uses minimatch 11.0.3 (GHSA-g3hv-75wg-m249) and glob 14.0.3 (GHSA-3g3m-2fjr-6pw4) through pnpm overrides ([ADR 0026](docs/adr/0026-dependency-audit-overrides.md)). The published package still depends on `@modelcontextprotocol/server-filesystem` 2.1.0, the newest release, whose own ranges give an npm install minimatch 10.2.6 and glob 13.0.6. That server never imports glob; the demo uses it with only the demo inbox allowed.
+
+### Known advisories
+
+- **`npm audit` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) in a project that installs `sudowall`.** Both come from `@modelcontextprotocol/server-filesystem` 2.1.0, the filesystem MCP server that `sudowall demo` runs. No release of it allows the fixed versions yet, and the overrides in this repository do not reach your install. SudoWall does not import either package, and only `sudowall demo` starts that server.
+  - glob: `server-filesystem` 2.1.0 never imports it, so this advisory cannot be reached. Upstream has removed the dependency; the change ships in its next release.
+  - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet; the issue is [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420).
 
 ## 0.7.0 (2026-10-30)
 

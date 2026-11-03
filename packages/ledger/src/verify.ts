@@ -1,7 +1,7 @@
 import { verify as edVerify } from 'node:crypto';
 import {
   EventSchema,
-  SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION,
   newerVersionMessage,
   parseLossless,
   tgjson,
@@ -35,6 +35,7 @@ export type VerifyFailureKind =
   | 'CHECKPOINT_CHAIN_BREAK'
   | 'CHECKPOINT_MISMATCH'
   | 'TRUNCATED'
+  | 'ROLLBACK'
   /**
    * Not tampering: part of the ledger was written by a newer SudoWall, so this build cannot
    * check it. Reported only when nothing this build can check failed first.
@@ -50,6 +51,15 @@ export type VerifyResult =
       checkpoints: number;
       lastSignedSeq: number;
       unsignedTail: number;
+      /** Hash of the newest checkpoint (record it off the machine to detect later rollback). */
+      latestCheckpointHash: string | null;
+      /**
+       * True when the history reaches the expected (anchored) checkpoint; false when no anchor
+       * was given, so a valid but older prefix of the history would also pass.
+       */
+      anchored: boolean;
+      /** True when no entry is signed at all: the history is only hash-chained. */
+      unsigned: boolean;
     }
   | {
       ok: false;
@@ -87,6 +97,11 @@ export interface VerifyCheckpoint {
 export interface VerifyOptions {
   /** A public key obtained out of band (raw 32 bytes). The ledger must have been signed by it. */
   expectedPublicKey?: Buffer;
+  /**
+   * The newest checkpoint known from outside the ledger (the anchor file, or a value recorded
+   * off the machine). The ledger must contain it, byte for byte; otherwise `ROLLBACK`.
+   */
+  expectedCheckpoint?: { checkpointSeq: number; checkpointHash: string; ledgerId?: string };
 }
 
 const CheckpointBodySchema = z.strictObject({
@@ -120,7 +135,9 @@ function newerSpec(spec: unknown): NewerVersionInfo | undefined {
 function newerEventVersion(event: unknown): number | undefined {
   if (typeof event !== 'object' || event === null) return undefined;
   const v = (event as { schemaVersion?: unknown }).schemaVersion;
-  return typeof v === 'number' && Number.isSafeInteger(v) && v > SCHEMA_VERSION ? v : undefined;
+  return typeof v === 'number' && Number.isSafeInteger(v) && v > EVENT_SCHEMA_VERSION
+    ? v
+    : undefined;
 }
 
 const INTACT = ' The hash chain and the checkpoint signatures check out.';
@@ -234,7 +251,17 @@ export function verifyLedger(
   }
   const lastSeq = expected - 1;
 
+  if (
+    opts.expectedCheckpoint?.ledgerId !== undefined &&
+    opts.expectedCheckpoint.ledgerId !== header.ledgerId
+  ) {
+    return fail(
+      'ROLLBACK',
+      `the anchor is for ledger ${opts.expectedCheckpoint.ledgerId}, but this is ledger ${header.ledgerId}`,
+    );
+  }
   const pub = publicKeyFromRaw(header.publicKey);
+  const cpHashes: string[] = [];
   let prevTo = 0;
   let prevCpHash = ZERO_HASH;
   let n = 0;
@@ -296,10 +323,29 @@ export function verifyLedger(
     }
     prevTo = body.toSeq;
     prevCpHash = sha256Buf(msg);
+    cpHashes.push(prevCpHash);
+  }
+  const want = opts.expectedCheckpoint;
+  if (want !== undefined) {
+    const have = cpHashes[want.checkpointSeq - 1];
+    if (have === undefined) {
+      return fail(
+        'ROLLBACK',
+        `the ledger ends at checkpoint ${String(n)}, but checkpoint ${String(want.checkpointSeq)} was signed earlier: newer history was removed`,
+        { checkpointSeq: want.checkpointSeq, seq: lastSeq + 1 },
+      );
+    }
+    if (have !== want.checkpointHash) {
+      return fail(
+        'ROLLBACK',
+        `checkpoint ${String(want.checkpointSeq)} differs from the anchored one: history was replaced`,
+        { checkpointSeq: want.checkpointSeq },
+      );
+    }
   }
   if (firstNewer !== undefined) {
     return newerFailure(
-      { what: 'event schema', found: firstNewer.version, supported: SCHEMA_VERSION },
+      { what: 'event schema', found: firstNewer.version, supported: EVENT_SCHEMA_VERSION },
       { seq: firstNewer.seq },
       true,
     );
@@ -312,6 +358,9 @@ export function verifyLedger(
     checkpoints: n,
     lastSignedSeq: prevTo,
     unsignedTail: lastSeq - prevTo,
+    latestCheckpointHash: cpHashes[cpHashes.length - 1] ?? null,
+    anchored: want !== undefined,
+    unsigned: lastSeq > 0 && n === 0,
   };
 }
 
@@ -345,14 +394,18 @@ function* dbCheckpoints(db: StateDb): Generator<VerifyCheckpoint> {
 }
 
 function verifyDatabaseOnly(db: StateDb, opts: VerifyOptions = {}): VerifyResult {
-  const meta = readLedgerMeta(db);
-  if (meta === undefined) return fail('BAD_HEADER', 'no ledger in this database');
-  return verifyLedger(
-    { spec: meta.spec, ledgerId: meta.ledgerId, publicKey: meta.publicKey, keyId: meta.keyId },
-    dbEntries(db),
-    dbCheckpoints(db),
-    opts,
-  );
+  // One read transaction: entries and checkpoints come from the same snapshot, even while
+  // other gateway processes append.
+  return db.transaction(() => {
+    const meta = readLedgerMeta(db);
+    if (meta === undefined) return fail('BAD_HEADER', 'no ledger in this database');
+    return verifyLedger(
+      { spec: meta.spec, ledgerId: meta.ledgerId, publicKey: meta.publicKey, keyId: meta.keyId },
+      dbEntries(db),
+      dbCheckpoints(db),
+      opts,
+    );
+  })();
 }
 
 /** Verifies the ledger stored in a state database. */

@@ -47,7 +47,7 @@ The demo starts a private local test chain, puts SudoWall in front of two real M
    Gate: allowed. Sent 0.005 ETH. Transaction 0xa38d…812f success in block 1 (chain 31337).
 
 4. Every step is in a signed, hash-chained ledger. sudowall ledger verify:
-   OK: 13 entries, 1 checkpoints, last signed entry 13, 0 unsigned (newer than the last checkpoint).
+   OK: 13 entries, 1 checkpoint, last signed entry 13, 0 unsigned (newer than the last checkpoint).
    Now someone edits entry 10 in a copy of the ledger (the amount of the blocked payment):
    FAILED at entry 10: HASH_MISMATCH: entry hash does not match
 ```
@@ -73,7 +73,7 @@ Then restart the client and open `npx sudowall ui` to watch decisions. The gate 
 
 ### Security logs: Cribl
 
-Optionally send a sanitized copy of each decision (no arguments, results or values) to a Cribl Stream HTTP/S Source. Off by default; the local signed ledger stays the record. See [docs/integrations/cribl.md](docs/integrations/cribl.md).
+Experimental. Optionally send a sanitized copy of each decision (no arguments, results or values) to a Cribl Stream HTTP/S Source. Off by default; the local signed ledger stays the record. Export failures after startup (a rejected token, an unreachable Source, dropped records) appear only in the gateway's stderr log for now: `sudowall status`, the local app and the ledger do not show them. See [docs/integrations/cribl.md](docs/integrations/cribl.md).
 
 ## How it works
 
