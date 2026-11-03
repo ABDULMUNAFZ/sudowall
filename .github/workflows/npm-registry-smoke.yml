@@ -7,11 +7,6 @@ name: npm registry smoke
 #
 #   gh workflow run npm-registry-smoke.yml -f version=0.7.1
 on:
-  # TEMPORARY: workflow_dispatch only works once this file is on main, so this push trigger runs
-  # it once for 0.7.1 from this branch. The next commit removes it.
-  push:
-    branches: [fix/audit-recheck-split]
-    paths: [.github/workflows/npm-registry-smoke.yml]
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +19,7 @@ permissions:
 
 jobs:
   smoke:
-    name: sudowall@${{ inputs.version || '0.7.1' }} (${{ matrix.os }}, Node ${{ matrix.node }})
+    name: sudowall@${{ inputs.version }} (${{ matrix.os }}, Node ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +51,6 @@ jobs:
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
       - name: Registry smoke
         env:
-          VERSION: ${{ inputs.version || '0.7.1' }}
+          VERSION: ${{ inputs.version }}
         run: node scripts/registry-smoke.mjs "$VERSION"
         shell: bash
