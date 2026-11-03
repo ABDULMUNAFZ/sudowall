@@ -1,8 +1,21 @@
 # 0.8.0 draft: behaviour delta against 0.7.0
 
-Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). Nothing is published to npm. `main` holds `release/0.7.x` (0.7.1, not published), merged through PRs #2 and #3 on 2026-11-01, and this branch merged `main` in `211dbae`, so the package version here is 0.7.1 until release day. The live demo and www.sudowall.tech still run 0.7.0.
+Status: **draft, not released.** Branch `fix/audit-recheck` (pushed as `fix/audit-recheck-split`). Nothing of 0.8.0 is published. **0.7.1 was published on 2026-11-03** (see [0.7.1 published](#071-published-2026-11-03)); the gap before 0.8.0 ends **2026-11-06 07:25 UTC**. `main` holds `release/0.7.x` (0.7.1), merged through PRs #2 and #3 on 2026-11-01, and this branch merged `main` in `211dbae`, so the package version here is 0.7.1 until release day. The live demo and www.sudowall.tech still run 0.7.0.
 
-Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`, and again for the commits after `26782ba`, up to `cbc4d32`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01) and [Since 26782ba](#since-26782ba-2026-11-01), the release candidates in [Release candidates](#release-candidates-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release is prepared on the `release/0.7.x` branch and is not published. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
+## 0.7.1 published (2026-11-03)
+
+Published from `release/0.7.x` at `9aa0466` (tag `v0.7.1`), following [step 1 of the release plan](#1-publish-071-branch-release07x).
+
+- npm: [`sudowall@0.7.1`](https://www.npmjs.com/package/sudowall/v/0.7.1), published 2026-11-03 07:25:00 UTC. `npm view sudowall dist-tags` prints `{ latest: '0.7.1' }`.
+- `dist.integrity` is `sha512-VQa8cnqrra+DVZjxxkYGGOOjLSsR+FYiAZjfvtX8eKyvJ1DJbiJo3uby0Pu6/YY5GINBoq8AWpC3kbVuNJnHHA==`, the SHA-512 of the local `release/sudowall-0.7.1.tgz`; `dist.shasum` `f59e34ea7d8a16837ab80a7946892c4e66c321e3` is its SHA-1. Its SHA-256, `f1c26660dddba335d5e73892ef9bd3e648519d9eb6212b145859a5982f5df250`, equals the 0.7.1 release candidate's in [Release candidates](#release-candidates-2026-11-01).
+- GitHub release: [SudoWall 0.7.1: newer data is not tampering](https://github.com/ABDULMUNAFZ/sudowall/releases/tag/v0.7.1), marked Latest, notes from the CHANGELOG's 0.7.1 section.
+- GitHub Packages: `@abdulmunafz/sudowall` 0.7.1, published by [run 41596251829](https://github.com/ABDULMUNAFZ/sudowall/actions/runs/41596251829) (success).
+- Checked on Linux (Fedora 44, Node.js 24.22.0) with an empty npm cache: `npx -y sudowall@0.7.1 --version` prints `0.7.1`, and `demo --ci` prints four `ok` lines and exits 0.
+- The CHANGELOG heading on `release/0.7.x` and in the tag says `## 0.7.1 (2026-11-01)`, the day it was prepared; npm and GitHub date it 2026-11-03.
+
+The gap ends 2026-11-06 07:25 UTC, 72 hours after the GitHub release (see [The gap](#2-the-gap)).
+
+Updated on 2026-11-01 for the commits after `4afaeba`, up to `30e7045`, and again for the commits after `26782ba`, up to `cbc4d32`. They are summarised in [Since 4afaeba](#since-4afaeba-2026-11-01) and [Since 26782ba](#since-26782ba-2026-11-01), the release candidates in [Release candidates](#release-candidates-2026-11-01), and the sections below are updated where those commits change them. A 0.7.1 patch release was prepared on the `release/0.7.x` branch and published on 2026-11-03. The steps to publish 0.7.1 and then 0.8.0, and to roll each back, are in [Release plan](#release-plan).
 
 This page lists what the branch changes compared with 0.7.0. For each change it says what 0.7.0 does, what the branch does, and which claims in the demo guide, the README, `docs/` and the website it makes false. The design decisions are in [ADR 0023](adr/0023-audit-recheck-fixes.md), and the full list is in the CHANGELOG under "Unreleased".
 
@@ -271,14 +284,14 @@ Each row up to `f6ea3c3`, and `78c7093`, is a clean checkout running `pnpm turbo
 
 - **The interactive demo (without `--ci`)**, and the app's pages by eye. The browser was covered only by the Playwright suite (`apps/web-ui/e2e/approvals.spec.ts`), run at `3c7a1d8` with `pnpm test:e2e`: 4 passed.
 - **`protect --apply` and `unprotect --apply`** against real client configs. Running them would change this machine's configs.
-- **0.7.0 reading 0.8.0 data** still reports `BAD_EVENT`, exit 4. That is the shipped behaviour and cannot change; only 0.7.1 (prepared) reports it as newer.
+- **0.7.0 reading 0.8.0 data** still reports `BAD_EVENT`, exit 4. That is the shipped behaviour and cannot change; only 0.7.1 (published 2026-11-03) reports it as newer.
 - **macOS and Windows, by hand.** Everything in this page ran on Linux. On macOS and Windows only CI ran: the full package smoke test, which since `30e7045` also checks that `demo --ci` leaves nothing in `%LOCALAPPDATA%`, `~/Library/Application Support` or `$XDG_STATE_HOME` (runs 41295615920 for the PR and 41295706535 for `release/0.7.x`: passed on all three systems). The checklist for a Mac is [manual-check-mac.md](manual-check-mac.md); it has not been run yet. Windows has no by-hand checklist.
 - **TigerGraph parity.** It was not rerun.
 - **A rollback end to end through the CLI** (restore an older database, run `ledger verify`). It is covered by `packages/ledger/test/anchor.test.ts`.
 
 ## Known risks and open decisions before a release
 
-1. **Downgrade break: decided ([ADR 0024](adr/0024-newer-data-and-downgrades.md)).** Event schema 2 and exit code 5 on the branch; 0.7.1 prepared with the same distinction. 0.7.0 still reports 0.8.0 ledgers as `BAD_EVENT`, exit 4. To decide: whether to publish 0.7.1 before 0.8.0.
+1. **Downgrade break: decided ([ADR 0024](adr/0024-newer-data-and-downgrades.md)).** Event schema 2 and exit code 5 on the branch; 0.7.1, published on 2026-11-03, has the same distinction. 0.7.0 still reports 0.8.0 ledgers as `BAD_EVENT`, exit 4. Decided: 0.7.1 first, published on 2026-11-03.
 2. **Copy to change at release:** see the [checklist](#release-day-copy-checklist). The `docs/graph.md` example is fixed on the branch.
 3. **Demo output:** fixed (`f6ea3c3`).
 4. **Dodo reads:** proven reads run unasked again (`9b6bc24`). A demo script that shows a `list` using a value from a ticket, or an aliased client, will pause.
@@ -385,7 +398,7 @@ Do not apply these before 0.8.0 is published. Two of them are on the live site. 
 
 ## Release plan
 
-Not run: nothing here has been published. Every command is for the owner to run, in this order. npm publishing is by hand because npm asks for the owner's 2FA code (`.github/workflows/publish-github-packages.yml`); a published GitHub release also publishes `@abdulmunafz/sudowall` to GitHub Packages through that workflow.
+Step 1 was run on 2026-11-03: 0.7.1 is published (see [0.7.1 published](#071-published-2026-11-03)). Steps 2 onward are not run. Every command is for the owner to run, in this order. npm publishing is by hand because npm asks for the owner's 2FA code (`.github/workflows/publish-github-packages.yml`); a published GitHub release also publishes `@abdulmunafz/sudowall` to GitHub Packages through that workflow.
 
 The npm rules these steps rely on (npm docs, checked 2026-11-01):
 
@@ -446,7 +459,7 @@ gh run list --workflow publish-github-packages.yml --limit 1                    
 
 ### 2. The gap
 
-Proposed: **at least 72 hours** between 0.7.1 and 0.8.0. 0.7.1 is the version that reports 0.8.0 data as "written by a newer SudoWall" (exit 5) instead of tampering (exit 4), so it should be the version people have before 0.8.0 data exists. 72 hours is also npm's unpublish window for 0.7.1, so if 0.7.1 is pulled it is pulled before 0.8.0 depends on its being there. During the gap, run the `npx` checks above on macOS and Windows as well, and watch the issue tracker.
+**Ends 2026-11-06 07:25 UTC**, 72 hours after 0.7.1 was published (npm 2026-11-03 07:25:00 UTC, GitHub release 07:25:41 UTC). Proposed: **at least 72 hours** between 0.7.1 and 0.8.0. 0.7.1 is the version that reports 0.8.0 data as "written by a newer SudoWall" (exit 5) instead of tampering (exit 4), so it should be the version people have before 0.8.0 data exists. 72 hours is also npm's unpublish window for 0.7.1, so if 0.7.1 is pulled it is pulled before 0.8.0 depends on its being there. During the gap, run the `npx` checks above on macOS and Windows as well, and watch the issue tracker.
 
 ### 3. Publish 0.8.0 (from `main`)
 
