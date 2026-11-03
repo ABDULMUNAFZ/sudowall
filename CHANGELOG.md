@@ -6,6 +6,10 @@ All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions fol
 
 Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).
 
+### Added
+
+- **Optional Cribl export** (off by default): the `events.cribl` config section sends a sanitized record of each decision, tool result and approval to a Cribl Stream HTTP/S (Bulk API) Source. Records carry ids, names that look like identifiers, the verdict, matched rule ids, the policy hash and match counts; never arguments, results, values, error messages or the free-text reason. https only (plain http only to this machine), no redirects, the token only through `{ "fromEnv" }`. Export happens after the ledger write and never delays or fails a decision; delivery is best effort with a bounded queue, retries with backoff and a time-limited flush on exit. Upstream servers never inherit the token variable, also under `wrap`. New `sudowall cribl test --config <file>` and `sudowall demo --config <file>`. Guide: [docs/integrations/cribl.md](docs/integrations/cribl.md), decisions in [ADR 0027](docs/adr/0027-cribl-audit-export.md).
+
 ### Security
 
 - **Dodo Payments template v3:** code is parsed, and only a proven read runs unasked: `async function run(client)` whose every call is `client.<resource>.list(query)` or `.retrieve(id)` on a fixed list of resources, with literal arguments and no value from untrusted content. Everything else asks, and code that writes with a value from untrusted content is still blocked. Read-looking text (comments, strings, `&&`, aliases, bracket access, request options) no longer lets a write run unasked (audit H1). New policy condition `sdk_read_only`. Input that parsers may read differently is never proven: unusual whitespace, line terminators and invisible characters, non-ASCII outside strings and comments, hashbangs, HTML-like comments, `using`, decorators, import attributes, duplicate keys, and anything the parser could only recover from. It parses with `@babel/parser` 8.0.7, a new runtime dependency of about 2 MB loaded only when a policy uses it ([ADR 0025](docs/adr/0025-read-check-parser.md)).
@@ -23,7 +27,7 @@ Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](
 See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not supported; upgrading is.
 
 - **Event schema 2.** New events are written with `schemaVersion: 2` (they may carry `valueRef` and the `same-host` near kind). Version 1 events stay valid, so ledgers that continue across the upgrade verify in full. The config file stays at `schemaVersion: 1`.
-- **Data from a newer SudoWall is not reported as tampering.** `ledger verify` prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; …), upgrade to verify it.` and exits with the new code `5`; tampering stays `4`. A state database from a newer build is refused the same way, and `wrap` and `serve` check before they start. The same handling is prepared for 0.7.x as 0.7.1 (branch `release/0.7.x`, not published).
+- **Data from a newer SudoWall is not reported as tampering.** `ledger verify` prints `CANNOT VERIFY: entry <seq> was written by a newer SudoWall (v<version>; …), upgrade to verify it.` and exits with the new code `5`; tampering stays `4`. A state database from a newer build is refused the same way, and `wrap` and `serve` check before they start. 0.7.1 has the same handling.
 - The ledger records the product version that writes it (`tg_writer`), so older builds can name it.
 
 ### Requirements
@@ -52,7 +56,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
   - glob: `server-filesystem` 2.1.0 never imports it, so this advisory cannot be reached. Upstream has removed the dependency; the change ships in its next release.
   - minimatch: the demo's filesystem server matches the patterns in `search_files` and `directory_tree` arguments with it. The demo allows that server only its own inbox, and the worst effect is a denial of service of that one server process. Upstream has no fix yet; the issue is [modelcontextprotocol/servers#5420](https://github.com/modelcontextprotocol/servers/issues/5420).
 
-## 0.7.1 (prepared, not published)
+## 0.7.1 (2026-11-03)
 
 ### Fixed
 
