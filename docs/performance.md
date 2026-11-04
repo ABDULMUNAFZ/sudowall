@@ -57,6 +57,29 @@ Measured 2026-10-29 on the same laptop, state directory on btrfs, 2,000 calls af
 
 Policy evaluation itself adds about 0.15 ms at the median over the deny-list pipeline. The max column is a call that coincided with the WAL checkpoint timer.
 
+## Before 0.8.0: v0.7.0, v0.7.1 and main (2026-11-04)
+
+On an Intel Mac, on battery with other Docker workloads running, main at `cb96b99` failed the gate: added p50 2.79 ms (observe), 2.53 ms (enforce) and 2.63 ms (enforce, policy), p99 under 7 ms. To tell a regression from a slow machine, `bench:latency --gate` ran three times for each of `v0.7.0`, `v0.7.1` and `cb96b99`, each in a clean worktree (`pnpm install --frozen-lockfile`, `pnpm turbo run build --filter=sudowall...`), interleaved so that drift on the machine hits all three alike. The benchmark script and `server-everything` 2.1.0 are identical in all three.
+
+AMD Ryzen 7 7735HS (16 threads), Linux 7.2.15 (Fedora 45), Node.js 24.22.0, on AC power, load average 1.0 to 1.6 (a browser open, nothing else heavy), state directory on tmpfs. 2,000 calls after 200 warm-up calls. Mean of three runs, with the range in brackets, in milliseconds:
+
+| ref       | added p50, observe  | added p50, enforce  | added p50, policy   | added p99, observe  | added p99, enforce  | added p99, policy   |
+| --------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
+| `v0.7.0`  | 0.600 (0.584–0.613) | 0.611 (0.598–0.618) | 0.742 (0.723–0.753) | 1.497 (1.468–1.538) | 1.511 (1.422–1.584) | 1.606 (1.575–1.666) |
+| `v0.7.1`  | 0.605 (0.598–0.612) | 0.613 (0.593–0.624) | 0.746 (0.738–0.753) | 1.466 (1.383–1.539) | 1.475 (1.427–1.515) | 1.578 (1.543–1.607) |
+| `cb96b99` | 0.655 (0.644–0.669) | 0.662 (0.637–0.684) | 0.802 (0.780–0.816) | 1.575 (1.555–1.610) | 1.607 (1.585–1.650) | 1.710 (1.685–1.732) |
+
+All nine runs passed the gate. Main adds about 0.05 to 0.06 ms at the median over 0.7.0 (8 to 9 %) and about 0.1 ms at p99 (5 to 7 %), in every mode and every run. That is below the 20 % that would call for profiling, so the hot path was not profiled. The Intel Mac's numbers are about four times this machine's, which points to the machine, not a regression; a same-machine run of `v0.7.0` on that Mac would confirm it.
+
+Slow-machine data point, from the owner's run of `bench:latency --gate` at `cb96b99` on 2026-11-03 (19:48 to 20:04 IST): an Intel Mac, macOS 26.7.1 (x86_64), Node.js 24.22.0, on battery with other Docker workloads running. One run; the direct p50 and p99 were not recorded. The gate failed on added p50.
+
+| machine                    | added p50, observe | added p50, enforce | added p50, policy | added p99, observe | added p99, enforce | added p99, policy |
+| -------------------------- | ------------------ | ------------------ | ----------------- | ------------------ | ------------------ | ----------------- |
+| Intel Mac, battery (1 run) | 2.79               | 2.53               | 2.63              | 6.77               | 6.12               | 5.64              |
+| Ryzen, AC (mean of 3 runs) | 0.655              | 0.662              | 0.802             | 1.575              | 1.607              | 1.710             |
+
+Slower machines, such as an Intel Mac on battery, can see about 2 to 3 ms added at the median. The CI gate's 2 ms limit is meant for the CI runner, where both runs share one machine; on a slow laptop it can fail without a regression.
+
 ## CI gate
 
 The `latency-benchmark` job in `.github/workflows/ci.yml` runs the same benchmark with `--gate`. Both runs happen in the same job on the same runner. The job fails if the gateway adds more than **2 ms at the median** or **20 ms at p99** over the direct run. Gating on overhead relative to the direct run keeps the gate meaningful on noisy shared runners. Absolute numbers from CI are written to the job summary but are not gated.
