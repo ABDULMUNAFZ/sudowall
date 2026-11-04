@@ -2,7 +2,7 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
-## Unreleased
+## 0.8.1 (prepared, not published)
 
 ### Fixed
 
@@ -17,6 +17,16 @@ All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions fol
 - Test runs no longer leave directories in the OS temp folder (about 336 per `pnpm test` before). Every package's vitest run gets its own temporary directory through `scripts/vitest-temp-dir.mjs` and removes it at the end; the `demo --keep` test and the Playwright approvals spec remove what their child processes kept. CI fails if `pnpm test` or the browser tests leave `tg-`, `sw-` or `sudowall-` entries behind (`scripts/check-temp-leaks.mjs`).
 - A CI job installs the packed package on a real Node.js 24.10.0 and checks the upgrade message and exit 1 (`scripts/check-old-node.sh`).
 - `ledger verify` catching a rolled-back database is now also tested through the CLI.
+
+### Docs
+
+- How long Claude Code, Claude Desktop and Cursor wait for a paused call, and what to set so an approval is not cut short by the client: `docs/configuration.md` ("How long MCP clients wait for a paused call"). Claude Code aborts a call with no response or progress after 30 minutes for stdio servers (5 for HTTP) unless the server entry's `timeout` is higher.
+- A by-hand checklist for Windows: `docs/manual-check-windows.md`.
+- `docs/roadmap.md`: the plan for 0.8.1 and 0.9.0, and the decisions.
+
+### Known advisories
+
+- Unchanged from 0.8.0 (checked 2026-11-04: `@modelcontextprotocol/server-filesystem` is still 2.1.0, release PR [modelcontextprotocol/servers#5401](https://github.com/modelcontextprotocol/servers/pull/5401) and issue [#5420](https://github.com/modelcontextprotocol/servers/issues/5420) are open). `npm audit` in a project that installs `sudowall` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) through that server, which only `sudowall demo` starts; see the 0.8.0 entry below.
 
 ## 0.8.0 (2026-11-04)
 
