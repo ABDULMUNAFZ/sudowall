@@ -48,6 +48,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 - Ledger verification of a database reads one snapshot; `ledger export` respects backpressure.
 - `protect`: stricter detection of wrapped entries, header variables do not overwrite existing ones, `unprotect` keeps later env changes, URL secrets are masked, and config writes take a lock.
 - Incident reports show when a path was cut at the depth limit and which ledger entries could not be read, and label sources by their own trust.
+- TigerGraph backend: the parity test no longer compares the `contained` edge's source label, which only the local graph stores (incident reports fill it in from the local ledger). Run against TigerGraph Community 4.2.5, `incident --tigergraph` matched the local report.
 - The app: polls no longer race, settings errors are shown, the Overview labels watching-only counts separately, Activity shows how each call ended and pages back with "Show older", and Record shows signing and anchor status.
 
 ### Known advisories
