@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Client } from '@modelcontextprotocol/client';
+import { Client, ProtocolError, SdkError } from '@modelcontextprotocol/client';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
 import {
   ApprovalStore,
@@ -17,6 +17,7 @@ import { ensureAnvil, rpc, balanceWei, startAnvil, type RunningAnvil } from './a
 import { cliEntry, demoAssets, webUiDir } from './assets.js';
 import { DEMO_ADDRESSES as A, DEMO_EMAILS, writeDemoConfig } from './demo-config.js';
 import { ledgerCommand } from './ledger-cmd.js';
+import { RuntimeError } from './errors.js';
 import { productProvider } from './product.js';
 
 export interface DemoFlags {
@@ -174,7 +175,11 @@ export async function demoCommand(flags: DemoFlags): Promise<number> {
     // on a call the gate is still holding.
     const callTimeoutMs = (approvalTimeout + 30) * 1000;
     const call = (name: string, args: Record<string, unknown>) =>
-      c.callTool({ name, arguments: args }, { timeout: callTimeoutMs }) as Promise<ToolResult>;
+      (
+        c.callTool({ name, arguments: args }, { timeout: callTimeoutMs }) as Promise<ToolResult>
+      ).catch((e: unknown) => {
+        throw demoCallError(name, e);
+      });
     const url = anvil.url;
     const outcomes: { step: string; expected: string; got: string; ok: boolean }[] = [];
 
@@ -346,4 +351,21 @@ function editBlockedPayment(dbPath: string): number {
   } finally {
     db.close();
   }
+}
+
+/**
+ * A JSON-RPC error from the gateway, or the demo's MCP client giving up, as one line for the
+ * user (printed without a stack trace). Any other error is returned unchanged: it is a bug, and
+ * its stack trace belongs in the report.
+ */
+export function demoCallError(tool: string, e: unknown): unknown {
+  if (ProtocolError.isInstance(e)) {
+    return new RuntimeError(
+      `demo: the gateway answered ${tool} with an error: ${e.message} (${String(e.code)})`,
+    );
+  }
+  if (SdkError.isInstance(e)) {
+    return new RuntimeError(`demo: the MCP client stopped waiting for ${tool}: ${e.message}`);
+  }
+  return e;
 }
