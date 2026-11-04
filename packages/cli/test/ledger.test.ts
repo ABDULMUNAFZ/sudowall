@@ -1,6 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -188,6 +195,40 @@ describe('ledger commands', () => {
     expect(anchorOnly.code).toBe(4);
     expect(anchorOnly.stdout).not.toMatch(/newer than the last checkpoint \(/);
     expect(anchorOnly.stdout).toMatch(/FAILED \(--strict\): no anchor found/);
+  });
+
+  it('a database rolled back to an older signed copy fails with ROLLBACK, exit 4', () => {
+    const home = tmp();
+    const dir = join(home, 'sudowall');
+    const db = join(dir, 'ledger.db');
+    const open = () =>
+      Ledger.open({
+        path: db,
+        keys: loadOrCreateKeys(dir),
+        anchorPath: join(dir, ANCHOR_FILE),
+        checkpointEveryEntries: 1,
+      });
+    const first = open();
+    first.append(started(0));
+    first.append(started(1));
+    first.close();
+    expect(cli(home, ['ledger', 'verify']).code).toBe(0);
+    // An attacker keeps this correctly signed copy...
+    const saved = join(home, 'saved.db');
+    copyFileSync(db, saved);
+    // ...the history grows (and the anchor moves forward)...
+    const second = open();
+    second.append(started(2));
+    second.close();
+    expect(cli(home, ['ledger', 'verify']).code).toBe(0);
+    // ...and the older copy replaces it.
+    for (const f of [`${db}-wal`, `${db}-shm`]) rmSync(f, { force: true });
+    copyFileSync(saved, db);
+    const r = cli(home, ['ledger', 'verify']);
+    expect(r.code).toBe(4);
+    expect(r.stdout).toBe(
+      'FAILED at entry 3: ROLLBACK: the ledger ends at checkpoint 2, but checkpoint 3 was signed earlier: newer history was removed\n',
+    );
   });
 
   it('a wrong public key fails verification', async () => {
