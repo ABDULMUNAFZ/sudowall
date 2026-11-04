@@ -79,6 +79,23 @@ function expectedCheckpoint(
   }
 }
 
+/** The time of the newest ledger entry, in ms since the epoch; undefined if none or unreadable. */
+function newestEntryTime(db: StateDb): number | undefined {
+  const row = db.prepare('SELECT ts FROM ledger_entries ORDER BY seq DESC LIMIT 1').get() as
+    { ts: string } | undefined;
+  const t = row === undefined ? NaN : Date.parse(row.ts);
+  return Number.isFinite(t) ? t : undefined;
+}
+
+/** "12 s", "5 min", "3 h", "2 days". A clock running behind the entry reads as "0 s". */
+function ageText(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 120) return `${String(s)} s`;
+  if (s < 7200) return `${String(Math.floor(s / 60))} min`;
+  if (s < 172800) return `${String(Math.floor(s / 3600))} h`;
+  return `${String(Math.floor(s / 86400))} days`;
+}
+
 export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise<number> {
   const dbPath = flags.db ?? join(defaultStateDir(), 'ledger.db');
   const keyDir = flags.keyDir ?? defaultConfigDir();
@@ -120,7 +137,23 @@ export async function ledgerCommand(args: string[], flags: LedgerFlags): Promise
           say('Note: no expected public key was available, so the signer was not checked.');
         }
         if (flags.strict === true && (r.unsignedTail > 0 || anchor === undefined)) {
-          say('FAILED (--strict): unsigned entries or no anchor.');
+          if (r.unsignedTail > 0) {
+            const newest = withDb(dbPath, newestEntryTime);
+            const age =
+              newest === undefined ? '' : ` (the newest is ${ageText(Date.now() - newest)} old)`;
+            say(
+              `FAILED (--strict): ${count(r.unsignedTail, 'entry is', 'entries are')} newer than the last checkpoint${age}. ` +
+                'A running gateway signs them within about 75 s with the default checkpoint settings (every 60 s or 256 entries); ' +
+                'run this again after that, or after the gateways stop. If no gateway is running, they were not signed at shutdown ' +
+                '(a crash or kill) and stay unsigned until a gateway opens this ledger again.',
+            );
+          }
+          if (anchor === undefined) {
+            say(
+              `FAILED (--strict): no anchor found (${join(keyDir, ANCHOR_FILE)}). A gateway writes it at its first checkpoint. ` +
+                'Or pass --expect-checkpoint with a copy kept off this machine.',
+            );
+          }
           return EXIT.verifyFailed;
         }
         return EXIT.ok;

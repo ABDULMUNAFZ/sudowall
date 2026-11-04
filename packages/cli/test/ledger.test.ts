@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { EVENT_SCHEMA_VERSION, type Event } from '@sudowall/core';
-import { Ledger, loadOrCreateKeys } from '@sudowall/ledger';
+import { ANCHOR_FILE, Ledger, loadOrCreateKeys } from '@sudowall/ledger';
 
 const CLI = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const EVERYTHING = fileURLToPath(
@@ -142,6 +142,52 @@ describe('ledger commands', () => {
       expect(r.code).toBe(0);
       expect(r.stdout.startsWith(`${line} (newer than the last checkpoint). Ledger `)).toBe(true);
     }
+  });
+
+  it('--strict says which condition failed: unsigned entries (with their age) or no anchor', () => {
+    const home = tmp();
+    const dir = join(home, 'sudowall');
+    const first = Ledger.open({
+      path: join(dir, 'ledger.db'),
+      keys: loadOrCreateKeys(dir),
+      anchorPath: join(dir, ANCHOR_FILE),
+      checkpointEveryEntries: 1,
+    });
+    first.append(started(0));
+    first.close(); // signed, and the anchor is written
+    const second = Ledger.open({
+      path: join(dir, 'ledger.db'),
+      keys: loadOrCreateKeys(dir),
+      anchorPath: join(dir, ANCHOR_FILE),
+      checkpointEveryEntries: 1000,
+      checkpointEverySeconds: 86400,
+    });
+    try {
+      for (let i = 1; i <= 3; i++) second.append({ ...started(i), ts: new Date().toISOString() });
+      const r = cli(home, ['ledger', 'verify', '--strict']);
+      expect(r.code).toBe(4);
+      expect(r.stdout).toMatch(
+        /\nFAILED \(--strict\): 3 entries are newer than the last checkpoint \(the newest is [0-9]+ s old\)\. A running gateway signs them within about 75 s with the default checkpoint settings \(every 60 s or 256 entries\); run this again after that, or after the gateways stop\. If no gateway is running, they were not signed at shutdown \(a crash or kill\) and stay unsigned until a gateway opens this ledger again\.\n$/,
+      );
+      expect(r.stdout).not.toMatch(/no anchor/);
+
+      rmSync(join(dir, ANCHOR_FILE));
+      const both = cli(home, ['ledger', 'verify', '--strict']);
+      expect(both.code).toBe(4);
+      expect(both.stdout).toContain(
+        'FAILED (--strict): 3 entries are newer than the last checkpoint',
+      );
+      expect(both.stdout).toContain(
+        `FAILED (--strict): no anchor found (${join(dir, ANCHOR_FILE)}). A gateway writes it at its first checkpoint. Or pass --expect-checkpoint with a copy kept off this machine.`,
+      );
+    } finally {
+      second.close();
+    }
+    rmSync(join(dir, ANCHOR_FILE));
+    const anchorOnly = cli(home, ['ledger', 'verify', '--strict']);
+    expect(anchorOnly.code).toBe(4);
+    expect(anchorOnly.stdout).not.toMatch(/newer than the last checkpoint \(/);
+    expect(anchorOnly.stdout).toMatch(/FAILED \(--strict\): no anchor found/);
   });
 
   it('a wrong public key fails verification', async () => {
