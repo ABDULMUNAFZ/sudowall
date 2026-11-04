@@ -50,10 +50,12 @@
           <div class="prose">
             <h2 id="needs">What you need</h2>
             <p>
-              Node.js 24 on macOS, Linux or Windows, and an agent that uses MCP tools, such as
-              Claude Code, Claude Desktop or Cursor. SudoWall is on npm as
+              Node.js 24.11 or newer on macOS, Linux and Windows (Windows tested in CI), and an
+              agent that uses MCP tools, such as Claude Code, Claude Desktop or Cursor. SudoWall is
+              on npm as
               <a href="https://www.npmjs.com/package/sudowall"><code>sudowall</code></a
               >, so every command below works with <code>npx</code> and nothing to install globally.
+              Slower machines, such as an Intel Mac on battery, can add 2&ndash;3 ms per tool call.
             </p>
           </div>
         </section>
@@ -146,9 +148,10 @@ npx sudowall ledger verify</code></pre>
             <p>For the official Dodo Payments MCP server, start from its policy:</p>
             <pre><code>npx sudowall init --template dodo-payments</code></pre>
             <p>
-              Reads run. Refunds, payments and other changes ask you first. A change that uses an
-              email or URL copied from a support ticket or an email is blocked, so a poisoned ticket
-              cannot take over a customer account or send your payment events to someone else.
+              Simple reads run. Refunds, payments, other changes and any code SudoWall cannot prove
+              is a read ask you first. A change that uses an email or URL copied from a support
+              ticket or an email is blocked, so a poisoned ticket cannot take over a customer
+              account or send your payment events to someone else.
               <a
                 href="https://github.com/ABDULMUNAFZ/sudowall/blob/main/docs/integrations/dodo-payments.md"
                 >Setup and a tested run</a

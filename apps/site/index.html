@@ -6,7 +6,7 @@
     <title>SudoWall: a firewall for AI agents</title>
     <meta
       name="description"
-      content="Open-source firewall for AI agents. SudoWall checks every tool call before it runs, pauses or blocks risky ones, and keeps a tamper-evident record. Claude Code, Claude Desktop, Cursor; macOS, Linux, Windows."
+      content="Open-source firewall for AI agents. SudoWall checks every tool call before it runs, pauses or blocks risky ones, and keeps a tamper-evident record. Claude Code, Claude Desktop, Cursor; macOS, Linux and Windows (Windows tested in CI)."
     />
     <meta name="referrer" content="no-referrer" />
     <meta
@@ -86,17 +86,17 @@
           <article class="tile tile-lime" data-tile>
             <span class="tile-icon" aria-hidden="true">&#x23F1;</span>
             <p class="tile-big">~<span data-count="1">1</span> ms</p>
-            <p class="tile-small">added per tool call (median, measured)</p>
+            <p class="tile-small">added per tool call (median, Ryzen 7 laptop)</p>
           </article>
           <article class="tile tile-white" data-tile>
             <span class="tile-icon orange" aria-hidden="true">&#x2714;</span>
-            <p class="tile-big"><span data-count="406">406</span> tests</p>
+            <p class="tile-big"><span data-count="800">800</span> tests</p>
             <p class="tile-small">
               automated tests pass in CI; the package is checked on macOS, Linux and Windows
             </p>
           </article>
           <article class="tile tile-dashed" data-tile>
-            <p class="tile-label">Nothing to install: Node.js 24 is enough</p>
+            <p class="tile-label">Nothing to install: Node.js 24.11 or newer is enough</p>
             <code>npx sudowall demo</code>
             <code>npx sudowall protect --apply</code>
             <p class="tile-small">Claude Code &middot; Claude Desktop &middot; Cursor</p>
@@ -308,7 +308,7 @@
               <img class="w-logo" src="logos/windows.svg" alt="" width="34" height="34" />
             </span>
             <h3>macOS &middot; Linux &middot; Windows</h3>
-            <p>Node.js 24 or newer</p>
+            <p>Node.js 24.11 or newer. Windows tested in CI.</p>
           </article>
           <article class="w-tile peach" data-wtile>
             <img class="w-logo" src="brand/mark.png" alt="" width="40" height="40" />
@@ -325,7 +325,7 @@
             <p class="kicker dark">Get started</p>
             <h2>Two minutes to see it. One command to keep it.</h2>
             <ol class="first-steps">
-              <li><b>Check Node.js 24 or newer:</b> <code>node -v</code></li>
+              <li><b>Check Node.js 24.11 or newer:</b> <code>node -v</code></li>
               <li><b>See it stop an attack:</b> <code>npx sudowall demo</code></li>
               <li>
                 <b>Protect your agents:</b> <code>npx sudowall protect --apply</code>, then restart
@@ -346,7 +346,7 @@
               class="term"
               data-term
             ><span class="p">$</span> <span class="c" data-type="node -v">node -v</span>
-<span class="o" data-out>  v24.x</span>
+<span class="o" data-out>  v24.11.0</span>
 <span class="p">$</span> <span class="c" data-type="npx sudowall demo">npx sudowall demo</span>
 <span class="o" data-out>  ▟█ sudowall  Nothing moves until it's checked.</span>
 <span class="o ok" data-out>  ok  pay address injected in an email: denied</span>
