@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,9 +129,16 @@ type CallResult = {
 };
 
 let e: Env | undefined;
-test.afterEach(() => {
-  e?.ui.kill('SIGTERM');
+test.afterEach(async () => {
+  const done = e;
   e = undefined;
+  if (done === undefined) return;
+  if (done.ui.exitCode === null && done.ui.signalCode === null) {
+    const exited = new Promise((resolve) => done.ui.once('exit', resolve));
+    done.ui.kill('SIGTERM');
+    await exited;
+  }
+  rmSync(done.home, { recursive: true, force: true });
 });
 
 test('a paused payment is approved in the UI and then runs', async ({ page }) => {

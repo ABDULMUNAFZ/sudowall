@@ -12,6 +12,12 @@ All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions fol
 - `ledger verify --strict` says which condition failed. For unsigned entries: how many, how old the newest is, that a running gateway signs them within about 75 s with the default checkpoint settings, and that after a crash or kill they stay unsigned until a gateway opens the ledger again. For a missing anchor: where it was looked for. The rule and the exit code (4) do not change.
 - The upstream is no longer sent `notifications/cancelled` for a request it never received (a call cancelled or timed out before it was forwarded).
 
+### Tests and CI
+
+- Test runs no longer leave directories in the OS temp folder (about 336 per `pnpm test` before). Every package's vitest run gets its own temporary directory through `scripts/vitest-temp-dir.mjs` and removes it at the end; the `demo --keep` test and the Playwright approvals spec remove what their child processes kept. CI fails if `pnpm test` or the browser tests leave `tg-`, `sw-` or `sudowall-` entries behind (`scripts/check-temp-leaks.mjs`).
+- A CI job installs the packed package on a real Node.js 24.10.0 and checks the upgrade message and exit 1 (`scripts/check-old-node.sh`).
+- `ledger verify` catching a rolled-back database is now also tested through the CLI.
+
 ## 0.8.0 (2026-11-04)
 
 Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).

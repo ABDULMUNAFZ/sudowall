@@ -34,7 +34,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
+      - run: node scripts/check-temp-leaks.mjs snapshot "$RUNNER_TEMP/temp-before.json"
       - run: pnpm test
+      # Fails if the tests left tg-, sw- or sudowall- directories in the OS temp folder.
+      - run: node scripts/check-temp-leaks.mjs compare "$RUNNER_TEMP/temp-before.json"
 
   audit:
     name: dependency audit and licences
@@ -97,7 +100,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm --filter @sudowall/web-ui exec playwright install --with-deps chromium
+      - run: node scripts/check-temp-leaks.mjs snapshot "$RUNNER_TEMP/temp-before.json"
       - run: pnpm --filter @sudowall/web-ui run test:e2e
+      - run: node scripts/check-temp-leaks.mjs compare "$RUNNER_TEMP/temp-before.json"
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

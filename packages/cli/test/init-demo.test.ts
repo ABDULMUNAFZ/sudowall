@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +133,8 @@ describe('demo --ci', () => {
     expect(json.call.verdict).toBe('block');
     expect(json.path.some((p) => p.match.nearKind === 'address-poisoning')).toBe(true);
     expect(cli(['incident', 'no-such-id', ...flags]).code).toBe(2);
+    // The kept state is in the child's temp folder (its environment has no TMPDIR).
+    rmSync(String(dir), { recursive: true, force: true });
   });
 });
 
