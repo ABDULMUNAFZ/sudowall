@@ -2,6 +2,14 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## Unreleased
+
+### Fixed
+
+- **Approvals longer than the request timeout.** `limits.requestTimeoutMs` (default 600 s) no longer runs while a call waits for a person, so an `approvals.timeoutSeconds` up to 3600 s works as documented; before, a call left waiting for more than 10 minutes ended with -32003 `request timed out after 600000 ms`, and `sudowall demo --approval-timeout` above 600 stopped with a stack trace. The wait is bounded by `approvals.timeoutSeconds`; once the call is released, the upstream gets the full request timeout again. 0.7.x and 0.8.0 have the same limit.
+- **An approval that comes after the call ended never runs it.** If the client cancelled the call or its session closed while it waited, an Approve that arrives afterwards does not forward it (as for timeouts and cancellations since 0.8.0). The ledger records that approval with `resultingAction: block`, the gateway logs `APPROVED TOO LATE`, and the app's Activity page says "You approved it too late". On a closing session this is recorded before `session.ended`. If the cancel arrives while the approval itself is being written to the ledger, the call is still not run, but that approval entry says `allow`; the call's `tool.result` (`cancelled`, no upstream response) and the log line record that it did not run.
+- The upstream is no longer sent `notifications/cancelled` for a request it never received (a call cancelled or timed out before it was forwarded).
+
 ## 0.8.0 (2026-11-04)
 
 Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).

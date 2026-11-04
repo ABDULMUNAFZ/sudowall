@@ -143,7 +143,7 @@ flowchart LR
 ```
 
 - **Upstream lifecycle.** A stdio upstream gets an explicit environment: only `inheritEnv` names (default `DEFAULT_INHERITED_ENV`: PATH, HOME, locale and temp-dir variables) plus its own `env`. `wrap` passes the full environment, because the client launched it with the environment meant for the server. Upstream stderr goes to the gateway log, line by line. A crashed upstream is restarted with exponential backoff (`restartInitialDelayMs` doubling to `restartMaxDelayMs`, at most `restartMaxAttempts` in a row) and then marked down. Calls in flight or sent while it is down get -32001 with a clear message. Health checks use `ping` (2025-11-25) or `server/discover` (2026-07-28) when the link is idle. SIGINT and SIGTERM close the client side, record the session end, close upstream stdin, then SIGTERM and SIGKILL after `shutdownGraceMs`.
-- **Limits.** Messages over `limits.maxMessageBytes` (default 16 MiB) are refused with -32002 (HTTP 413 at the frontend). An upstream that sends one is restarted. Requests time out after `limits.requestTimeoutMs` with -32003, and the upstream is sent `notifications/cancelled`.
+- **Limits.** Messages over `limits.maxMessageBytes` (default 16 MiB) are refused with -32002 (HTTP 413 at the frontend). An upstream that sends one is restarted. Requests time out after `limits.requestTimeoutMs` with -32003, and the upstream is sent `notifications/cancelled` if the request had reached it. Time a call spends waiting for a person does not count; the timer starts again when the call is released.
 
 ## Trust boundaries
 
