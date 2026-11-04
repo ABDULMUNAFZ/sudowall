@@ -17,7 +17,7 @@ Website: https://www.sudowall.tech
 
 ## Quickstart
 
-See it work in two minutes. Node.js 24 on macOS, Linux and Windows (Windows tested in CI):
+See it work in two minutes. Node.js 24.11 or newer on macOS, Linux and Windows (Windows tested in CI):
 
 ```sh
 npx sudowall demo
@@ -69,7 +69,7 @@ Then restart the client and open `npx sudowall ui` to watch decisions. The gate 
 
 ### Payments agents: Dodo Payments
 
-`npx sudowall init --template dodo-payments` writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: reads run, refunds and other changes ask you first, and a change using an email or URL copied from a support ticket or email is blocked. Setup and a tested run: [docs/integrations/dodo-payments.md](docs/integrations/dodo-payments.md).
+`npx sudowall init --template dodo-payments` writes a policy for the official [Dodo Payments](https://dodopayments.com) MCP server: simple reads (a list or retrieve with fixed arguments) run, every other call, including refunds, asks you first, and a change using an email or URL copied from a support ticket or email is blocked. Setup and a tested run: [docs/integrations/dodo-payments.md](docs/integrations/dodo-payments.md).
 
 ### Security logs: Cribl
 
@@ -157,7 +157,7 @@ For several servers behind one entry, or for HTTP on `127.0.0.1` with a bearer t
 
 ## Development
 
-Requirements: Node.js 24, pnpm 12, and [gitleaks](https://github.com/gitleaks/gitleaks) (used by the pre-commit hook).
+Requirements: Node.js 24.11 or newer, pnpm 12, and [gitleaks](https://github.com/gitleaks/gitleaks) (used by the pre-commit hook).
 
 ```sh
 pnpm install
