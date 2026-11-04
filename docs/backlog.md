@@ -46,7 +46,6 @@ Out-of-scope ideas and post-deadline work. Nothing here is built or promised.
 
 ## Approvals and UI
 
-- **0.8.1: approvals longer than the request timeout.** `approvals.timeoutSeconds` and `demo --approval-timeout` allow up to 3600 s, but `limits.requestTimeoutMs` (default 600 s) also runs while a call waits for approval, so the request times out first (-32003 `request timed out after 600000 ms`) and the demo exits with a stack trace (found in the 0.8.0 UI check, 2026-11-04; also in 0.7.x). Options: pause the request timer while a call waits for a person, or reject configs and flags whose approval timeout is not below the request timeout; the demo should also print a gateway error as one line, not a stack trace. Needs a test with an approval timeout above the request timeout, and a check of what a late Approve click does.
 - Keep a waiting approval alive in MCP clients with idle timeouts: while a call waits for a person, send `notifications/progress` when the client gave a `progressToken`. Claude Code aborts a call with no response and no progress for its idle window (30 min for stdio, 5 min for HTTP; its MCP docs, checked 2026-11-04). Today users raise the server's `timeout` instead (`docs/configuration.md`).
 - `protect` could write a per-server `timeout` into Claude Code entries that is above `approvals.timeoutSeconds`.
 - Push updates to the UI (server-sent events) instead of 1 s polling; file notification instead of DB polling in the gateway.
