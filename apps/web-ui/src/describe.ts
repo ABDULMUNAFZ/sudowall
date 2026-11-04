@@ -93,7 +93,12 @@ export function plainReason(reason: string): string {
 
 /** "approved" / "denied" / "expired" -> a short sentence about the person's decision. */
 export function approvalWords(outcomeText: string, resultingAction: string): string {
-  if (outcomeText === 'approved') return 'You approved it, so it ran.';
+  if (outcomeText === 'approved') {
+    // `block` after an approval: the call ended (cancelled, session closed) before it could run.
+    return resultingAction === 'allow'
+      ? 'You approved it, so it ran.'
+      : 'You approved it too late: the call had already been cancelled or its session closed, so it never ran.';
+  }
   if (outcomeText === 'denied') return 'You denied it, so it never ran.';
   return resultingAction === 'allow'
     ? `${outcomeText}: it ran.`

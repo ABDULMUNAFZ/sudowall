@@ -2,6 +2,32 @@
 
 All notable changes to SudoWall, called Tortoise Gate before 0.3.0. Versions follow [semantic versioning](https://semver.org/). Entries before 0.3.0 keep the old names as they were released.
 
+## 0.8.1 (prepared, not published)
+
+### Fixed
+
+- **Approvals longer than the request timeout.** `limits.requestTimeoutMs` (default 600 s) no longer runs while a call waits for a person, so an `approvals.timeoutSeconds` up to 3600 s works as documented; before, a call left waiting for more than 10 minutes ended with -32003 `request timed out after 600000 ms`, and `sudowall demo --approval-timeout` above 600 stopped with a stack trace. The wait is bounded by `approvals.timeoutSeconds`; once the call is released, the upstream gets the full request timeout again. 0.7.x and 0.8.0 have the same limit.
+- **An approval that comes after the call ended never runs it.** If the client cancelled the call or its session closed while it waited, an Approve that arrives afterwards does not forward it (as for timeouts and cancellations since 0.8.0). The ledger records that approval with `resultingAction: block`, the gateway logs `APPROVED TOO LATE`, and the app's Activity page says "You approved it too late". On a closing session this is recorded before `session.ended`. If the cancel arrives while the approval itself is being written to the ledger, the call is still not run, but that approval entry says `allow`; the call's `tool.result` (`cancelled`, no upstream response) and the log line record that it did not run.
+- `sudowall demo` prints an error from the gateway, or its MCP client giving up, as one line (`sudowall: demo: the gateway answered send_funds with an error: … (-32003)`), exit 1, instead of a stack trace. Other unexpected errors keep the stack trace.
+- `ledger verify --strict` says which condition failed. For unsigned entries: how many, how old the newest is, that a running gateway signs them within about 75 s with the default checkpoint settings, and that after a crash or kill they stay unsigned until a gateway opens the ledger again. For a missing anchor: where it was looked for. The rule and the exit code (4) do not change.
+- The upstream is no longer sent `notifications/cancelled` for a request it never received (a call cancelled or timed out before it was forwarded).
+
+### Tests and CI
+
+- Test runs no longer leave directories in the OS temp folder (about 336 per `pnpm test` before). Every package's vitest run gets its own temporary directory through `scripts/vitest-temp-dir.mjs` and removes it at the end; the `demo --keep` test and the Playwright approvals spec remove what their child processes kept. CI fails if `pnpm test` or the browser tests leave `tg-`, `sw-` or `sudowall-` entries behind (`scripts/check-temp-leaks.mjs`).
+- A CI job installs the packed package on a real Node.js 24.10.0 and checks the upgrade message and exit 1 (`scripts/check-old-node.sh`).
+- `ledger verify` catching a rolled-back database is now also tested through the CLI.
+
+### Docs
+
+- How long Claude Code, Claude Desktop and Cursor wait for a paused call, and what to set so an approval is not cut short by the client: `docs/configuration.md` ("How long MCP clients wait for a paused call"). Claude Code aborts a call with no response or progress after 30 minutes for stdio servers (5 for HTTP) unless the server entry's `timeout` is higher.
+- A by-hand checklist for Windows: `docs/manual-check-windows.md`.
+- `docs/roadmap.md`: the plan for 0.8.1 and 0.9.0, and the decisions.
+
+### Known advisories
+
+- Unchanged from 0.8.0 (checked 2026-11-04: `@modelcontextprotocol/server-filesystem` is still 2.1.0, release PR [modelcontextprotocol/servers#5401](https://github.com/modelcontextprotocol/servers/pull/5401) and issue [#5420](https://github.com/modelcontextprotocol/servers/issues/5420) are open). `npm audit` in a project that installs `sudowall` reports minimatch 10.2.6 ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) and glob 13.0.6 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) through that server, which only `sudowall demo` starts; see the 0.8.0 entry below.
+
 ## 0.8.0 (2026-11-04)
 
 Fixes from the rechecked diagnostic audit. Decisions are recorded in [ADR 0023](docs/adr/0023-audit-recheck-fixes.md).

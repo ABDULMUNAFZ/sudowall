@@ -5,6 +5,7 @@ import { openStateDb, type StateDb } from '@sudowall/ledger';
 import { ApprovalStore, DbApprovalChannel, type ApprovalChannel } from '../src/approvals.js';
 import { silentLogger } from '../src/log.js';
 import type { DecisionPipeline } from '../src/pipeline.js';
+import { MemorySink } from '../src/sinks.js';
 import { DECISION_META_KEY } from '../src/session.js';
 import {
   CALL,
@@ -46,7 +47,28 @@ afterEach(async () => {
   ctx = undefined;
 });
 
-function setup(approvals: Record<string, unknown> = {}, channel?: ApprovalChannel): Ctx {
+/** Asks for every call. */
+const askAll: DecisionPipeline = {
+  decideToolCall: () => ({
+    verdict: 'ask',
+    matchedRules: [{ ruleId: 'ask-all', action: 'ask' }],
+    reason: 'Every call needs approval.',
+    policySha256: 'a'.repeat(64),
+  }),
+};
+
+interface SetupOptions {
+  /** Other config keys for the session (for example `limits`). */
+  config?: Record<string, unknown>;
+  pipeline?: DecisionPipeline;
+  sink?: MemorySink;
+}
+
+function setup(
+  approvals: Record<string, unknown> = {},
+  channel?: ApprovalChannel,
+  opts: SetupOptions = {},
+): Ctx {
   const dir = tempDir();
   const dbPath = join(dir, 'ledger.db');
   const db = openStateDb(dbPath);
@@ -73,11 +95,16 @@ function setup(approvals: Record<string, unknown> = {}, channel?: ApprovalChanne
     );
   const h = startSession(
     {
+      ...opts.config,
       mode: 'enforce',
       upstreams: [rawUpstream('raw', { RECORD_FILE: rec })],
       approvals: { pollIntervalMs: 50, notify: false, ...approvals },
     },
-    { pipeline: askEcho, approvals: ch },
+    {
+      pipeline: opts.pipeline ?? askEcho,
+      approvals: ch,
+      ...(opts.sink === undefined ? {} : { sink: opts.sink }),
+    },
   );
   ctx = { h, db, dbPath, store, rec, clock };
   return ctx;
@@ -99,6 +126,30 @@ type Result = {
 };
 const resultOf = (r: Record<string, unknown>) => r['result'] as Result;
 const forwarded = (rec: string) => readLines(rec).filter((l) => l.includes('"tools/call"'));
+const upstreamCancels = (rec: string) =>
+  readLines(rec).filter((l) => l.includes('"notifications/cancelled"'));
+const errorOf = (r: Record<string, unknown>) => r['error'] as { code: number; message: string };
+
+/** A sink whose `approval.resolved` writes finish only when the test says so. */
+class HeldApprovalSink extends MemorySink {
+  held: (() => void) | undefined;
+  override write(event: Event): Promise<void> {
+    if (event.type !== 'approval.resolved') return super.write(event);
+    return new Promise((resolve) => {
+      this.held = () => {
+        void super.write(event).then(resolve);
+      };
+    });
+  }
+}
+
+async function until(check: () => boolean, what: string): Promise<void> {
+  for (let i = 0; i < 300; i++) {
+    if (check()) return;
+    await sleep(10);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
 const ofType = <T extends Event['type']>(events: Event[], t: T) =>
   events.filter((e): e is Extract<Event, { type: T }> => e.type === t);
 
@@ -298,6 +349,12 @@ describe('approvals', () => {
     expect(store.get(a?.id ?? '')?.status).toBe('cancelled');
     expect(forwarded(rec)).toEqual([]);
     expect(ofType(h.events, 'approval.resolved')).toEqual([]);
+    // A click after the gateway saw the cancel is refused, and the upstream, which never got
+    // the call, is not told to cancel it.
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('not-pending');
+    expect(upstreamCancels(rec)).toEqual([]);
   });
 
   it('fails closed with SW_APPROVAL_UNAVAILABLE when the approval store fails', async () => {
@@ -310,5 +367,130 @@ describe('approvals', () => {
     const res = resultOf(await h.client.response('13'));
     expect(res._meta?.[DECISION_META_KEY]?.code).toBe('SW_APPROVAL_UNAVAILABLE');
     expect(forwarded(rec)).toEqual([]);
+  });
+});
+
+describe('approvals and the request timeout', () => {
+  it('the request timeout does not run while a call waits for a person', async () => {
+    const { h, store, rec } = setup({}, undefined, {
+      config: { limits: { requestTimeoutMs: 300 } },
+    });
+    await handshake(h.client);
+    h.client.push(CALL(20, 'echo', '{"to":"0xabc"}'));
+    const [a] = await waitPending(store);
+    await sleep(700); // more than twice the request timeout
+    expect(h.client.received.some((r) => r.text.includes('"id":20'))).toBe(false);
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('ok');
+    const res = resultOf(await h.client.response('20'));
+    expect(res.isError).toBeFalsy();
+    expect(forwarded(rec)).toHaveLength(1);
+    expect(ofType(h.events, 'approval.resolved')[0]).toMatchObject({
+      outcome: 'approved',
+      resultingAction: 'allow',
+    });
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('ok');
+  });
+
+  it('an undecided call ends with SW_APPROVAL_TIMEOUT, not the request timeout', async () => {
+    const { h, store, rec, clock } = setup({ timeoutSeconds: 5 }, undefined, {
+      config: { limits: { requestTimeoutMs: 300 } },
+    });
+    await handshake(h.client);
+    h.client.push(CALL(21, 'echo', '{}'));
+    await waitPending(store);
+    await sleep(500);
+    clock.skewMs = 6000;
+    const res = resultOf(await h.client.response('21'));
+    expect(res.isError).toBe(true);
+    expect(res._meta?.[DECISION_META_KEY]?.code).toBe('SW_APPROVAL_TIMEOUT');
+    expect(forwarded(rec)).toEqual([]);
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('timeout');
+  });
+
+  it('after approval, the upstream still gets the full request timeout', async () => {
+    const { h, store, rec } = setup({}, undefined, {
+      config: { limits: { requestTimeoutMs: 400 } },
+      pipeline: askAll,
+    });
+    await handshake(h.client);
+    h.client.push(CALL(22, 'slow', '{"ms":5000}'));
+    const [a] = await waitPending(store);
+    await sleep(600);
+    const approvedAt = Date.now();
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('ok');
+    const err = errorOf(await h.client.response('22'));
+    expect(err.code).toBe(-32003);
+    expect(err.message).toBe('request timed out after 400 ms');
+    // The timer started again when the call was released, so it fired about 400 ms later.
+    expect(Date.now() - approvedAt).toBeGreaterThanOrEqual(350);
+    expect(forwarded(rec)).toHaveLength(1);
+    await until(() => upstreamCancels(rec).length === 1, 'the upstream cancel');
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('timeout');
+  });
+
+  it('an approval that lands after the client cancelled never runs and is recorded as too late', async () => {
+    const { h, store, rec } = setup({ pollIntervalMs: 400 });
+    await handshake(h.client);
+    h.client.push(CALL(23, 'echo', '{"to":"0xabc"}'));
+    const [a] = await waitPending(store);
+    h.client.push('{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":23}}');
+    await until(() => ofType(h.events, 'tool.result').length === 1, 'the cancelled result');
+    // The person approves before the gateway's next poll notices the cancel.
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('ok');
+    await until(() => ofType(h.events, 'approval.resolved').length === 1, 'the approval entry');
+    await sleep(100);
+    expect(ofType(h.events, 'approval.resolved')[0]).toMatchObject({
+      approvalId: a?.id,
+      outcome: 'approved',
+      resultingAction: 'block',
+    });
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('cancelled');
+    expect(forwarded(rec)).toEqual([]);
+    expect(upstreamCancels(rec)).toEqual([]);
+    expect(h.client.received.some((r) => r.text.includes('"id":23'))).toBe(false);
+  });
+
+  it('an approval that lands after the session closed never runs and is recorded before session.ended', async () => {
+    const { h, store, rec } = setup({ pollIntervalMs: 400 });
+    await handshake(h.client);
+    h.client.push(CALL(24, 'echo', '{}'));
+    const [a] = await waitPending(store);
+    const closing = h.session.close('client-closed');
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('ok');
+    await closing;
+    expect(forwarded(rec)).toEqual([]);
+    const types = h.events.map((e) => e.type);
+    expect(types.at(-1)).toBe('session.ended');
+    expect(ofType(h.events, 'approval.resolved')).toEqual([
+      expect.objectContaining({ approvalId: a?.id, outcome: 'approved', resultingAction: 'block' }),
+    ]);
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('cancelled');
+  });
+
+  it('a cancel that arrives while the approval is being recorded still stops the call', async () => {
+    const sink = new HeldApprovalSink();
+    const { h, store, rec } = setup({}, undefined, { sink });
+    await handshake(h.client);
+    h.client.push(CALL(25, 'echo', '{}'));
+    const [a] = await waitPending(store);
+    expect(
+      store.resolve(a?.id ?? '', 'approved', a?.argumentsSha256 ?? '', 'web-ui', Date.now()),
+    ).toBe('ok');
+    await until(() => sink.held !== undefined, 'the approval write');
+    h.client.push('{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":25}}');
+    await until(() => ofType(h.events, 'tool.result').length === 1, 'the cancelled result');
+    sink.held?.();
+    await sleep(200);
+    expect(forwarded(rec)).toEqual([]);
+    expect(upstreamCancels(rec)).toEqual([]);
+    expect(ofType(h.events, 'tool.result')[0]?.outcome).toBe('cancelled');
   });
 });

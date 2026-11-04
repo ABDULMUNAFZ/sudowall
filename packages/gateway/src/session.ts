@@ -70,6 +70,8 @@ interface Pending {
   timer: NodeJS.Timeout | undefined;
   toolCall: { event: ToolCallEvent; startedAt: number } | undefined;
   cancelled: boolean;
+  /** True once the request was sent to the upstream; only then is the upstream told to cancel. */
+  forwarded: boolean;
   /** Edits applied to the upstream's response before it goes to the client. */
   rewrite: ((m: Message) => string) | undefined;
   /** For resources/read and prompts/get: the URI or name, so the content can be indexed. */
@@ -129,6 +131,8 @@ export class Session {
   private startedEmitted = false;
   private closed = false;
   private closing: Promise<void> | undefined;
+  /** Calls waiting for a person, or recording the decision; shutdown waits for them. */
+  private readonly approvalWaits = new Set<Promise<void>>();
   private initParams: unknown;
   private initializedSeen = false;
   private nextUpId = 1;
@@ -283,7 +287,12 @@ export class Session {
         p.cancelled = true;
         this.finish(p);
         void this.recordResult(p, 'cancelled', null, null, null);
-        if (p.upstream !== undefined && p.upstreamIdKey !== undefined && rid !== undefined) {
+        if (
+          p.forwarded &&
+          p.upstream !== undefined &&
+          p.upstreamIdKey !== undefined &&
+          rid !== undefined
+        ) {
           p.upstream.send(
             applyEdits(m.text, [{ start: rid.start, end: rid.end, replacement: p.upstreamIdKey }]),
           );
@@ -936,78 +945,20 @@ export class Session {
       return;
     }
     if (decision.effective === 'ask') {
-      const approvals = this.opts.approvals;
-      if (approvals === undefined) {
-        this.blockCall(
-          p,
-          m,
-          'SW_APPROVAL_UNAVAILABLE',
-          `${decision.reason} Approval is required but no approval channel is available.`,
-          decision.matchedRules,
-        );
-        return;
-      }
-      let outcome: ApprovalOutcome;
-      try {
-        outcome = await approvals.request(
-          { call: event, argumentsSha256: canonicalSha256(event.arguments) },
-          () => this.gone(p),
-        );
-      } catch (e) {
-        this.log.error('APPROVAL FAILED: approval could not be requested', {
-          eventId: event.id,
-          error: (e as Error).message,
-        });
-        if (this.gone(p)) return;
-        this.blockCall(
-          p,
-          m,
-          'SW_APPROVAL_UNAVAILABLE',
-          `${decision.reason} Approval is required but the approval store failed.`,
-          decision.matchedRules,
-        );
-        return;
-      }
-      if (outcome.outcome === 'cancelled') return;
-      const timedOut = outcome.outcome === 'timed-out';
-      const release =
-        outcome.outcome === 'approved' || (timedOut && this.cfg.approvals.onTimeout === 'allow');
-      const resolved = await this.writeResolved(event, outcome, release);
-      if (this.gone(p)) return;
-      if (!resolved && mode === 'enforce') {
-        this.blockCall(
-          p,
-          m,
-          'SW_LEDGER_UNAVAILABLE',
-          'The approval could not be recorded, so the action was not run.',
-          [],
-        );
-        return;
-      }
-      if (!release) {
-        if (timedOut) {
-          this.blockCall(
-            p,
-            m,
-            'SW_APPROVAL_TIMEOUT',
-            `${decision.reason} No one approved this action within ${String(this.cfg.approvals.timeoutSeconds)} s.`,
-            decision.matchedRules,
-            'timeout',
-          );
-        } else {
-          this.blockCall(
-            p,
-            m,
-            'SW_APPROVAL_DENIED',
-            `${decision.reason} The user denied this action.`,
-            decision.matchedRules,
-            'denied',
-          );
-        }
-        return;
-      }
+      const wait = this.awaitApproval(p, m, event, decision);
+      const tracked = wait.then(
+        () => undefined,
+        () => undefined,
+      );
+      this.approvalWaits.add(tracked);
+      void tracked.finally(() => this.approvalWaits.delete(tracked));
+      const released = await wait;
+      if (!released) return;
+      // The call waited for a person; the upstream gets the full request timeout from now.
+      this.armTimer(p);
     }
     if (this.gone(p)) return;
+    p.forwarded = true;
     if (!up.send(forwardText)) {
       this.finish(p);
       this.replyError(
@@ -1020,6 +971,109 @@ export class Session {
         message: `upstream ${up.status}`,
       });
     }
+  }
+
+  /**
+   * Waits for a person to decide an `ask` call and records the decision. True only when the call
+   * may now be forwarded: approved (or timed out with `onTimeout: allow`), recorded, and still
+   * pending, not cancelled, with its session open. A call that ended while it waited is never
+   * forwarded (audit H5); if it was approved anyway, the ledger records the approval with
+   * `resultingAction: block` and the log says APPROVED TOO LATE. Every other outcome answers
+   * the client here.
+   */
+  private async awaitApproval(
+    p: Pending,
+    m: Extract<Message, { kind: 'request' }>,
+    event: ToolCallEvent,
+    decision: Decision,
+  ): Promise<boolean> {
+    const approvals = this.opts.approvals;
+    if (approvals === undefined) {
+      this.blockCall(
+        p,
+        m,
+        'SW_APPROVAL_UNAVAILABLE',
+        `${decision.reason} Approval is required but no approval channel is available.`,
+        decision.matchedRules,
+      );
+      return false;
+    }
+    // A person may take longer than `limits.requestTimeoutMs`; that wait is bounded by
+    // `approvals.timeoutSeconds` instead. The timer starts again when the call is released.
+    this.pauseTimer(p);
+    let outcome: ApprovalOutcome;
+    try {
+      outcome = await approvals.request(
+        { call: event, argumentsSha256: canonicalSha256(event.arguments) },
+        () => this.gone(p),
+      );
+    } catch (e) {
+      this.log.error('APPROVAL FAILED: approval could not be requested', {
+        eventId: event.id,
+        error: (e as Error).message,
+      });
+      if (this.gone(p)) return false;
+      this.blockCall(
+        p,
+        m,
+        'SW_APPROVAL_UNAVAILABLE',
+        `${decision.reason} Approval is required but the approval store failed.`,
+        decision.matchedRules,
+      );
+      return false;
+    }
+    if (outcome.outcome === 'cancelled') return false;
+    const timedOut = outcome.outcome === 'timed-out';
+    const allowed =
+      outcome.outcome === 'approved' || (timedOut && this.cfg.approvals.onTimeout === 'allow');
+    // Checked before the decision is recorded, so the ledger says the call did not run.
+    const late = allowed && this.gone(p);
+    const resolved = await this.writeResolved(event, outcome, allowed && !late);
+    if (late || this.gone(p)) {
+      if (allowed) {
+        this.log.warn(
+          'APPROVED TOO LATE: the call was cancelled or its session closed before it could run; it was not run',
+          {
+            approvalId: outcome.approvalId,
+            eventId: event.id,
+            outcome: outcome.outcome,
+            recordedAs: late ? 'block' : 'allow',
+          },
+        );
+      }
+      return false;
+    }
+    if (!resolved && this.cfg.mode === 'enforce') {
+      this.blockCall(
+        p,
+        m,
+        'SW_LEDGER_UNAVAILABLE',
+        'The approval could not be recorded, so the action was not run.',
+        [],
+      );
+      return false;
+    }
+    if (allowed) return true;
+    if (timedOut) {
+      this.blockCall(
+        p,
+        m,
+        'SW_APPROVAL_TIMEOUT',
+        `${decision.reason} No one approved this action within ${String(this.cfg.approvals.timeoutSeconds)} s.`,
+        decision.matchedRules,
+        'timeout',
+      );
+    } else {
+      this.blockCall(
+        p,
+        m,
+        'SW_APPROVAL_DENIED',
+        `${decision.reason} The user denied this action.`,
+        decision.matchedRules,
+        'denied',
+      );
+    }
+    return false;
   }
 
   /** True once a call has been answered, cancelled, or its session closed (checked across awaits). */
@@ -1327,9 +1381,21 @@ export class Session {
       timer: undefined,
       toolCall: undefined,
       cancelled: false,
+      forwarded: false,
       rewrite,
       content: contentOrigin(m),
     };
+    this.armTimer(p);
+    this.pending.set(m.idKey, p);
+    this.admitting.delete(m.idKey);
+    if (this.aggregate && upstreamIdKey !== undefined)
+      this.byUpstreamId.set(upstreamIdKey, m.idKey);
+    return p;
+  }
+
+  /** Starts (or restarts) the request timer at the full `limits.requestTimeoutMs`. */
+  private armTimer(p: Pending): void {
+    this.pauseTimer(p);
     const timeout = this.cfg.limits.requestTimeoutMs;
     if (timeout > 0) {
       p.timer = setTimeout(() => {
@@ -1337,11 +1403,12 @@ export class Session {
       }, timeout);
       p.timer.unref();
     }
-    this.pending.set(m.idKey, p);
-    this.admitting.delete(m.idKey);
-    if (this.aggregate && upstreamIdKey !== undefined)
-      this.byUpstreamId.set(upstreamIdKey, m.idKey);
-    return p;
+  }
+
+  /** Stops the request timer; used while a call waits for a person. */
+  private pauseTimer(p: Pending): void {
+    if (p.timer !== undefined) clearTimeout(p.timer);
+    p.timer = undefined;
   }
 
   private forward(
@@ -1352,6 +1419,7 @@ export class Session {
     rewrite: Pending['rewrite'],
   ): void {
     const p = this.track(m, up, upstreamIdKey, rewrite);
+    p.forwarded = true;
     if (!up.send(text)) {
       this.finish(p);
       this.replyError(
@@ -1379,7 +1447,7 @@ export class Session {
         final: true,
       },
     );
-    if (p.upstream !== undefined && p.upstreamIdKey !== undefined) {
+    if (p.forwarded && p.upstream !== undefined && p.upstreamIdKey !== undefined) {
       p.upstream.send(
         `{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":${p.upstreamIdKey},"reason":"timed out at the gateway"}}`,
       );
@@ -1540,6 +1608,9 @@ export class Session {
       this.finish(p);
       if (p.toolCall !== undefined) await this.recordResult(p, 'cancelled', null, null, null);
     }
+    // A call waiting for a person notices the close within one approval poll; its decision (an
+    // approval that came too late, for one) is recorded before session.ended.
+    await Promise.all([...this.approvalWaits]);
     await Promise.all(this.upstreams.map((u) => u.stop()));
     await this.write({
       schemaVersion: EVENT_SCHEMA_VERSION,

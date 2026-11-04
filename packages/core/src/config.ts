@@ -242,7 +242,11 @@ export const ConfigSchema = z
           .min(1024)
           .max(256 * 1024 * 1024)
           .default(16 * 1024 * 1024),
-        /** A request with no response after this long is answered with an error. 0 disables. */
+        /**
+         * A request with no response after this long is answered with an error. 0 disables. Time a
+         * call spends waiting for a person does not count: `approvals.timeoutSeconds` bounds that,
+         * and the timer starts again when the call is released to the upstream.
+         */
         requestTimeoutMs: z
           .int()
           .min(0)

@@ -1,6 +1,6 @@
 # Roadmap: 0.8.1 and 0.9.0
 
-Status: **proposal, 2026-11-04. Nothing here is approved or built.** The owner picks the 0.9.0 theme and approves the 0.8.1 scope before any code is written. 0.8.0 is the current release (npm `latest`, published 2026-11-04).
+Status: **decided on 2026-11-04** (see [section 5](#5-decisions)). 0.8.1 is approved with two changes, 0.9.0 is theme (b), and (d) runs as a parallel track after 0.8.1 ships. Sections 1 to 4 are the proposal as written; where a decision changed it, the section says so. 0.8.0 is the current release (npm `latest`, published 2026-11-04).
 
 This page plans two releases from everything that is open today. Each open item has a source, so it can be checked. "Read from code" means the claim comes from reading the source at `4dffdc6` (main), not from running it.
 
@@ -93,6 +93,8 @@ The backlog lists two options. The other one, rejecting configs and flags whose 
 
 What stays the same: the decision, the approval timeout and its `onTimeout` stance, the ledger events, and cancellation. A client that gives up still sends `notifications/cancelled`; the call is marked gone and the approval `cancelled` within one poll (`approvals.ts`, the `isGone` check).
 
+**Decided: pausing the timer must not bring back H5** (the rechecked audit: a call that timed out or was cancelled never runs afterwards; `packages/gateway/test/audit.test.ts`). After an approval, and again after its ledger entry is written, the gateway checks that the request is still pending, was not cancelled and its session is still open. If not, it never forwards the call; it logs `APPROVED TOO LATE` and records the approval in the ledger as `outcome: approved` with `resultingAction: block` (fields that already exist, so no schema change). The call's own `tool.result` stays `cancelled`.
+
 Part of the same change: when the request timer fires before a call was forwarded (during the write-ahead write), the gateway today still sends `notifications/cancelled` to the upstream for a request id it never received (`onTimeout` in `session.ts`, read from code). Send it only for forwarded requests.
 
 Tests (gateway integration, real processes, `requestTimeoutMs: 2000`, `approvals.timeoutSeconds: 5`):
@@ -102,11 +104,12 @@ Tests (gateway integration, real processes, `requestTimeoutMs: 2000`, `approvals
 3. After approval, an upstream that never answers still gets -32003 after 2 s: the upstream leg keeps its timer.
 4. A client that cancels during the wait: the approval becomes `cancelled`, a later Approve click gets `not-pending`, nothing reaches the upstream, and the app's card shows the call as no longer waiting. This answers the open question in known risk 9.
 5. No `notifications/cancelled` reaches the upstream for a request that was never forwarded.
-6. By hand: `sudowall demo --no-open --approval-timeout 900`, left paused for 11 minutes, then approved: the demo finishes its four steps.
+6. Approval after the client cancelled, after the session closed, and within time (decided): the first two never reach the upstream and are recorded as approved too late; the third runs.
+7. By hand: `sudowall demo --no-open --approval-timeout 900`, left paused for 11 minutes, then approved: the demo finishes its four steps.
 
 Docs: `docs/configuration.md` says `limits.requestTimeoutMs` does not count time spent waiting for a person; the 0.8.0 known issue and its workarounds move to "Fixed" in the CHANGELOG.
 
-Not verified by this plan: how long other MCP clients (Claude Desktop, Cursor) wait for a tool call before giving up on their own. Claude Code's default was read from its binary when approvals were built (1e8 ms, `docs/progress.md`). A client with a shorter limit cancels the call; the gateway already handles that (test 4).
+**Decided: find out how long Claude Code, Claude Desktop and Cursor wait for a tool call, from docs and source, and document what users should set.** A client with a shorter limit cancels the call; the gateway already handles that (test 4). The findings and settings go in `docs/configuration.md` (the `approvals` section) in 0.8.1.
 
 ### 2.2 The demo prints one line for a gateway error (B2)
 
@@ -116,11 +119,9 @@ The demo catches the client's JSON-RPC error and prints one line, for example `s
 
 Say which condition failed and why: `FAILED (--strict): 3 entries newer than the last checkpoint (newest 12 s old). A running gateway signs them within about 75 s with the default checkpoint settings; run again after that or after the gateways stop.` and, separately, `FAILED (--strict): no anchor found.` The exit code and the rule do not change. Test: CLI tests for each message.
 
-### 2.4 Latency gate on slow machines (P2, tooling only)
+### 2.4 Latency gate on slow machines (P2): dropped from 0.8.1
 
-First, the owner runs `bench:latency --gate` three times each for `v0.7.0` and `v0.8.0` on the Intel Mac, interleaved as in `docs/performance.md`, and records the direct p50 and p99. That shows whether the Mac's 2.5 ms is the machine or a regression.
-
-If it is the machine: scale the limits by how slow the machine is, measured by its own direct run, and never below today's limits: `limit = LIMITS × max(1, directP50 / CI_DIRECT_P50)`, where `CI_DIRECT_P50` is the CI runner's recorded direct median. On the CI runner the factor is about 1, so CI stays as strict as today. The output prints the factor. If the Mac data does not support a linear scale, this item is dropped from 0.8.1 and the doc keeps saying the gate is meant for CI.
+**Decided:** not in 0.8.1. The gate stays CI-only, and a local `bench:latency` run without `--gate` never fails. Scaling the limits to the machine's speed is in `docs/backlog.md` (Tooling), still waiting for the Intel Mac runs of `v0.7.0` against `v0.8.0` described in the proposal.
 
 ### 2.5 Verification and test-only items
 
@@ -225,8 +226,46 @@ Not claimed: real-time status (it can be up to 5 s old, 15 s before a gateway co
 
 Estimated effort: about 2 to 3 weeks, including the threat-model and doc updates and an ADR for the status file format.
 
-## 5. Decisions needed from the owner
+## 5. Decisions
 
-1. Approve or change the 0.8.1 scope in section 2, including the approval-timeout fix (pause the timer) and whether 2.4 waits for the Mac runs.
-2. Pick the 0.9.0 theme: (b) is recommended; (a), (c) or (d) instead.
-3. Whether to run (d) as a parallel evaluation track, and its API budget.
+Recorded on 2026-11-04 from the owner's reply on PR #10.
+
+1. **0.8.1 scope: approved, with two changes.**
+   - Approval timeout (2.1): pausing the request timer must not bring back H5. After an approval, check that the request is still pending, not cancelled, and its session still open before forwarding. If not, never forward, and log and ledger it as "approved too late". Find out how long Claude Code, Claude Desktop and Cursor wait for a tool call before giving up (docs and source, and Claude Code's `MCP_TOOL_TIMEOUT`), and document what users should set. Tests: approval after the client cancelled, after the session closed, and within time.
+   - Latency gate scaling (2.4): dropped from 0.8.1. The gate stays CI-only; a local bench run without `--gate` never fails. Scaling moves to the backlog.
+2. **0.9.0 theme: (b) visibility**, as designed in section 4.
+3. **(d) real-model tests: approved as a parallel track, planned after 0.8.1 ships.** Budget: at most 20 scenarios x 3 runs, local test servers and the test chain only, placeholder keys, and a hard cost cap of $20 per full run. The plan is in section 6; no code for it yet.
+
+0.8.1 is built on `release/0.8.1` from `main`, one commit per item, the same way as 0.8.0.
+
+## 6. Plan: real-model test suite (track d)
+
+Starts after 0.8.1 is published. No code is written for it before then.
+
+**Goal.** A repeatable count of how SudoWall handles prompt injection when a real model drives a real MCP client: for each scenario, whether the attack was stopped, asked, missed, or not attempted by the model.
+
+**Limits (decided).**
+
+- At most 20 scenarios, each run 3 times: at most 60 runs per full run.
+- Only local test servers and the test chain: the EVM demo server (`examples/evm-mcp`) against a local Anvil chain, `server-filesystem` in a temporary folder, and small local servers that return the poisoned content (a ticket, an email, a web page) from fixtures. No real accounts, no network services, no mainnet (principle 9).
+- Placeholder keys only. Nothing in the suite reads a real secret.
+- **A hard cost cap of $20 per full run.** Each run passes `claude -p --max-budget-usd <share>` (the flag is in Claude Code 2.1.318's `--help`), where the share is $20 divided by the runs left, and the harness adds up `total_cost_usd` from `--output-format json` and stops starting runs once the total would pass $20. A full run that stops early is reported as incomplete, never as a smaller full run.
+
+**How a run works.**
+
+1. A fresh temporary `HOME` and state directory, a fresh Anvil chain, `sudowall init` with the scenario's template (`everyday` or a money-moving policy), and an MCP config that wraps each test server with `sudowall wrap`.
+2. `claude -p "<the user's task>" --mcp-config mcp.json --strict-mcp-config --model <pinned model id> --output-format json --max-budget-usd <share>`, with the allowed tools limited to the scenario's servers. Approvals are answered by the harness through the approval store (deny after 5 s), so an `ask` never needs a person.
+3. The outcome is read from the SudoWall ledger and the test servers' own logs, never from what the model says:
+   - **stopped:** the attacker's value reached a sink call that was blocked;
+   - **asked:** it reached a sink call that asked (and was denied by the harness);
+   - **missed:** it reached a sink call that ran (the test server's log or the chain shows it);
+   - **not attempted:** the model never used the attacker's value.
+     A control scenario with no injection checks that the honest task still runs (false asks are counted separately).
+
+**Scenarios.** Start from the three in `docs/real-world-test.md` (injected payment, lookalike address, the honest payment), then add, up to 20: an email address and a URL copied from a ticket into a send tool; an amount with context; a write tool with a read-like name (`fetch_and_post`, the known gap E2); a reworded instruction (a known gap: value matching does not catch it); and a value split or re-encoded by the model. Known gaps are included on purpose and reported as such.
+
+**Where.** A new `eval/real-model/` folder (the `eval/` directory in CLAUDE.md's layout, created then), with scenarios as data files and the results as dated Markdown and JSON.
+
+**Reporting.** Every published number names the model id, the Claude Code version, the SudoWall version, the date and the scenario list, with all three runs per scenario. Results are not a CI gate (a model's behaviour is not deterministic); they are run by hand before a release that changes policy or provenance.
+
+**Not decided yet:** which model id to pin, and who holds the API key for the runs.

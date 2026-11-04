@@ -78,7 +78,7 @@ Slow-machine data point, from the owner's run of `bench:latency --gate` at `cb96
 | Intel Mac, battery (1 run) | 2.79               | 2.53               | 2.63              | 6.77               | 6.12               | 5.64              |
 | Ryzen, AC (mean of 3 runs) | 0.655              | 0.662              | 0.802             | 1.575              | 1.607              | 1.710             |
 
-Slower machines, such as an Intel Mac on battery, can see about 2 to 3 ms added at the median. The CI gate's 2 ms limit is meant for the CI runner, where both runs share one machine; on a slow laptop it can fail without a regression.
+Slower machines, such as an Intel Mac on battery, can see about 2 to 3 ms added at the median. The CI gate's 2 ms limit is meant for the CI runner, where both runs share one machine; on a slow laptop it can fail without a regression. **The gate is for CI (decided 2026-11-04).** Run locally without `--gate` to measure: that run prints the table and never fails on the numbers (it exits non-zero only if the benchmark itself cannot run). A gate that scales to the machine is in `docs/backlog.md`.
 
 ## CI gate
 
