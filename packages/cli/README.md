@@ -6,7 +6,7 @@ AI agents read email, browse the web and call tools with your credentials. A hid
 
 ## Try it in two minutes
 
-Requires Node.js 24.11 or later. Runs on macOS, Linux and Windows (Windows tested in CI).
+Requires Node.js 24.11 or newer. Runs on macOS, Linux and Windows (Windows tested in CI).
 
 ```sh
 npx sudowall demo
