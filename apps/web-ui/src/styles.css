@@ -741,7 +741,7 @@ button.copy {
 }
 .side li a .count {
   background: var(--orange);
-  color: #ffffff;
+  color: #111111;
 }
 @media (min-width: 900px) {
   .side {
@@ -770,7 +770,7 @@ button.copy {
   }
   .side-mode.off {
     background: var(--orange);
-    color: #ffffff;
+    color: #111111;
   }
   .side-mode small {
     color: inherit;
@@ -803,13 +803,31 @@ button.copy {
 }
 .stat.block .n,
 .stat.block .l {
-  color: #ffffff;
+  color: #111111;
 }
 .stat.ask {
   background: var(--peach);
 }
 .stat.allow {
   background: var(--lime);
+}
+/* The tile text above is for the light theme. In dark mode the plain and peach tiles are dark,
+   so their text uses the theme's colours; the orange and lime tiles stay bright and keep dark
+   text. Text on --orange is always #111111 (white on it is 2.5:1). e2e/contrast.spec.ts checks
+   4.5:1 for the tiles and the other orange elements in both themes. */
+@media (prefers-color-scheme: dark) {
+  .stat .n {
+    color: var(--text);
+  }
+  .stat .l {
+    color: var(--muted);
+  }
+  .stat.block .n,
+  .stat.block .l,
+  .stat.allow .n,
+  .stat.allow .l {
+    color: #111111;
+  }
 }
 .mode {
   border: 0;
@@ -834,7 +852,7 @@ button.copy {
 }
 .badge.ask {
   background: var(--orange);
-  color: #ffffff;
+  color: #111111;
 }
 .badge.block {
   background: #111111;
@@ -868,7 +886,7 @@ button.deny {
 .pending-strip {
   background: var(--orange);
   border-color: var(--orange);
-  color: #ffffff;
+  color: #111111;
   border-radius: 999px;
 }
 .feed {

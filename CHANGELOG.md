@@ -50,6 +50,7 @@ See [ADR 0024](docs/adr/0024-newer-data-and-downgrades.md). Downgrades are not s
 - Incident reports show when a path was cut at the depth limit and which ledger entries could not be read, and label sources by their own trust.
 - TigerGraph backend: the parity test no longer compares the `contained` edge's source label, which only the local graph stores (incident reports fill it in from the local ledger). Run against TigerGraph Community 4.2.5, `incident --tigergraph` matched the local report.
 - The app: polls no longer race, settings errors are shown, the Overview labels watching-only counts separately, Activity shows how each call ended and pages back with "Show older", and Record shows signing and anchor status.
+- The app: dark-mode text on the Overview tiles is readable (the numbers and labels used light-theme colours on dark tiles), and text on the brand orange (the pending count, the "Watching only" label, "ask" badges, the pending strip and the blocked tile) is dark instead of white, which had 2.5:1 contrast. Both were also in 0.7.x. A browser test checks 4.5:1 for these in light and dark mode.
 
 ### Known advisories
 
